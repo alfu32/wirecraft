@@ -1,6 +1,6 @@
 {
-  "verifiedAt": "2026-10-26T21:52:14.011025+00:00",
-  "codeCommit": "959ab38f3d8f18c25bf05e9722f8025ec9173060",
+  "verifiedAt": "2026-10-26T21:58:51.305030+00:00",
+  "codeCommit": "ca9a60016948795b220e33cefbeb0481aff406f6",
   "tests": {
     "total": 61,
     "coreIntegration": 18,
@@ -83,19 +83,20 @@
       "releaseOutsideCanvas": true,
       "debouncedPreviewWithoutMutation": true,
       "cycleRejected": true,
+      "panPreservesDraft": true,
       "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
     }
   ],
   "binarySha256": {
     "wirecraft": "9c5a1d99dc681b9c700b8546fea26ebf937321194a788c2cd225ce280833d3b3",
-    "wirecraft-desktop": "80dd7d4b90ba4bd6218dbba867e5c951318557caf29d3aa137f802ccbe8f3a9d"
+    "wirecraft-desktop": "47810671f3433d6e24e6ad711b6b8251b399e771836b87775312072aa0c46c73"
   },
   "remoteCi": {
-    "initialInteractionCommit": "0602a179b2a99da4202126eb98ab5280c0b38dbb",
-    "initialResult": "success",
-    "initialUrl": "https://github.com/alfu32/wirecraft/actions/runs/40406995006",
+    "routingCodeCommit": "959ab38f3d8f18c25bf05e9722f8025ec9173060",
+    "routingResult": "success",
+    "routingUrl": "https://github.com/alfu32/wirecraft/actions/runs/40407388067",
     "finalCodeResult": "in_progress",
-    "finalCodeUrl": "https://github.com/alfu32/wirecraft/actions/runs/40407388067"
+    "finalCodeUrl": "https://github.com/alfu32/wirecraft/actions/runs/40408260304"
   },
   "platform": "Linux x86_64; X11/XWayland/Vulkan; other platforms unverified"
 }
