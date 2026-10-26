@@ -11,7 +11,10 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
  log=open(artifact/'desktop.log','w')
  app=subprocess.Popen([binary,'--state-dir',str(state)],env=env,stdout=log,stderr=log)
  def xd(*args):
-  if args and args[0] in ('key','type') and window is not None:args=(args[0],'--window',window,*args[1:])
+  if args and args[0] in ('key','type') and window is not None:
+   subprocess.run(['xdotool','windowactivate','--sync',str(window)],env=env,check=True,capture_output=True)
+   assert int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))==int(window)
+   if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
   result=subprocess.run(['xdotool',*map(str,args)],env=env,text=True,capture_output=True)
   if result.returncode and args[-1]!='ctrl+q':raise subprocess.CalledProcessError(result.returncode,result.args,result.stdout,result.stderr)
   return result.stdout.strip()
