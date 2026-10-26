@@ -229,6 +229,9 @@ impl AssetSource for Assets {
         let data = match path {
             "icons/check.svg" => "M4 12l5 6L21 5",
             "icons/close.svg" | "icons/window-close.svg" => "M6 6l12 12M6 18L18 6",
+            "icons/window-minimize.svg" => "M5 17h14",
+            "icons/window-maximize.svg" => "M5 5h14v14H5z",
+            "icons/window-restore.svg" => "M8 5h11v11M5 8h11v11H5z",
             "icons/chevron-down.svg" => "M5 9l7 7 7-7",
             "icons/chevron-up.svg" => "M5 15l7-7 7 7",
             "icons/chevron-left.svg" => "M15 5l-7 7 7 7",

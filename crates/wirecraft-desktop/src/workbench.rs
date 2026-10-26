@@ -1,5 +1,6 @@
 //! Screenshot-driven workbench views. Mutations use the shared application service.
 use super::*;
+use gpui_component::Sizable;
 use std::collections::BTreeMap;
 
 pub(super) fn property_changes(
@@ -23,7 +24,7 @@ pub(super) fn property_changes(
 }
 pub struct FormField {
     pub path: &'static str,
-    label: &'static str,
+    pub(super) label: &'static str,
     pub input: Entity<InputState>,
     pub baseline: String,
 }
@@ -574,7 +575,8 @@ impl Wirecraft {
                     .child(label),
             );
         }
-        bar.child(div().flex_1())
+        let bar = bar
+            .child(div().flex_1())
             .child(
                 div()
                     .id("command-search")
@@ -585,7 +587,16 @@ impl Wirecraft {
                     .child(icons::icon("search"))
                     .child("Commands  Ctrl Shift P"),
             )
-            .into_any_element()
+            .into_any_element();
+        if cfg!(target_os = "linux") {
+            gpui_component::TitleBar::new()
+                .h(px(32.))
+                .pl_0()
+                .child(div().flex_1().min_w_0().child(bar))
+                .into_any_element()
+        } else {
+            bar
+        }
     }
     pub(super) fn render_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let group = self.menu.as_deref()?;
@@ -962,7 +973,13 @@ impl Wirecraft {
                         self.inspector
                             .iter()
                             .find(|f| f.path == format!("/text/{}LanguageId", self.section)),
-                        |b, field| b.child(div().w(px(135.)).child(Input::new(&field.input))),
+                        |b, field| {
+                            b.child(
+                                div()
+                                    .w(px(135.))
+                                    .child(crate::inspector_widgets::language(&field.input, cx)),
+                            )
+                        },
                     )
                     .child(format!("Effective: {language}"))
                     .child(button("reload-entity", "Discard draft / Reload").on_click(
@@ -973,10 +990,37 @@ impl Wirecraft {
                         }),
                     )),
             )
+            .when(!self.function_header.is_empty(), |b| {
+                b.child(
+                    div()
+                        .id("generated-function-header")
+                        .whitespace_nowrap()
+                        .overflow_x_scroll()
+                        .h(px(25.))
+                        .px_3()
+                        .font_family(self.options.saved.appearance.editor_font.clone())
+                        .text_xs()
+                        .text_color(crate::chrome::color(0x70d5c6))
+                        .child(self.function_header.clone()),
+                )
+            })
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
+                    .relative()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, w, cx| {
+                            this.editor.update(cx, |s, cx| s.focus(w, cx))
+                        }),
+                    )
+                    .child({
+                        let bounds = self.editor_bounds.clone();
+                        canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {})
+                            .absolute()
+                            .size_full()
+                    })
                     .font_family(self.options.saved.appearance.editor_font.clone())
                     .child(Input::new(&self.editor).h_full()),
             );
@@ -984,13 +1028,14 @@ impl Wirecraft {
             .id("inspector-scroll")
             .flex_1()
             .overflow_y_scroll()
-            .p_3()
-            .gap_2()
+            .p_2()
+            .gap_1()
             .flex()
             .flex_col();
-        inspector = inspector
-            .child(heading("GENERAL"))
-            .child(field_row("Name", Input::new(&self.name).into_any_element()));
+        inspector = inspector.child(heading("GENERAL")).child(field_row(
+            "Name",
+            Input::new(&self.name).small().into_any_element(),
+        ));
         if let Some(n) = n {
             inspector = inspector.child(read_row(
                 "Parent",
@@ -1001,7 +1046,10 @@ impl Wirecraft {
             ));
         }
         for f in &self.inspector {
-            if f.path.starts_with("/masterRevision/") {
+            if f.path.starts_with("/masterRevision/")
+                || f.path.starts_with("/text/")
+                || ["/status", "/responsible", "/assignee"].contains(&f.path)
+            {
                 continue;
             }
             if f.path.starts_with("/link/") && !n.is_some_and(|n| n.is_link()) {
@@ -1012,51 +1060,10 @@ impl Wirecraft {
             {
                 continue;
             }
-            if f.path == "/status" {
-                inspector = inspector.child(heading("MANAGEMENT"));
-            }
-            if f.path == "/text/sourceLanguageId" {
-                inspector = inspector.child(heading("SECTION LANGUAGES"));
-            }
             if f.path == "/link/sourcePortName" {
                 inspector = inspector.child(heading("LINK"));
             }
-            if f.path == "/status" {
-                let status = f.input.read(cx).value().to_string();
-                inspector = inspector.child(field_row(
-                    f.label,
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap_1()
-                        .children(std::iter::once("").chain(STATUSES).map(|s| {
-                            let input = f.input.clone();
-                            button(
-                                if s.is_empty() { "no-status" } else { s },
-                                if s.is_empty() { "None" } else { s },
-                            )
-                            .text_xs()
-                            .when(status == s, |b| b.bg(crate::chrome::color(0x255452)))
-                            .on_click(move |_, w, cx| {
-                                input.update(cx, |state, cx| state.set_value(s, w, cx))
-                            })
-                        }))
-                        .into_any_element(),
-                ));
-            } else {
-                inspector =
-                    inspector.child(field_row(f.label, Input::new(&f.input).into_any_element()));
-                if f.path == "/link/typeDefinitionId" {
-                    inspector =
-                        inspector.child(button("choose-link-type", "Choose type…").on_click(
-                            cx.listener(|this, _, _, cx| {
-                                this.type_choice = None;
-                                this.menu = Some("Type reference".into());
-                                cx.notify();
-                            }),
-                        ));
-                }
-            }
+            inspector = inspector.child(field_row(f.label, self.inspector_control(f, cx)));
         }
         if let Some(n) = n {
             inspector = inspector.child(heading("EFFECTIVE"));
@@ -1071,18 +1078,26 @@ impl Wirecraft {
                     self.snapshot.document.effective(&n.id, key),
                 ));
             }
+            inspector = inspector.child(heading("MANAGEMENT"));
+            for f in self
+                .inspector
+                .iter()
+                .filter(|f| ["/status", "/responsible", "/assignee"].contains(&f.path))
+            {
+                inspector = inspector.child(field_row(f.label, self.inspector_control(f, cx)));
+            }
             let revision = self.snapshot.document.effective_revision(&n.id);
             inspector = inspector
                 .child(heading("TRACKING"))
                 .child(read_row(
-                    "Effective revision",
+                    "Revision",
                     revision
                         .and_then(|v| v["name"].as_str())
                         .unwrap_or("")
                         .into(),
                 ))
                 .child(read_row(
-                    "Effective revision date",
+                    "Revision date",
                     revision
                         .and_then(|v| v["date"].as_str())
                         .unwrap_or("")
@@ -1108,21 +1123,8 @@ impl Wirecraft {
                     ));
                 }
             }
-            for (i, event) in n.status_changes.iter().rev().enumerate() {
-                inspector = inspector.child(
-                    div()
-                        .id(("transition", i))
-                        .text_xs()
-                        .p_2()
-                        .bg(crate::chrome::color(0x202b35))
-                        .child(format!(
-                            "{}  {} → {} · {}",
-                            event["changedDate"].as_str().unwrap_or(""),
-                            event["initStatus"].as_str().unwrap_or("none"),
-                            event["endStatus"].as_str().unwrap_or("none"),
-                            event["userId"].as_str().unwrap_or("")
-                        )),
-                );
+            if !n.status_changes.is_empty() {
+                inspector = inspector.child(crate::inspector::history(&n.status_changes));
             }
         }
         if let Some(n) = n
@@ -1940,7 +1942,8 @@ impl Wirecraft {
 }
 fn heading(text: &str) -> AnyElement {
     div()
-        .py_2()
+        .pt_2()
+        .pb_1()
         .text_xs()
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(crate::chrome::color(0x70d5c6))
@@ -1950,29 +1953,37 @@ fn heading(text: &str) -> AnyElement {
 fn field_row(label: &str, input: AnyElement) -> AnyElement {
     div()
         .flex()
-        .flex_col()
-        .gap_1()
-        .mb_2()
+        .items_center()
+        .gap_2()
+        .min_h(px(27.))
         .child(
             div()
+                .w(px(112.))
+                .flex_none()
                 .text_xs()
                 .text_color(crate::chrome::color(0xa0b0c0))
                 .child(label.to_string()),
         )
-        .child(input)
+        .child(div().flex_1().min_w_0().child(input))
         .into_any_element()
 }
 fn read_row(label: &str, value: String) -> AnyElement {
+    let tooltip = value.clone();
     div()
+        .id(SharedString::from(format!("read-{label}")))
+        .tooltip(move |w, cx| gpui_component::tooltip::Tooltip::new(tooltip.clone()).build(w, cx))
         .flex()
-        .flex_col()
-        .mb_2()
+        .items_center()
+        .gap_2()
+        .min_h(px(22.))
         .child(
             div()
+                .w(px(112.))
+                .flex_none()
                 .text_xs()
                 .text_color(crate::chrome::color(0x8496a5))
                 .child(label.to_string()),
         )
-        .child(div().text_xs().child(value))
+        .child(div().flex_1().min_w_0().text_xs().truncate().child(value))
         .into_any_element()
 }

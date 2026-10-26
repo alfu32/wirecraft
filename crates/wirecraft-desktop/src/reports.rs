@@ -444,3 +444,29 @@ impl Wirecraft {
         self.persist_ui(cx);
     }
 }
+
+pub(super) fn preview_summary(value: &Value) -> String {
+    if value["kind"] == "documentation" {
+        return "Documentation".into();
+    }
+    if value["kind"] == "all" {
+        return format!(
+            "{} plan pages · {} documentation pages",
+            value["planPages"].as_u64().unwrap_or(0),
+            value["documentationPages"].as_u64().unwrap_or(0)
+        );
+    }
+    format!(
+        "{} · {:.0} × {:.0} mm · {} × {} sheets{}",
+        value["format"].as_str().unwrap_or("Plan"),
+        value["widthMm"].as_f64().unwrap_or(0.),
+        value["heightMm"].as_f64().unwrap_or(0.),
+        value["columns"].as_u64().unwrap_or(1),
+        value["rows"].as_u64().unwrap_or(1),
+        if value["clipped"] == true {
+            " · Drawing clipped"
+        } else {
+            ""
+        }
+    )
+}

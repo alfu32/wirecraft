@@ -234,6 +234,8 @@ fn worker(
                     intelligence.started = false;
                     intelligence.versions.clear();
                 }
+                let editor_query =
+                    ["editor.context", "editor.complete"].contains(&command.as_str());
                 match backend.call_with_revision(&request) {
                     Ok((value, response_revision)) => {
                         if command == "settings.replace" {
@@ -245,7 +247,9 @@ fn worker(
                             revision: Some(response_revision),
                             commit,
                         })?;
-                        revision = None;
+                        if !editor_query {
+                            revision = None;
+                        }
                     }
                     Err(e) => {
                         updates.send_blocking(Update::Error {

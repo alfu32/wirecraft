@@ -1,8 +1,10 @@
 mod chrome;
 mod client;
+mod completion;
 mod fonts;
 mod icons;
 mod inspector;
+mod inspector_widgets;
 mod options;
 mod reports;
 mod scene;
@@ -43,7 +45,8 @@ actions!(
         PasteEntities,
         CommandPalette,
         ShowExport,
-        ShowOptions
+        ShowOptions,
+        Complete
     ]
 );
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -106,6 +109,7 @@ struct Wirecraft {
     pending_draft: Option<Draft>,
     editor_entity: Option<String>,
     bounds: Rc<Cell<Bounds<Pixels>>>,
+    editor_bounds: Rc<Cell<Bounds<Pixels>>>,
     drag_start: Option<[f64; 2]>,
     drag_delta: [f64; 2],
     drag_ids: BTreeSet<String>,
@@ -127,6 +131,9 @@ struct Wirecraft {
     generated_diagnostics: Vec<Value>,
     generated_revision: u64,
     inspector: Vec<workbench::FormField>,
+    completion: Option<completion::Pending>,
+    completion_generation: u64,
+    function_header: String,
     tables: inspector::Tables,
     advanced: bool,
     editor_committed: bool,
@@ -236,6 +243,7 @@ impl Wirecraft {
             pending_draft: session.draft,
             editor_entity: None,
             bounds: Rc::new(Cell::new(Bounds::default())),
+            editor_bounds: Rc::new(Cell::new(Bounds::default())),
             drag_start: None,
             drag_delta: [0., 0.],
             drag_ids: BTreeSet::new(),
@@ -265,6 +273,9 @@ impl Wirecraft {
             generated_diagnostics: vec![],
             generated_revision: 0,
             inspector,
+            completion: None,
+            completion_generation: 0,
+            function_header: String::new(),
             tables: inspector::Tables::default(),
             advanced: false,
             editor_committed: false,
@@ -310,7 +321,9 @@ impl Wirecraft {
         {
             cx.subscribe(input, |this, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
+                    this.completion = None;
                     this.persist_ui(cx);
+                    cx.notify();
                 }
             })
             .detach();
@@ -332,6 +345,7 @@ impl Wirecraft {
                 self.tool("mcp.status");
             }
             Update::Error { message, commit } => {
+                self.completion = None;
                 self.status = message;
                 if commit {
                     self.editor_request_pending = false;
@@ -418,11 +432,21 @@ impl Wirecraft {
                             .with_appearance(self.options.saved.appearance.clone()),
                     ));
                 }
+                if command == "editor.complete" {
+                    self.accept_completions(&value, cx);
+                }
+                if command == "editor.context"
+                    && value["revision"].as_u64() == Some(self.snapshot.revision)
+                    && value["nodeId"].as_str() == self.editor_entity.as_deref()
+                    && value["section"] == self.section
+                {
+                    self.function_header = value["header"].as_str().unwrap_or("").into();
+                }
                 if command == "export.preview"
                     && value["generation"].as_u64() == Some(self.export_generation)
                 {
                     self.export_pages = value["pages"].as_u64().unwrap_or(0) as usize;
-                    self.export_summary = value["summary"].to_string();
+                    self.export_summary = reports::preview_summary(&value["summary"]);
                     if value["summary"]["clipped"] == true {
                         self.status="Drawing exceeds the fixed sheet. Enable split or increase scale denominator.".into();
                     }
@@ -673,6 +697,8 @@ impl Wirecraft {
             .send(Message::SaveUi(serde_json::to_value(state).unwrap()));
     }
     fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.completion = None;
+        self.function_header.clear();
         if let Some(n) = self
             .selected
             .first()
@@ -723,7 +749,21 @@ impl Wirecraft {
                 .document
                 .effective_text_language(&n.id, &self.section);
             self.editor
-                .update(cx, |state, cx| state.set_highlighter(language, cx));
+                .update(cx, |state, cx| state.set_highlighter(language.clone(), cx));
+            if language == "c"
+                && !n.is_link()
+                && !matches!(
+                    n.kind,
+                    wirecraft_core::NodeKind::Type | wirecraft_core::NodeKind::Note
+                )
+                && self.snapshot.document.effective(&n.id, "technologyId") == "c-native"
+                && ["source", "initialization"].contains(&self.section.as_str())
+            {
+                self.client.send(
+                    "editor.context",
+                    json!({"nodeId":n.id,"section":self.section}),
+                );
+            }
             self.edit_revision = self.snapshot.revision;
             self.name.update(cx, |state, cx| {
                 state.set_value(self.base_name.clone(), window, cx)
@@ -1447,7 +1487,7 @@ fn button(id: &'static str, label: impl Into<SharedString>) -> Stateful<Div> {
         .child(label.into())
 }
 impl Render for Wirecraft {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let title = format!(
             "{}{}",
             self.snapshot.document.project_name(),
@@ -1833,7 +1873,7 @@ impl Render for Wirecraft {
         } else {
             content = content.child(self.render_mcp(cx));
         }
-        div().on_mouse_move(cx.listener(Self::move_panel)).on_mouse_up(MouseButton::Left,cx.listener(Self::end_panel)).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_menu(cx))
+        div().on_mouse_move(cx.listener(Self::move_panel)).on_mouse_up(MouseButton::Left,cx.listener(Self::end_panel)).capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Enter,w,cx|{if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_completion(window,cx)).children(self.render_menu(cx))
     }
 }
 fn main() -> anyhow::Result<()> {
@@ -1899,6 +1939,23 @@ fn main() -> anyhow::Result<()> {
                 initial_settings.appearance.editor_font.clone().into();
             cx.bind_keys([
                 KeyBinding::new("ctrl-shift-p", CommandPalette, Some("Wirecraft")),
+                KeyBinding::new("ctrl-space", Complete, Some("Wirecraft")),
+                KeyBinding::new(
+                    "ctrl-home",
+                    gpui_component::input::MoveToStart,
+                    Some("Input"),
+                ),
+                KeyBinding::new("ctrl-end", gpui_component::input::MoveToEnd, Some("Input")),
+                KeyBinding::new(
+                    "ctrl-shift-home",
+                    gpui_component::input::SelectToStart,
+                    Some("Input"),
+                ),
+                KeyBinding::new(
+                    "ctrl-shift-end",
+                    gpui_component::input::SelectToEnd,
+                    Some("Input"),
+                ),
                 KeyBinding::new("ctrl-p", ShowExport, Some("Wirecraft")),
                 KeyBinding::new("ctrl-comma", ShowOptions, Some("Wirecraft")),
                 KeyBinding::new("ctrl-o", Open, Some("Wirecraft")),
@@ -1926,6 +1983,13 @@ fn main() -> anyhow::Result<()> {
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    app_id: Some("wirecraft".into()),
+                    window_decorations: if cfg!(target_os = "linux") {
+                        Some(WindowDecorations::Client)
+                    } else {
+                        None
+                    },
+                    window_min_size: Some(size(px(900.), px(600.))),
                     ..Default::default()
                 },
                 move |window, cx| {

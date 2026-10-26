@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Install an owned archive into a temporary prefix and exercise real binary contracts."""
-import json,os,pathlib,select,subprocess,sys,tempfile,time,urllib.request,uuid
+import base64,json,os,pathlib,select,subprocess,sys,tempfile,time,urllib.request,uuid
 root=pathlib.Path(__file__).resolve().parent.parent
 archive=pathlib.Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
@@ -30,6 +30,15 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
   exported=rpc('tools/call',{'name':'wirecraft.export_diagram','arguments':{'path':str(tmp/'diagram.pdf'),'format':'pdf'}});assert not exported['result']['isError']
   assert (tmp/'diagram.pdf').read_bytes().startswith(b'%PDF')
   node_id=created['result']['structuredContent']['entity']['id']
+  def workbench(operation,arguments=None):
+   value=rpc('tools/call',{'name':'wirecraft.workbench','arguments':{'operation':operation,'arguments':arguments or {}}})['result'];assert not value['isError'],value;return value['structuredContent']
+  for kind in ['plan','documentation']:
+   preview=workbench('preview_export',{'kind':kind,'options':{'format':'A4'}})
+   assert preview['pages']>=1 and '<svg' in preview['svg']
+   assert base64.b64decode(preview['pngBase64']).startswith(b'\x89PNG\r\n\x1a\n')
+  combined=tmp/'combined.pdf';workbench('export',{'kind':'all','format':'pdf','path':str(combined),'sheetOptions':{'format':'A4'},'documentOptions':{'format':'A4'}});assert combined.read_bytes().startswith(b'%PDF')
+  assert workbench('settings')['schemaVersion']==1
+  prompt=workbench('prepare_ai_prompt',{'task':'tests','nodeIds':[node_id]});assert 'packaged worker' in prompt['prompt']
   edited=rpc('tools/call',{'name':'threadwork.update_entity','arguments':{'nodeId':node_id,'patch':{'text':{'source':'threadwork_runner__shutdown_request(&threadwork_runner);'}}}});assert not edited['result']['isError']
   generated_dir=tmp/'generated-c17'
   compiled=rpc('tools/call',{'name':'wirecraft.compile_c17','arguments':{'outputDir':str(generated_dir)}});assert not compiled['result']['isError']
@@ -51,6 +60,12 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
   if '--desktop' in sys.argv[2:]:
    env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
    subprocess.run([sys.executable,str(root/'scripts/desktop_smoke.py')],env=env,check=True)
-  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'nativeC17Graph':True,'generatedClangd':True,'installedDesktop':'--desktop' in sys.argv[2:]}))
+  if '--walkthrough' in sys.argv[2:]:
+   env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
+   subprocess.run([sys.executable,str(root/'scripts/walkthrough_smoke.py')],env=env,check=True)
+  if '--editor' in sys.argv[2:]:
+   env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
+   subprocess.run([sys.executable,str(root/'scripts/editor_smoke.py')],env=env,check=True)
+  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'workbenchMcp':True,'nativeC17Graph':True,'generatedClangd':True,'installedDesktop':'--desktop' in sys.argv[2:],'installedWalkthrough':'--walkthrough' in sys.argv[2:],'installedEditor':'--editor' in sys.argv[2:]}))
  finally:
   if app.poll() is None:app.terminate();app.wait(timeout=10)

@@ -10,15 +10,25 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
  env=os.environ.copy();env.pop('WAYLAND_DISPLAY',None);env['XDG_SESSION_TYPE']='x11'
  log=open(artifact/'desktop.log','w')
  app=subprocess.Popen([binary,'--state-dir',str(state)],env=env,stdout=log,stderr=log)
+ def content_inset():
+  if window is None:return (0,0)
+  text=subprocess.check_output(['xprop','-id',str(window),'_GTK_FRAME_EXTENTS'],env=env,text=True)
+  if '=' not in text:return (0,0)
+  values=[int(v.strip()) for v in text.split('=',1)[1].split(',')]
+  return (values[0],values[2])
  def xd(*args):
+  if args and args[0]=='mousemove' and len(args)>4 and args[1]=='--window':
+   dx,dy=content_inset();args=(*args[:3],int(args[3])+dx,int(args[4])+dy,*args[5:])
   if args and args[0] in ('key','type') and window is not None:
-   subprocess.run(['xdotool','windowactivate','--sync',str(window)],env=env,check=True,capture_output=True)
+   if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
+    subprocess.run(['xdotool','windowactivate','--sync',str(window)],env=env,check=True,capture_output=True)
    assert int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))==int(window)
    if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
   result=subprocess.run(['xdotool',*map(str,args)],env=env,text=True,capture_output=True)
   if result.returncode and args[-1]!='ctrl+q':raise subprocess.CalledProcessError(result.returncode,result.args,result.stdout,result.stderr)
   return result.stdout.strip()
- def caption():return subprocess.check_output(['import','-window',window,'-crop','350x32+850+132','rgba:-'],env=env)
+ def caption():
+  dx,dy=content_inset();return subprocess.check_output(['import','-window',window,'-crop',f'350x32+{850+dx}+{132+dy}','rgba:-'],env=env)
  def choose_mode(x,y):
   before=caption();until=time.monotonic()+8
   while time.monotonic()<until:
@@ -72,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   xd('mousemove','--window',window,165,102);xd('click',1)
   time.sleep(.3)
   subprocess.run(['import','-window',window,str(artifact/'editor.png')],env=env,check=True)
-  xd('mousemove','--window',window,450,280);xd('click',1)
+  xd('mousemove','--window',window,450,350);xd('click',1)
   xd('type','--clearmodifiers','--delay',1,'int main(void) { return missing; }')
   wait_for(lambda:state.joinpath('ui.json').exists() and (json.loads(state.joinpath('ui.json').read_text()).get('draft') or {}).get('text')=='int main(void) { return missing; }')
   # Quit through our own registered action and check process lifecycle.

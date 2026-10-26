@@ -21,7 +21,15 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
    except (subprocess.CalledProcessError,FileNotFoundError,json.JSONDecodeError,KeyError,IndexError):pass
    time.sleep(.12)
   raise TimeoutError('walkthrough condition timed out')
+ def content_inset():
+  if window is None:return (0,0)
+  text=subprocess.check_output(['xprop','-id',str(window),'_GTK_FRAME_EXTENTS'],env=env,text=True)
+  if '=' not in text:return (0,0)
+  values=[int(v.strip()) for v in text.split('=',1)[1].split(',')]
+  return (values[0],values[2])
  def xd(*args):
+  if args and args[0]=='mousemove' and len(args)>4 and args[1]=='--window':
+   dx,dy=content_inset();args=(*args[:3],int(args[3])+dx,int(args[4])+dy,*args[5:])
   if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
    subprocess.run(['xdotool','windowactivate','--sync',window],env=env,check=True,capture_output=True)
   assert int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))==int(window)
@@ -69,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   click(151,151);shot('003-backlog')
   # A source-style inspector name edit must preserve existing source and history.
   before=document()['nodes'][route]['text']['source'];click(165,102)
-  click(1200,266);xd('key','ctrl+a');xd('type','--clearmodifiers','routeApiUserDetailsReviewed')
+  click(1200,230);xd('key','ctrl+a');xd('type','--clearmodifiers','routeApiUserDetailsReviewed')
   wait(lambda:(ui().get('draft') or {}).get('name')=='routeApiUserDetailsReviewed')
   click(950,151);wait(lambda:document()['nodes'][route]['name']=='routeApiUserDetailsReviewed');assert document()['nodes'][route]['text']['source']==before;shot('002-inspector')
   # Matrix cells select the real relationship endpoints without mutating the graph.
@@ -125,25 +133,33 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   # A blank type's structured collections can be edited and invalid drafts recover intact.
   click(100,270);wait(lambda:ui()['selected']=='packet');click(165,102);wait(lambda:ui()['tab']=='Editor')
   def bottom_inspector():xd('mousemove','--window',window,1240,780);xd('click','--repeat',60,'--delay',5,5);time.sleep(.3)
-  def inspector_inputs():
-   path=shot('inspector-fields-detection')
-   output=subprocess.check_output(['convert',str(path),'-crop','350x688+1045+172','-colorspace','gray','-threshold','8%','-define','connected-components:verbose=true','-connected-components','8','null:'],text=True,stderr=subprocess.STDOUT)
+  def inspector_regions(buttons=False):
+   xd('mousemove','--window',window,900,300)
+   path=shot('inspector-fields-detection');dx,dy=content_inset()
+   args=['convert',str(path),'-crop',f'350x688+{1045+dx}+{172+dy}']
+   if buttons:args+=['-fill','white','+opaque','#242c36','-fill','black','-opaque','#242c36']
+   args+=['-colorspace','gray','-threshold','8%','-define','connected-components:verbose=true','-connected-components','8','null:']
+   output=subprocess.check_output(args,text=True,stderr=subprocess.STDOUT)
    import re
    fields=[]
    for line in output.splitlines():
     match=re.search(r'\d+: (\d+)x(\d+)\+(\d+)\+(\d+).*gray\(0\)',line)
     if match:
      width,height,x,y=map(int,match.groups())
-     if width>100 and 20<=height<=45:fields.append((1045+x+width//2,172+y+height//2))
-   return sorted(fields,key=lambda p:p[1])
+     if (width>280 if buttons else width>=70) and 18<=height<=40:fields.append((1045+x+width//2,172+y+height//2))
+   return sorted(fields,key=lambda p:(p[1],p[0]))
+  def inspector_inputs():return inspector_regions()
+  def add_table_row(field=False):
+   bottom_inspector();buttons=inspector_regions(True);assert len(buttons)>=3,buttons
+   click(*buttons[-3 if field else -2]);bottom_inspector()
   def fill(position,text):click(*position);xd('key','ctrl+a');xd('type','--clearmodifiers',text)
   # Restore Dark for deterministic input-color detection, using the normal Options editor.
   command('Options…');click(480,273);xd('key','ctrl+a');xd('type','--clearmodifiers','dark');click(60,833)
   wait(lambda:json.loads((state/'settings.json').read_text())['appearance']['theme']=='dark');click(165,102)
-  bottom_inspector();click(1150,713);bottom_inspector();fields=inspector_inputs();assert len(fields)>=4,fields
-  fill(fields[-4],'sequence');fill(fields[-3],'int')
-  click(1150,795);bottom_inspector();fields=inspector_inputs();assert len(fields)>=2;fill(fields[-2],'fixture_note');fill(fields[-1],'first')
-  click(1150,795);bottom_inspector();fields=inspector_inputs();fill(fields[-2],'fixture_note');fill(fields[-1],'second')
+  add_table_row(True);fields=inspector_inputs();assert len(fields)>=2,fields
+  fill(fields[-2],'sequence')
+  add_table_row();fields=inspector_inputs();assert len(fields)>=2;fill(fields[-2],'fixture_note');fill(fields[-1],'first')
+  add_table_row();fields=inspector_inputs();fill(fields[-2],'fixture_note');fill(fields[-1],'second')
   click(950,151);time.sleep(.5);assert document()['nodes']['packet']['typeDefinition']['fields']==[]
   wait(lambda:len((ui().get('draft') or {}).get('tables',{}).get('metadata',[]))==2);shot('002-invalid-table-draft')
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0
@@ -157,7 +173,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
    if fields[3]=='0A' and f'socket:[{fields[9]}]' in sockets:endpoint=f'http://127.0.0.1:{int(fields[1].split(":")[1],16)}'
   assert len(ui()['draft']['tables']['metadata'])==2
   bottom_inspector();fields=inspector_inputs();fill(fields[-2],'another_note');click(950,151)
-  wait(lambda:document()['nodes']['packet']['metadata'].get('another_note')=='second');assert document()['nodes']['packet']['metadata']['fixture_note']=='first';assert document()['nodes']['packet']['typeDefinition']['fields'][0]['name']=='sequence';assert document()['nodes']['packet']['typeDefinition']['fields'][0]['typeId']=='int';shot('002-applied-type-and-metadata')
+  wait(lambda:document()['nodes']['packet']['metadata'].get('another_note')=='second');assert document()['nodes']['packet']['metadata']['fixture_note']=='first';assert document()['nodes']['packet']['typeDefinition']['fields'][0]['name']=='sequence';assert document()['nodes']['packet']['typeDefinition']['fields'][0]['typeId']=='string';shot('002-applied-type-and-metadata')
   # Keep the earlier Light-theme restoration assertion meaningful after this deterministic Dark check.
   command('Options…');wait(lambda:ui()['tab']=='Options');time.sleep(.5);click(480,273);xd('key','ctrl+a');xd('type','--clearmodifiers','light');shot('018-options-staged');click(60,833);wait(lambda:json.loads((state/'settings.json').read_text())['appearance']['theme']=='light')
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0

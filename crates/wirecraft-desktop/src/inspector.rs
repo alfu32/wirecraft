@@ -1,5 +1,6 @@
 //! Structured collection editors retain unknown type-field data and stage a single patch.
 use super::*;
+use gpui_component::Sizable;
 pub struct MetadataRow {
     key: Entity<InputState>,
     value: Entity<InputState>,
@@ -30,6 +31,7 @@ fn input(value: &str, w: &mut Window, cx: &mut Context<Wirecraft>) -> Entity<Inp
     cx.subscribe(&field, |this, _, event: &InputEvent, cx| {
         if matches!(event, InputEvent::Change) {
             this.persist_ui(cx);
+            cx.notify();
         }
     })
     .detach();
@@ -200,141 +202,243 @@ impl Tables {
         Ok(())
     }
 }
+pub(super) fn history(events: &[Value]) -> AnyElement {
+    let header = div()
+        .flex()
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(div().w(px(108.)).child("Date"))
+        .child(div().w(px(104.)).child("Status"))
+        .child(div().flex_1().child("Changed by"));
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(div().text_xs().child("State transitions"))
+        .child(header)
+        .child(
+            div()
+                .id("status-history-table")
+                .max_h(px(104.))
+                .overflow_y_scroll()
+                .children(events.iter().rev().enumerate().map(|(i, e)| {
+                    div()
+                        .id(i)
+                        .flex()
+                        .h(px(24.))
+                        .text_xs()
+                        .border_b_1()
+                        .border_color(crate::chrome::color(0x29323d))
+                        .child(
+                            div().w(px(108.)).truncate().child(
+                                e["changedDate"]
+                                    .as_str()
+                                    .unwrap_or("")
+                                    .chars()
+                                    .take(16)
+                                    .collect::<String>()
+                                    .replace('T', " "),
+                            ),
+                        )
+                        .child(
+                            div()
+                                .w(px(104.))
+                                .truncate()
+                                .child(e["endStatus"].as_str().unwrap_or("").to_string()),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .truncate()
+                                .child(e["userId"].as_str().unwrap_or("").to_string()),
+                        )
+                })),
+        )
+        .into_any_element()
+}
+fn section(title: &str) -> AnyElement {
+    div()
+        .pt_2()
+        .pb_1()
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(crate::chrome::color(0x70d5c6))
+        .child(title.to_string())
+        .into_any_element()
+}
+fn cell(child: AnyElement, width: f32) -> AnyElement {
+    div()
+        .w(px(width))
+        .flex_none()
+        .child(child)
+        .into_any_element()
+}
 impl Wirecraft {
     pub(super) fn render_tables(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut form = div().flex().flex_col().gap_2();
+        let mut form = div().flex().flex_col().gap_1();
         if self.tables.is_type {
-            form = form.child(
-                div()
-                    .text_color(crate::chrome::color(0x70d5c6))
-                    .mt_3()
-                    .child("TYPE FIELDS"),
-            );
+            let type_choices = crate::inspector_widgets::types(&self.snapshot.document);
+            let mut table = div()
+                .id("type-fields-table")
+                .overflow_x_scroll()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .flex()
+                        .min_w(px(338.))
+                        .h(px(24.))
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(div().w(px(120.)).child("Name"))
+                        .child(div().w(px(104.)).child("Type"))
+                        .child(div().w(px(64.)).child("Kind"))
+                        .child(div().w(px(24.)).child("Ref")),
+                );
             for (i, row) in self.tables.types.iter().enumerate() {
-                form =
-                    form.child(
-                        div()
-                            .id(("type-field", i))
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .p_2()
-                            .bg(crate::chrome::color(0x202b35))
-                            .rounded_md()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .child("Name / Type ID (primitive or entity)"),
-                            )
-                            .child(Input::new(&row.name))
-                            .child(Input::new(&row.type_id))
-                            .child(button("choose-field-type", "Choose type…").on_click(
-                                cx.listener(move |this, _, _, cx| {
-                                    this.type_choice = Some((i, false));
-                                    this.menu = Some("Type reference".into());
-                                    cx.notify();
-                                }),
-                            ))
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .child("Collection (array / list / map) / Key type ID"),
-                            )
-                            .child(Input::new(&row.collection))
-                            .child(Input::new(&row.key_type))
-                            .when(row.collection.read(cx).value().as_ref() == "map", |b| {
-                                b.child(button("choose-key-type", "Choose key type…").on_click(
-                                    cx.listener(move |this, _, _, cx| {
-                                        this.type_choice = Some((i, true));
-                                        this.menu = Some("Type reference".into());
-                                        cx.notify();
-                                    }),
-                                ))
-                            })
-                            .child(
-                                div()
-                                    .flex()
-                                    .gap_2()
-                                    .child(
-                                        button(
-                                            "field-reference",
-                                            if row.reference {
-                                                "☑ Reference"
-                                            } else {
-                                                "☐ Reference"
-                                            },
-                                        )
-                                        .on_click(
-                                            cx.listener(move |this, _, _, cx| {
-                                                this.tables.types[i].reference =
-                                                    !this.tables.types[i].reference;
-                                                this.persist_ui(cx);
-                                                cx.notify();
-                                            }),
-                                        ),
-                                    )
-                                    .child(button("remove-field", "Remove field").on_click(
-                                        cx.listener(move |this, _, _, cx| {
-                                            this.tables.types.remove(i);
-                                            this.persist_ui(cx);
-                                            cx.notify();
-                                        }),
-                                    )),
+                let collection = row.collection.read(cx).value().to_string();
+                table = table.child(
+                    div()
+                        .id(("type-field", i))
+                        .flex()
+                        .gap_1()
+                        .items_center()
+                        .min_w(px(338.))
+                        .h(px(28.))
+                        .child(cell(Input::new(&row.name).small().into_any_element(), 116.))
+                        .child(cell(
+                            crate::inspector_widgets::choices(
+                                &row.type_id,
+                                type_choices.clone(),
+                                "Type",
+                                cx,
                             ),
+                            100.,
+                        ))
+                        .child(cell(
+                            crate::inspector_widgets::choices(
+                                &row.collection,
+                                crate::inspector_widgets::list(&["array", "list", "map"], "Value"),
+                                "Value",
+                                cx,
+                            ),
+                            60.,
+                        ))
+                        .child(
+                            button("field-reference", if row.reference { "✓" } else { "□" })
+                                .w(px(24.))
+                                .h(px(24.))
+                                .p_0()
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.tables.types[i].reference =
+                                        !this.tables.types[i].reference;
+                                    this.persist_ui(cx);
+                                    cx.notify();
+                                })),
+                        )
+                        .child(
+                            button("remove-field", "×")
+                                .w(px(22.))
+                                .h(px(24.))
+                                .p_0()
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.tables.types.remove(i);
+                                    this.persist_ui(cx);
+                                    cx.notify();
+                                })),
+                        ),
+                );
+                if collection == "map" {
+                    table = table.child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .text_xs()
+                            .child("Key type")
+                            .child(div().w(px(160.)).child(crate::inspector_widgets::choices(
+                                &row.key_type,
+                                type_choices.clone(),
+                                "Type",
+                                cx,
+                            ))),
                     );
+                }
             }
-            form = form.child(button("add-type-field", "Add field").on_click(cx.listener(
-                |this, _, w, cx| {
-                    let name = format!("field_{}", this.tables.types.len() + 1);
-                    this.tables.types.push(TypeRow {
-                        name: input(&name, w, cx),
-                        type_id: input("string", w, cx),
-                        collection: input("", w, cx),
-                        key_type: input("", w, cx),
-                        reference: false,
-                        original: json!({}),
-                    });
-                    this.persist_ui(cx);
-                    cx.notify();
-                },
-            )));
+            form = form.child(section("TYPE FIELDS")).child(table).child(
+                button("add-type-field", "+ Field")
+                    .text_xs()
+                    .h(px(24.))
+                    .py_0()
+                    .on_click(cx.listener(|this, _, w, cx| {
+                        let name = format!("field_{}", this.tables.types.len() + 1);
+                        this.tables.types.push(TypeRow {
+                            name: input(&name, w, cx),
+                            type_id: input("string", w, cx),
+                            collection: input("", w, cx),
+                            key_type: input("", w, cx),
+                            reference: false,
+                            original: json!({}),
+                        });
+                        this.persist_ui(cx);
+                        cx.notify();
+                    })),
+            );
         }
-        form = form.child(
+        let mut table = div().flex().flex_col().gap_1().child(
             div()
-                .text_color(crate::chrome::color(0x70d5c6))
-                .mt_3()
-                .child("METADATA"),
+                .flex()
+                .text_xs()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(div().flex_1().child("Key"))
+                .child(div().flex_1().child("Value"))
+                .child(div().w(px(24.))),
         );
         for (i, row) in self.tables.metadata.iter().enumerate() {
-            form = form.child(
+            table = table.child(
                 div()
                     .id(("metadata", i))
                     .flex()
-                    .flex_col()
+                    .items_center()
                     .gap_1()
-                    .p_2()
-                    .bg(crate::chrome::color(0x202b35))
-                    .rounded_md()
-                    .child(Input::new(&row.key))
-                    .child(Input::new(&row.value))
-                    .child(button("remove-metadata", "Remove").on_click(cx.listener(
-                        move |this, _, _, cx| {
-                            this.tables.metadata.remove(i);
-                            this.persist_ui(cx);
-                            cx.notify();
-                        },
-                    ))),
+                    .h(px(28.))
+                    .child(div().flex_1().min_w_0().child(Input::new(&row.key).small()))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(Input::new(&row.value).small()),
+                    )
+                    .child(
+                        button("remove-metadata", "×")
+                            .w(px(24.))
+                            .h(px(24.))
+                            .p_0()
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.tables.metadata.remove(i);
+                                this.persist_ui(cx);
+                                cx.notify();
+                            })),
+                    ),
             );
         }
-        form.child(button("add-metadata", "Add metadata").on_click(cx.listener(
-            |this, _, w, cx| {
-                this.tables.metadata.push(MetadataRow {
-                    key: input("", w, cx),
-                    value: input("", w, cx),
-                });
-                cx.notify();
-            },
-        )))
-        .into_any_element()
+        form.child(section("METADATA"))
+            .child(table)
+            .child(
+                button("add-metadata", "+ Metadata")
+                    .text_xs()
+                    .h(px(24.))
+                    .py_0()
+                    .on_click(cx.listener(|this, _, w, cx| {
+                        this.tables.metadata.push(MetadataRow {
+                            key: input("", w, cx),
+                            value: input("", w, cx),
+                        });
+                        this.persist_ui(cx);
+                        cx.notify();
+                    })),
+            )
+            .into_any_element()
     }
 }
