@@ -1,6 +1,6 @@
 # Screenshot-driven migration
 
-Reference: [20 chronological photos](threadworks/README.md), original names/times/hashes in [manifest](threadworks/manifest.json). All image bytes are unchanged. Captures establish visible layout; the Kotlin implementation and live baseline establish behavior. Source revision: Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`.
+Reference: [22 chronological photos](threadworks/README.md), original names/times/hashes in [manifest](threadworks/manifest.json). All image bytes are unchanged. Captures establish visible layout; the Kotlin implementation and live baseline establish behavior. Source revision: Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`.
 
 ## Photo-to-implementation map
 
@@ -10,6 +10,7 @@ Source UI paths below are relative to `app-desktop/src/main/kotlin/com/threadwor
 |---|---|---|---|
 | 001,015–017 Designer | ui/ThreadworkDesktopApp.kt canvas/hierarchy/registerCommands | core drawing/viewport; desktop scene: absolute composites, collapse/resize/subtree moves, ports/types, usage boxes, selection, alignment | Core projection/route/BVH tests; native collapse/move/resize/callout selection and original creation/link/drag smoke. Full source routing/boundary typography remains partial |
 | 002 Editor | Same file inspector/editor; editor/GridCodeEditorAdapter.kt | Selected list and collapsible hierarchy; five code sections, section-language/C/C++ highlighting; structured scalar/type/metadata inspector, inherited values and tracking; advanced JSON | Native name/source preservation, type/metadata Apply, duplicate-key rejection and invalid draft recovery. Master revision/inherited tracking tests. Inline LSP completion/navigation pending |
+| 021–022 Contextual code completion | editor/GridCodeEditorAdapter.kt Ctrl-Space; compiler/c/CCompiler.kt codeIntelligence/generatedFunctionHeader | Planned: clangd over the generated C wrapper plus model-aware channel/port/library symbols, mapped back to the authored function body | New source evidence: runtime symbols/signatures, typed buffers and injected library aliases. Inline completion remains pending; acceptance must check scope, insertion/replacement ranges, document versions and current compiler context |
 | 003 Project management | ui/ProjectManagementPanel.kt | Six real status lanes, counts/cards, drag/drop, remove-to-backlog, add BUSINESS; shared history/undo | Native lane move/removal/backlog and API status tests. OAuth/avatar providers pending |
 | 004 Archetypes | ui/WorkflowArchetypesPanel.kt | Grouped embedded catalog/descriptions; read-only scene preview, explicit Insert; import/save paths | Native asserts preview does not mutate, Insert does; all embedded imports/remapped references tested |
 | 005 Analysis | ui/NetworkAnalysisPanel.kt; core analysis | P/E/D/U sparse matrices, paged columns/virtual rows; dependent→dependency direction, coverage/candidates/findings and inspection actions | Fixtures and native matrix endpoint navigation. Reachability explicitly bounded above 4096. Automatic layout/model optimization was future work in source |
@@ -30,7 +31,7 @@ The Sheet button toggles unified Export preview instead of the source's editable
 
 ## Runnable slices and acceptance
 
-1. Chronological rename/index: complete, all 20 original hashes retained (`75a0d2f`).
+1. Chronological rename/index: initial 20 original hashes retained (`75a0d2f`); two later editor captures appended as 021–022, with original names/times/hashes recorded.
 2. Workbench/icon/inspector/board/matrix/archetype preview: connected (`a73f4e7`).
 3. Composite drawing, settings and independent MCP controls: connected (`24f610d`).
 4. Technical reports, clipboard assistance and inspector collections: connected (`260d016`).

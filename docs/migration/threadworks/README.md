@@ -24,5 +24,9 @@ Chronological capture order on 2026-10-26 (Europe/Brussels). Original image byte
 | [018](018-options-general.png) | General options | Theme, designer/editor fonts, composite title target and reference viewport, indent spaces, mouse-wheel rows. |
 | [019](019-options-colors.png) | Designer color options | Editable semantic canvas/grid/node/type/compiler/library/error/test and link colors with color pickers. |
 | [020](020-options-inference.png) | Inference provider options | Active provider, Claude/Codex/ChatGPT/local Ollama/clipboard tabs, endpoint/model/API token; browser authorization explicitly marked not implemented. |
+| [021](021-editor-c-runtime-completions.png) | C runtime identifier completion | Ctrl-Space in the C node function body lists compiler runtime types, constants and functions with declaration/signature details. |
+| [022](022-editor-node-context-completions.png) | Node-context channel and library completion | The same list includes typed channel/port identifiers, push/pop helpers, injected `base_lib_socket_accept__*` library aliases and link item types. |
+
+Ctrl-Space context (photos 021–022): the edited declaration is a processing node’s function body inside a compiler-generated C wrapper. Suggestions must reflect the effective project compiler/runtime, that node’s connected channels/ports and injected libraries, with usable names and type/signature details. These captures document Threadworks behavior; equivalent inline Wirecraft completion is still pending.
 
 Implementation and verification tracking: [walkthrough parity](../walkthrough.md).

@@ -178,5 +178,23 @@
     "sha256": "6d31add49a97c0b42be53e7a909d00dcedf78076dd7cde4a8d7971a75e1d4d27",
     "feature": "Inference provider options",
     "observed": "Active provider, Claude/Codex/ChatGPT/local Ollama/clipboard tabs, endpoint/model/API token; browser authorization explicitly marked not implemented."
+  },
+  {
+    "sequence": 21,
+    "original": "Screenshot From 2026-10-26 17-09-15.png",
+    "file": "021-editor-c-runtime-completions.png",
+    "captured": "2026-10-26 17-09-15",
+    "sha256": "4c420ceea08920daad1ec351f283b945fba4f56af6fff7595a57a9a1a76ffc43",
+    "feature": "C runtime identifier completion",
+    "observed": "Ctrl-Space list in the socket_accept C function body: compiler runtime types, constants and threadwork_* functions, with declaration/signature details."
+  },
+  {
+    "sequence": 22,
+    "original": "Screenshot From 2026-10-26 17-09-31.png",
+    "file": "022-editor-node-context-completions.png",
+    "captured": "2026-10-26 17-09-31",
+    "sha256": "b8f46f2a975db38a76dc2570f0b4b650a0d58a041ba0a4a7731218c8b67246db",
+    "feature": "Node-context channel and library completion",
+    "observed": "Ctrl-Space list includes push/pop, typed channel/port identifiers (awaitResponseLoop, request, response), injected base_lib_socket_accept__fclose/fopen/fprintf aliases with signatures, and the link item type Any."
   }
 ]

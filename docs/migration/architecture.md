@@ -52,7 +52,7 @@ The authenticated backend initially enables MCP and provides independent Start/S
 
 ## ADR 006 — Screenshot-driven workbench and shared drawing
 
-The twenty photos are indexed chronologically with original hashes. They establish view structure and visible controls; Kotlin source and runtime evidence establish semantics. The GPUI workbench retains recognizable views and five editor sections, but uses neutral light/dark surfaces, teal interaction accents and a consistent 24-unit stroke icon vocabulary. Font assets retain their SIL OFL. No generated bitmap icon dependency is introduced.
+The twenty-two photos are indexed chronologically with original hashes. They establish view structure and visible controls; Kotlin source and runtime evidence establish semantics. The GPUI workbench retains recognizable views and five editor sections, but uses neutral light/dark surfaces, teal interaction accents and a consistent 24-unit stroke icon vocabulary. Font assets retain their SIL OFL. No generated bitmap icon dependency is introduced.
 
 `core::drawing` projects expanded/collapsed topology once for both desktop and exported plans: nodes, ports, link segments, type usage and visible endpoint projection. Segment-level culling avoids large empty link bounding boxes. Corridor trials are bounded; full legacy routing fidelity is not claimed. Matrix adjacency remains sparse, rows virtualized and columns paged. Degree/SCC/components cover the full graph; all-node reachability is explicitly bounded above 4096 nodes to avoid quadratic interactive work.
 
