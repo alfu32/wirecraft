@@ -32,6 +32,7 @@ pub enum Update {
 impl Client {
     pub fn start(
         state_dir: PathBuf,
+        settings: wirecraft_runtime::config::Settings,
         project: Option<PathBuf>,
     ) -> (
         Self,
@@ -43,7 +44,7 @@ impl Client {
         let worker = std::thread::Builder::new()
             .name("wirecraft-client".into())
             .spawn(move || {
-                if let Err(e) = worker(receiver, updates.clone(), state_dir, project) {
+                if let Err(e) = worker(receiver, updates.clone(), state_dir, project, settings) {
                     let _ = updates.send_blocking(Update::Error(e.to_string()));
                 }
             })
@@ -103,6 +104,7 @@ fn worker(
     updates: async_channel::Sender<Update>,
     state_dir: PathBuf,
     project: Option<PathBuf>,
+    settings: wirecraft_runtime::config::Settings,
 ) -> anyhow::Result<()> {
     std::fs::create_dir_all(&state_dir)?;
     let lock = std::fs::OpenOptions::new()
@@ -179,7 +181,11 @@ fn worker(
         token: backend.token.clone(),
     })?;
     let mut revision = None;
-    let mut intelligence = Intelligence::default();
+    let mut intelligence = Intelligence {
+        root: state_dir.join("intelligence"),
+        settings,
+        ..Default::default()
+    };
     loop {
         match rx.recv_timeout(Duration::from_millis(300)) {
             Ok(Message::Execute(request)) => {
@@ -203,24 +209,21 @@ fn worker(
                 language,
                 text,
                 build,
-            }) => {
-                match intelligence.analyze(&backend, &state_dir, &node_id, &language, &text, build)
-                {
-                    Ok(value) => {
-                        updates.send_blocking(Update::Result {
-                            command: if build {
-                                "jobs.start".into()
-                            } else {
-                                "lsp.diagnostics".into()
-                            },
-                            value,
-                        })?;
-                    }
-                    Err(e) => {
-                        updates.send_blocking(Update::Error(e.to_string()))?;
-                    }
+            }) => match intelligence.analyze(&backend, &node_id, &language, &text, build) {
+                Ok(value) => {
+                    updates.send_blocking(Update::Result {
+                        command: if build {
+                            "jobs.start".into()
+                        } else {
+                            "lsp.diagnostics".into()
+                        },
+                        value,
+                    })?;
                 }
-            }
+                Err(e) => {
+                    updates.send_blocking(Update::Error(e.to_string()))?;
+                }
+            },
             Ok(Message::SaveUi(value)) => {
                 if let Err(e) = store::atomic_write(
                     &state_dir.join("ui.json"),
@@ -253,6 +256,8 @@ fn uuid_token() -> String {
 
 #[derive(Default)]
 struct Intelligence {
+    root: PathBuf,
+    settings: wirecraft_runtime::config::Settings,
     started: bool,
     versions: std::collections::BTreeMap<String, i64>,
 }
@@ -260,13 +265,13 @@ impl Intelligence {
     fn analyze(
         &mut self,
         backend: &OwnedBackend,
-        state_dir: &std::path::Path,
         node_id: &str,
         language: &str,
         text: &str,
         build: bool,
     ) -> anyhow::Result<Value> {
-        let root = state_dir.join("intelligence");
+        let settings = &self.settings;
+        let root = self.root.clone();
         std::fs::create_dir_all(&root)?;
         let root = root.canonicalize()?;
         let safe: String = node_id
@@ -280,18 +285,19 @@ impl Intelligence {
         if build {
             let executable = std::env::var("WIRECRAFT_CC").unwrap_or_else(|_| {
                 if language == "cpp" {
-                    "clang++".into()
+                    settings.cpp_compiler.clone()
                 } else {
-                    "clang".into()
+                    settings.c_compiler.clone()
                 }
             });
             return backend.call(&Request::new("jobs.start",json!({"executable":executable,"args":["-fsyntax-only",if language=="cpp"{"-std=c++20"}else{"-std=c17"},path],"cwd":root})));
         }
         if !self.started {
-            let executable = std::env::var("WIRECRAFT_CLANGD").unwrap_or_else(|_| "clangd".into());
+            let executable = std::env::var("WIRECRAFT_CLANGD")
+                .unwrap_or_else(|_| settings.clangd.executable.clone());
             backend.call(&Request::new(
                 "lsp.start",
-                json!({"executable":executable,"root":root,"args":["--background-index=false"]}),
+                json!({"executable":executable,"root":root,"args":settings.clangd.args}),
             ))?;
             self.started = true;
         }

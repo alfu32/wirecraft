@@ -1,0 +1,57 @@
+{
+  "id": "workflow-template-php-http-reader",
+  "name": "http_reader",
+  "rootNodeId": "template_root_php_http_reader",
+  "nodes": [
+    {
+      "id": "template_root_php_http_reader",
+      "name": "http_reader",
+      "kind": "Group",
+      "children": [
+        "http_reader"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_reader",
+      "name": "http_reader",
+      "kind": "Processor",
+      "parentId": "template_root_php_http_reader",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "php",
+        "technologyId": "php",
+        "compilerId": "php-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "HttpRequestConfig"
+        },
+        {
+          "id": "result",
+          "name": "result",
+          "direction": "Output",
+          "dataType": "HttpResult"
+        }
+      ],
+      "text": {
+        "source": "$state =& $context['http_reader'];\nif (!isset($state)) $state = ['busy' => false];\nif (!$state['busy'] && $config) {\n    $settings = array_shift($config);\n    if (empty($settings['url'])) throw new InvalidArgumentException('http_reader requires config.url');\n    $params = $settings['params'] ?? [];\n    $method = strtoupper($settings['method'] ?? 'GET');\n    $query = http_build_query($params);\n    $url = $method === 'GET' && $query !== '' ? $settings['url'] . '?' . $query : $settings['url'];\n    $body = $method === 'GET' ? null : $query;\n    $options = ['http' => ['method' => $method, 'header' => implode(\"\\r\\n\", array_map(fn($key, $value) => $key . ': ' . $value, array_keys($settings['headers'] ?? []), $settings['headers'] ?? [])), 'content' => $body, 'timeout' => (float)($settings['timeout'] ?? 10)]];\n    $state['busy'] = true;\n    $content = @file_get_contents($url, false, stream_context_create($options));\n    if ($content !== false) $result[] = ['status' => (int)substr($http_response_header[0] ?? 'HTTP/1.1 200', 9, 3), 'headers' => $http_response_header ?? [], 'content' => $content];\n    $state['busy'] = false;\n}",
+        "specification": "Polls an HTTP endpoint from configuration and emits the received content into the network.\n\nPort contract: input port/link `config` supplies `HttpRequestConfig`; output port/link `result` emits `HttpResult` packets.\n\nConfiguration contains exactly the request controls `method`, `url`, `params`, and `headers`. `method` defaults to GET only when absent; `url` is required; `params` are encoded according to the method; `headers` are copied without allowing transport-owned headers to become inconsistent.\n\nEach polling cycle must be bounded and non-blocking with respect to network progress. Emit a result only after a complete response. Preserve status, response headers, and content in the effective `HttpResult` model, and route transport failures through the project's error policy rather than emitting partial content.",
+        "aiInstructions": "Use the configured method, URL, params, and headers exactly. Respect timeouts and avoid overlapping polls unless explicitly configured."
+      }
+    }
+  ]
+}

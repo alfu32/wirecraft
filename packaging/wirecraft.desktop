@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Wirecraft
+Comment=Topology design and source workspace
+Exec=wirecraft-desktop %f
+Icon=wirecraft
+Terminal=false
+Categories=Development;IDE;
+MimeType=application/x-threadworks-orch;

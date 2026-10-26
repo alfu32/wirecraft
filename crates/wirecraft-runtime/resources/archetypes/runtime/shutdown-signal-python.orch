@@ -1,0 +1,26 @@
+{
+  "id": "workflow-template-shutdown-signal-python",
+  "name": "Shutdown Signal (Python)",
+  "rootNodeId": "template_root",
+  "nodes": [
+    {
+      "id": "template_root",
+      "name": "Shutdown Signal (Python)",
+      "kind": "Group",
+      "layout": { "x": 40, "y": 40, "width": 500, "height": 220 }
+    },
+    {
+      "id": "probe_shutdown_signal",
+      "name": "probe_shutdown_signal",
+      "kind": "Processor",
+      "parentId": "template_root",
+      "layout": { "x": 90, "y": 115, "width": 250, "height": 70 },
+      "technology": { "languageId": "python", "technologyId": "python", "compilerId": "python-compiler" },
+      "text": {
+        "sourceLanguageId": "python",
+        "source": "# POSIX SIGTERM is 15.\nif threadwork_runner.get_shutdown_signal() == 15:\n    threadwork_runner.shutdown_request()\n    return",
+        "specification": "Probes SIGTERM recorded by the Python runtime and requests an orderly network shutdown. This archetype defines the runner API expected by the Python compiler."
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "workflow-template-shutdown-signal-go",
+  "name": "Shutdown Signal (Go)",
+  "rootNodeId": "template_root",
+  "nodes": [
+    {
+      "id": "template_root",
+      "name": "Shutdown Signal (Go)",
+      "kind": "Group",
+      "layout": { "x": 40, "y": 40, "width": 500, "height": 220 }
+    },
+    {
+      "id": "probe_shutdown_signal",
+      "name": "probe_shutdown_signal",
+      "kind": "Processor",
+      "parentId": "template_root",
+      "layout": { "x": 90, "y": 115, "width": 250, "height": 70 },
+      "technology": { "languageId": "go", "technologyId": "go", "compilerId": "go-compiler" },
+      "text": {
+        "sourceLanguageId": "go",
+        "source": "// POSIX SIGTERM is 15.\nif threadworkRunner.GetShutdownSignal() == 15 {\n    threadworkRunner.ShutdownRequest()\n    return nil\n}",
+        "specification": "Probes SIGTERM recorded by the Go runtime and requests an orderly network shutdown. This archetype defines the runner API expected by the Go compiler."
+      }
+    }
+  ]
+}

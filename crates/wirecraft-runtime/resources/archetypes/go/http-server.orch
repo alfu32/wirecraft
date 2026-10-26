@@ -1,0 +1,80 @@
+{
+  "id": "workflow-template-go-http-server",
+  "name": "http_server",
+  "rootNodeId": "template_root_go_http_server",
+  "nodes": [
+    {
+      "id": "template_root_go_http_server",
+      "name": "http_server",
+      "kind": "Group",
+      "children": [
+        "http_server",
+        "http_request_registry_lib"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 760,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_server",
+      "name": "http_server",
+      "kind": "Processor",
+      "parentId": "template_root_go_http_server",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 250,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "go",
+        "technologyId": "go",
+        "compilerId": "go-compiler"
+      },
+      "ports": [
+        {
+          "id": "request",
+          "name": "request",
+          "direction": "Output",
+          "dataType": "HttpExchange"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "HttpExchange"
+        }
+      ],
+      "text": {
+        "source": "state, _ := context.Imports[\"httpServer\"].(map[string]any)\nif state == nil { state = map[string]any{\"accepting\": true, \"pending\": map[string]any{}}; context.Imports[\"httpServer\"] = state }\nif threadworkRunner.GetShutdownSignal() > 0 { state[\"accepting\"] = false; return nil }\nif accept, ok := context.Imports[\"httpAccept\"].(func() (map[string]any, bool)); ok && state[\"accepting\"] == true {\n    if item, accepted := accept(); accepted { id := fmt.Sprintf(\"%v\", item[\"id\"]); state[\"pending\"].(map[string]any)[id] = item; push(request, item) }\n}\nif item := map[string]any{}; pop(response, &item) {\n    if respond, ok := context.Imports[\"httpRespond\"].(func(string, string) error); ok { respond(fmt.Sprintf(\"%v\", item[\"id\"]), fmt.Sprintf(\"%v\", item[\"response_text\"])) }\n}",
+        "specification": "Accepts HTTP requests, emits each request into the Threadwork network, and returns the correlated response to the original client.\n\nPort and link contract:\n- `request` is the only output port and its transport link must also be named `request`.\n- `response` is the only input port and its transport link must also be named `response`.\n- The node may have exactly these two data ports and exactly these two data links. No additional data port or data link is permitted.\n\nPacket contract: `HttpExchange` contains exactly `id`, `request_text`, and `response_text`. A request sets `id` and `request_text`; the correlated response preserves `id` and sets `response_text`.\n\nShutdown contract: on a recorded SIGTERM, stop accepting new requests, keep the request registry available for already accepted requests, and request Threadwork shutdown. The runtime drain phase may then deliver residual responses while the network converges.\n\nThe companion `http_request_registry_lib` owns the map from packet `id` to the pending HTTP exchange. IDs must remain unique while pending; a response removes its entry after delivery. Unknown, duplicate, expired, or disconnected IDs are rejected without being delivered to another client.\n\nConfiguration supplies the listening address, port, request-size limit, and request timeout. Network I/O must remain non-blocking with respect to a Threadwork run cycle.",
+        "aiInstructions": "Preserve the exact request/response port contract, packet field names, ID correlation, and shutdown behavior. Bind a platform HTTP implementation without adding data ports."
+      }
+    },
+    {
+      "id": "http_request_registry_lib",
+      "name": "http_request_registry_lib",
+      "kind": "Processor",
+      "parentId": "template_root_go_http_server",
+      "layout": {
+        "x": 430,
+        "y": 115,
+        "width": 280,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "go",
+        "technologyId": "go",
+        "compilerId": "go-compiler"
+      },
+      "text": {
+        "source": "var httpRequestRegistry = map[string]any{}\n\nfunc RememberHttpRequest(id string, request any) bool { if _, exists := httpRequestRegistry[id]; exists { return false }; httpRequestRegistry[id] = request; return true }\nfunc ResolveHttpRequest(id string) (any, bool) { request, exists := httpRequestRegistry[id]; if exists { delete(httpRequestRegistry, id) }; return request, exists }",
+        "specification": "Service library for `http_server`. It allocates request IDs, records pending client exchanges, resolves responses by ID, expires stale entries, closes disconnected clients, and stops listener acceptance without discarding pending state. It exposes no data port; it is implementation support for the two-port `http_server` contract.",
+        "aiInstructions": "Implement request-registry state with deterministic ownership and cleanup. Never route a response by arrival order when an ID is available."
+      }
+    }
+  ]
+}

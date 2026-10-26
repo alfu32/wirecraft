@@ -1,0 +1,80 @@
+{
+  "id": "workflow-template-c-http-server",
+  "name": "http_server",
+  "rootNodeId": "template_root_c_http_server",
+  "nodes": [
+    {
+      "id": "template_root_c_http_server",
+      "name": "http_server",
+      "kind": "Group",
+      "children": [
+        "http_server",
+        "http_request_registry_lib"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 760,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_server",
+      "name": "http_server",
+      "kind": "Processor",
+      "parentId": "template_root_c_http_server",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 250,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "c",
+        "technologyId": "c-native",
+        "compilerId": "c-compiler"
+      },
+      "ports": [
+        {
+          "id": "request",
+          "name": "request",
+          "direction": "Output",
+          "dataType": "HttpExchange"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "HttpExchange"
+        }
+      ],
+      "text": {
+        "source": "static unsigned long long http_server_next_id = 1ULL;\nHttpExchange exchange;\nif (pop(response, &exchange) == THREADWORK_QUEUE_OK) http_request_registry__complete(&exchange);\nif (threadwork_runner.shutdown_signal > 0) return THREADWORK_OK;\nmemset(&exchange, 0, sizeof(exchange));\nsnprintf(exchange.id, sizeof(exchange.id), \"%llu\", http_server_next_id++);\nif (http_request_registry__accept(&exchange) == THREADWORK_OK) push(request, &exchange);",
+        "specification": "Accepts HTTP requests, emits each request into the Threadwork network, and returns the correlated response to the original client.\n\nPort and link contract:\n- `request` is the only output port and its transport link must also be named `request`.\n- `response` is the only input port and its transport link must also be named `response`.\n- The node may have exactly these two data ports and exactly these two data links. No additional data port or data link is permitted.\n\nPacket contract: `HttpExchange` contains exactly `id`, `request_text`, and `response_text`. A request sets `id` and `request_text`; the correlated response preserves `id` and sets `response_text`.\n\nShutdown contract: on a recorded SIGTERM, stop accepting new requests, keep the request registry available for already accepted requests, and request Threadwork shutdown. The runtime drain phase may then deliver residual responses while the network converges.\n\nThe companion `http_request_registry_lib` owns the map from packet `id` to the pending HTTP exchange. IDs must remain unique while pending; a response removes its entry after delivery. Unknown, duplicate, expired, or disconnected IDs are rejected without being delivered to another client.\n\nConfiguration supplies the listening address, port, request-size limit, and request timeout. Network I/O must remain non-blocking with respect to a Threadwork run cycle.",
+        "aiInstructions": "Preserve the exact request/response port contract, packet field names, ID correlation, and shutdown behavior. Bind a platform HTTP implementation without adding data ports."
+      }
+    },
+    {
+      "id": "http_request_registry_lib",
+      "name": "http_request_registry_lib",
+      "kind": "Processor",
+      "parentId": "template_root_c_http_server",
+      "layout": {
+        "x": 430,
+        "y": 115,
+        "width": 280,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "c",
+        "technologyId": "c-native",
+        "compilerId": "c-compiler"
+      },
+      "text": {
+        "source": "#include <sys/types.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n#include <fcntl.h>\n#include <errno.h>\ntypedef struct { char id[64]; char request_text[8192]; char response_text[8192]; } HttpExchange;\nstatic HttpExchange http_request_registry[64];\nstatic int http_request_clients[64];\nstatic size_t http_request_registry_size = 0U;\nstatic int http_request_listener = -1;\nstatic threadwork_error_t http_request_registry__start(void) {\n    struct sockaddr_in address;\n    if (http_request_listener >= 0) return THREADWORK_OK;\n    http_request_listener = socket(AF_INET, SOCK_STREAM, 0);\n    if (http_request_listener < 0) return THREADWORK_ERROR;\n    memset(&address, 0, sizeof(address));\n    address.sin_family = AF_INET;\n    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);\n    address.sin_port = htons(8080);\n    if (bind(http_request_listener, (struct sockaddr *)&address, sizeof(address)) < 0 || listen(http_request_listener, 16) < 0 || fcntl(http_request_listener, F_SETFL, O_NONBLOCK) < 0) { close(http_request_listener); http_request_listener = -1; return THREADWORK_ERROR; }\n    return THREADWORK_OK;\n}\nthreadwork_error_t http_request_registry__accept(HttpExchange *request) {\n    int client;\n    ssize_t received;\n    if (request == NULL || http_request_registry__start() != THREADWORK_OK || http_request_registry_size >= 64U) return THREADWORK_QUEUE_ERROR;\n    client = accept(http_request_listener, NULL, NULL);\n    if (client < 0) return errno == EAGAIN || errno == EWOULDBLOCK ? THREADWORK_QUEUE_ERROR : THREADWORK_ERROR;\n    received = recv(client, request->request_text, sizeof(request->request_text) - 1U, MSG_DONTWAIT);\n    if (received <= 0) { close(client); return THREADWORK_QUEUE_ERROR; }\n    request->request_text[received] = '\\0';\n    http_request_registry[http_request_registry_size] = *request;\n    http_request_clients[http_request_registry_size++] = client;\n    return THREADWORK_OK;\n}\nthreadwork_error_t http_request_registry__complete(const HttpExchange *response) {\n    size_t index;\n    if (response == NULL) return THREADWORK_ERROR;\n    for (index = 0U; index < http_request_registry_size; index++) {\n        if (strcmp(http_request_registry[index].id, response->id) == 0) {\n            dprintf(http_request_clients[index], \"HTTP/1.1 200 OK\\r\\nContent-Type: text/plain; charset=utf-8\\r\\nContent-Length: %zu\\r\\nConnection: close\\r\\n\\r\\n%s\", strlen(response->response_text), response->response_text);\n            close(http_request_clients[index]);\n            memmove(&http_request_registry[index], &http_request_registry[index + 1U], (http_request_registry_size - index - 1U) * sizeof(HttpExchange));\n            memmove(&http_request_clients[index], &http_request_clients[index + 1U], (http_request_registry_size - index - 1U) * sizeof(int));\n            http_request_registry_size--;\n            return THREADWORK_OK;\n        }\n    }\n    return THREADWORK_QUEUE_ERROR;\n}",
+        "specification": "Service library for `http_server`. It allocates request IDs, records pending client exchanges, resolves responses by ID, expires stale entries, closes disconnected clients, and stops listener acceptance without discarding pending state. It exposes no data port; it is implementation support for the two-port `http_server` contract.",
+        "aiInstructions": "Implement request-registry state with deterministic ownership and cleanup. Never route a response by arrival order when an ID is available."
+      }
+    }
+  ]
+}

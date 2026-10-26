@@ -1,0 +1,26 @@
+{
+  "id": "workflow-template-shutdown-signal-javascript",
+  "name": "Shutdown Signal (JavaScript)",
+  "rootNodeId": "template_root",
+  "nodes": [
+    {
+      "id": "template_root",
+      "name": "Shutdown Signal (JavaScript)",
+      "kind": "Group",
+      "layout": { "x": 40, "y": 40, "width": 500, "height": 220 }
+    },
+    {
+      "id": "probe_shutdown_signal",
+      "name": "probe_shutdown_signal",
+      "kind": "Processor",
+      "parentId": "template_root",
+      "layout": { "x": 90, "y": 115, "width": 250, "height": 70 },
+      "technology": { "languageId": "javascript", "technologyId": "nodejs", "compilerId": "nodejs-compiler" },
+      "text": {
+        "sourceLanguageId": "javascript",
+        "source": "if (threadworkRunner.getShutdownSignal() === 15) {\n  threadworkRunner.shutdownRequest();\n  return;\n}",
+        "specification": "Probes the SIGTERM recorded by the Node.js runtime and requests an orderly network shutdown. Residual packets continue through the runtime drain phase."
+      }
+    }
+  ]
+}

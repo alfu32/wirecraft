@@ -229,6 +229,58 @@ impl Service {
                     Ok(json!({"scope":"document","metadata":self.document.metadata}))
                 };
             }
+            "generate.files" => {
+                let id = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
+                let project = wirecraft_core::generation::literal_files(&self.document, id)?;
+                if let Some(output) = a["outputDir"].as_str() {
+                    crate::generation::write(&project, Path::new(output))?;
+                }
+                return Ok(serde_json::to_value(project)?);
+            }
+            "archetypes.save" => {
+                let id = required(a, "nodeId")?;
+                let fragment =
+                    wirecraft_core::fragment::Fragment::copy(&self.document, &[id.into()])?;
+                let mut document = self.document.clone();
+                document.root_node_id = id.into();
+                document.nodes = fragment
+                    .nodes
+                    .into_iter()
+                    .map(|n| (n.id.clone(), n))
+                    .collect();
+                document.repair()?;
+                store::save(&document, Path::new(required(a, "path")?))?;
+                return Ok(json!({"saved":true,"path":a["path"]}));
+            }
+            "entities.copy" => {
+                let ids: Vec<String> = serde_json::from_value(a["nodeIds"].clone())?;
+                return Ok(serde_json::to_value(
+                    wirecraft_core::fragment::Fragment::copy(&self.document, &ids)?,
+                )?);
+            }
+            "analysis.report" => return Ok(wirecraft_core::analysis::report(&self.document)),
+            "archetypes.list" => return Ok(crate::archetypes::list()),
+            "export.markdown" => {
+                let ids: Vec<String> = if let Some(ids) = a.get("nodeIds") {
+                    serde_json::from_value(ids.clone())?
+                } else {
+                    self.document.nodes.keys().cloned().collect()
+                };
+                let markdown = wirecraft_core::export::markdown(&self.document, &ids)?;
+                if let Some(path) = a["path"].as_str() {
+                    store::atomic_write(Path::new(path), markdown.as_bytes())?;
+                }
+                return Ok(json!({"markdown":markdown}));
+            }
+            "export.diagram" => {
+                let parent = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
+                let path = Path::new(required(a, "path")?);
+                let format = a["format"].as_str().unwrap_or("svg");
+                crate::export::diagram(&self.document, parent, path, format)?;
+                return Ok(
+                    json!({"path":path,"format":format,"exported":true,"scope":"focused graph","sheet":"free-size"}),
+                );
+            }
             "list_users" => return Ok(json!({"users":self.document.users})),
             "validate_design" => {
                 let diagnostics = self.document.validate();
@@ -237,7 +289,7 @@ impl Service {
             "analyze_network" => return Ok(self.document.network_counts()),
             "list_technologies" => {
                 return Ok(
-                    json!({"technologies":[],"languageServers":[{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}],"note":"Graph-to-source compiler migration pending; external build and LSP services are separate."}),
+                    json!({"technologies":[{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"file-export"},{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"multi-tech"}],"languageServers":[{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}],"note":"Graph-to-source compiler migration pending; external build and LSP services are separate."}),
                 );
             }
             "get_command_catalog" => return Ok(command_catalog()),
@@ -257,6 +309,150 @@ impl Service {
         // Candidate snapshot isolates partial failures (patches, link repair, validation).
         let mut candidate = self.document.clone();
         let result = match command {
+            "entities.paste" => {
+                let fragment: wirecraft_core::fragment::Fragment =
+                    serde_json::from_value(a["fragment"].clone())?;
+                let parent = a["parentId"]
+                    .as_str()
+                    .unwrap_or(&candidate.root_node_id)
+                    .to_string();
+                let ids = fragment.paste(
+                    &mut candidate,
+                    &parent,
+                    [
+                        a["offsetX"].as_f64().unwrap_or(30.),
+                        a["offsetY"].as_f64().unwrap_or(30.),
+                    ],
+                )?;
+                json!({"nodeIds":ids})
+            }
+            "entities.cut" => {
+                let ids: Vec<String> = serde_json::from_value(a["nodeIds"].clone())?;
+                let fragment = wirecraft_core::fragment::Fragment::copy(&candidate, &ids)?;
+                for id in &fragment.roots {
+                    candidate.delete(id)?;
+                }
+                serde_json::to_value(fragment)?
+            }
+            "archetypes.import" | "archetypes.import_file" => {
+                let source = if command == "archetypes.import" {
+                    crate::archetypes::load(required(a, "id")?)?
+                } else {
+                    store::load(Path::new(required(a, "path")?))?
+                };
+                let fragment = wirecraft_core::fragment::Fragment::from_document(&source)?;
+                let parent = a["parentId"]
+                    .as_str()
+                    .unwrap_or(&candidate.root_node_id)
+                    .to_string();
+                let ids = fragment.paste(
+                    &mut candidate,
+                    &parent,
+                    [
+                        a["x"].as_f64().unwrap_or(40.),
+                        a["y"].as_f64().unwrap_or(40.),
+                    ],
+                )?;
+                json!({"nodeIds":ids,"imported":true})
+            }
+            "entities.align" => {
+                let ids: Vec<String> = serde_json::from_value(a["nodeIds"].clone())?;
+                if ids.len() < 2 {
+                    return Err(Error::new("invalid_input", "Select at least two entities"));
+                }
+                let operation = required(a, "operation")?;
+                let mut nodes = ids
+                    .iter()
+                    .map(|id| candidate.node(id).cloned())
+                    .collect::<Result<Vec<_>>>()?;
+                if nodes
+                    .iter()
+                    .any(|n| n.is_link() || n.parent_id != nodes[0].parent_id)
+                {
+                    return Err(Error::new(
+                        "invalid_input",
+                        "Align entities in the same parent",
+                    ));
+                }
+                let left = nodes
+                    .iter()
+                    .map(|n| n.layout.x)
+                    .fold(f64::INFINITY, f64::min);
+                let top = nodes
+                    .iter()
+                    .map(|n| n.layout.y)
+                    .fold(f64::INFINITY, f64::min);
+                let right = nodes
+                    .iter()
+                    .map(|n| n.layout.x + n.layout.width)
+                    .fold(f64::NEG_INFINITY, f64::max);
+                let bottom = nodes
+                    .iter()
+                    .map(|n| n.layout.y + n.layout.height)
+                    .fold(f64::NEG_INFINITY, f64::max);
+                if operation == "distribute-horizontal" || operation == "distribute-vertical" {
+                    if nodes.len() < 3 {
+                        return Err(Error::new(
+                            "invalid_input",
+                            "Distribution requires at least three entities",
+                        ));
+                    }
+                    let horizontal = operation == "distribute-horizontal";
+                    nodes.sort_by(|a, b| {
+                        if horizontal {
+                            a.layout.x.total_cmp(&b.layout.x)
+                        } else {
+                            a.layout.y.total_cmp(&b.layout.y)
+                        }
+                    });
+                    let total = nodes
+                        .iter()
+                        .map(|n| {
+                            if horizontal {
+                                n.layout.width
+                            } else {
+                                n.layout.height
+                            }
+                        })
+                        .sum::<f64>();
+                    let gap = ((if horizontal {
+                        right - left
+                    } else {
+                        bottom - top
+                    }) - total)
+                        / (nodes.len() - 1) as f64;
+                    let mut cursor = if horizontal { left } else { top };
+                    for n in nodes {
+                        let mut layout = n.layout.clone();
+                        if horizontal {
+                            layout.x = cursor;
+                            cursor += layout.width + gap;
+                        } else {
+                            layout.y = cursor;
+                            cursor += layout.height + gap;
+                        }
+                        candidate.patch(&n.id, &json!({"layout":layout}))?;
+                    }
+                } else {
+                    for n in nodes {
+                        let mut layout = n.layout;
+                        match operation {
+                            "left" => layout.x = left,
+                            "right" => layout.x = right - layout.width,
+                            "top" => layout.y = top,
+                            "bottom" => layout.y = bottom - layout.height,
+                            _ => {
+                                return Err(Error::new(
+                                    "invalid_input",
+                                    "Unknown alignment operation",
+                                ));
+                            }
+                        }
+                        candidate.patch(&n.id, &json!({"layout":layout}))?;
+                    }
+                }
+                json!({"aligned":ids,"operation":operation})
+            }
             "create_entity" => {
                 let kind: NodeKind =
                     serde_json::from_value(a.get("kind").cloned().unwrap_or(json!("Processor")))?;

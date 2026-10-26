@@ -375,6 +375,20 @@ impl Document {
         found
     }
     pub fn effective(&self, id: &str, field: &str) -> String {
+        if let Some(node) = self.nodes.get(id) {
+            let export = matches!(field, "languageId" | "fileLayoutStrategyId")
+                && ["file-export", "multi-tech"]
+                    .contains(&self.effective(id, "technologyId").as_str());
+            if field == "languageId" && export && node.technology.language_id.is_empty() {
+                return "plain".into();
+            }
+            if field == "fileLayoutStrategyId"
+                && export
+                && ["", "none"].contains(&node.file_layout_strategy_id.as_str())
+            {
+                return "none".into();
+            }
+        }
         for id in self.ancestors(id) {
             if let Some(n) = self.nodes.get(&id) {
                 let v = match field {
@@ -395,6 +409,32 @@ impl Document {
         } else {
             none()
         }
+    }
+    pub fn effective_text_language(&self, id: &str, section: &str) -> String {
+        let key = match section {
+            "source" => "sourceLanguageId",
+            "initialization" => "initializationLanguageId",
+            "specification" => "specificationLanguageId",
+            "tests" => "testsLanguageId",
+            _ => "aiInstructionsLanguageId",
+        };
+        for current in self.ancestors(id) {
+            if let Some(node) = self.nodes.get(&current) {
+                let text = serde_json::to_value(&node.text).unwrap();
+                let language = text[key].as_str().unwrap_or("").trim();
+                if !language.is_empty() {
+                    return language.into();
+                }
+                if !["source", "initialization"].contains(&section) {
+                    return if section == "tests" {
+                        "json".into()
+                    } else {
+                        "markdown".into()
+                    };
+                }
+            }
+        }
+        self.effective(id, "languageId")
     }
     pub fn common_parent(&self, a: &str, b: &str) -> String {
         if a == b {
@@ -662,9 +702,22 @@ impl Document {
             {
                 add(Some(key), "Invalid layout geometry".into());
             }
+            if let Some(binary) = &n.binary_content {
+                use base64::Engine;
+                if base64::engine::general_purpose::STANDARD
+                    .decode(binary)
+                    .is_err()
+                {
+                    add(Some(key), "Invalid Base64 binary content".into());
+                }
+            }
+            let mut port_names = BTreeSet::new();
             let mut ports = BTreeSet::new();
             for p in &n.ports {
-                if p.name.trim().is_empty() || !ports.insert(&p.id) {
+                if p.name.trim().is_empty()
+                    || !ports.insert(&p.id)
+                    || !port_names.insert((format!("{:?}", p.direction), p.name.clone()))
+                {
                     add(Some(key), "Blank port name or duplicate port ID".into());
                 }
             }
@@ -672,6 +725,11 @@ impl Document {
                 add(Some(key), "Link has no link data".into());
             }
             if let Some(l) = &n.link {
+                let type_usage = self
+                    .nodes
+                    .get(&l.source_node_id)
+                    .is_some_and(|n| n.kind == NodeKind::Type)
+                    && ["auto", "type-usage"].contains(&l.interaction_kind.as_str());
                 if !["auto", "data", "lib", "src", "run", "type-usage"]
                     .contains(&l.interaction_kind.as_str())
                 {
@@ -686,14 +744,10 @@ impl Document {
                         Some(e) if e.is_link() => {
                             add(Some(key), "Link endpoint cannot be a link".into())
                         }
-                        Some(e)
-                            if e.kind == NodeKind::Type && l.interaction_kind != "type-usage" =>
-                        {
-                            add(
-                                Some(key),
-                                "Type endpoint requires type-usage interaction".into(),
-                            )
-                        }
+                        Some(e) if e.kind == NodeKind::Type && !type_usage => add(
+                            Some(key),
+                            "Type endpoint requires type-usage interaction".into(),
+                        ),
                         Some(e)
                             if e.kind != NodeKind::Type
                                 && !e
@@ -712,13 +766,50 @@ impl Document {
                     add(Some(key), "Link has incorrect common parent".into());
                 }
             }
-            if n.kind == NodeKind::Type
-                && let Some(t) = &n.type_definition
-            {
-                for f in t["fields"].as_array().into_iter().flatten() {
-                    if f["name"].as_str().unwrap_or("").trim().is_empty() {
-                        add(Some(key), "Type field name cannot be blank".into());
+            if n.kind == NodeKind::Type {
+                if let Some(t) = &n.type_definition {
+                    let qualifier = t["qualifier"]
+                        .as_str()
+                        .unwrap_or("object")
+                        .trim()
+                        .to_lowercase();
+                    let arity = match qualifier.as_str() {
+                        "object" => Some(0),
+                        "array" | "list" => Some(1),
+                        "map" => Some(2),
+                        _ => None,
+                    };
+                    let generic = t["genericTypeIds"].as_array();
+                    if !t.is_object()
+                        || arity.is_none()
+                        || generic.map_or(0, Vec::len) != arity.unwrap_or(0)
+                    {
+                        add(Some(key), "Invalid type qualifier or generic arity".into());
                     }
+                    if generic
+                        .into_iter()
+                        .flatten()
+                        .any(|id| id.as_str().is_none_or(|s| s.trim().is_empty()))
+                    {
+                        add(Some(key), "Generic type ID cannot be blank".into());
+                    }
+                    let mut names = BTreeSet::new();
+                    for f in t["fields"].as_array().into_iter().flatten() {
+                        let name = f["name"].as_str().unwrap_or("").trim();
+                        if name.is_empty() || !names.insert(name) {
+                            add(Some(key), "Blank or duplicate type field name".into());
+                        }
+                        if f.get("typeExpression").is_none_or(Value::is_null) {
+                            let id = f["typeId"].as_str().unwrap_or("string");
+                            if id.trim().is_empty()
+                                || self.nodes.get(id).is_some_and(|n| n.kind != NodeKind::Type)
+                            {
+                                add(Some(key), "Invalid type field reference".into());
+                            }
+                        }
+                    }
+                } else {
+                    add(Some(key), "Type entity has no type definition".into());
                 }
             }
         }
@@ -747,6 +838,8 @@ impl Document {
         let id = Uuid::new_v4().to_string();
         let mut n = Node::new(id.clone(), name.into(), kind, Some(parent.into()));
         n.status = Some("BUSINESS".into());
+        n.status_changes.push(json!({"userId":"local","changedDate":timestamp(),"initStatus":null,"endStatus":"BUSINESS"}));
+        n.modified = json!({"date":timestamp(),"user":"local"});
         self.nodes.insert(id.clone(), n);
         self.nodes
             .get_mut(parent)

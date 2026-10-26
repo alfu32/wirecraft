@@ -1,0 +1,63 @@
+{
+  "id": "workflow-template-php-file-queue",
+  "name": "file_queue",
+  "rootNodeId": "template_root_php_file_queue",
+  "nodes": [
+    {
+      "id": "template_root_php_file_queue",
+      "name": "file_queue",
+      "kind": "Group",
+      "children": [
+        "file_queue"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "file_queue",
+      "name": "file_queue",
+      "kind": "Processor",
+      "parentId": "template_root_php_file_queue",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "php",
+        "technologyId": "php",
+        "compilerId": "php-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "FileQueueConfig"
+        },
+        {
+          "id": "read",
+          "name": "read",
+          "direction": "Output",
+          "dataType": "FilePacket"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "FilePacket"
+        }
+      ],
+      "text": {
+        "source": "static $fileQueuePending = [];\nstatic $fileQueueConfig = null;\nif ($config) { $candidate = array_shift($config); if (is_array($candidate)) $fileQueueConfig = $candidate; }\nif (is_array($fileQueueConfig) && isset($fileQueueConfig['in'], $fileQueueConfig['out'], $fileQueueConfig['err'])) {\n    foreach (glob(rtrim($fileQueueConfig['in'], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*') ?: [] as $path) {\n        if (!is_file($path)) continue;\n        $claimed = $path . '.threadwork-processing';\n        if (!rename($path, $claimed)) continue;\n        $id = bin2hex(random_bytes(12));\n        $file = ['id' => $id, 'filename' => basename($path), 'content' => file_get_contents($claimed)];\n        if ($file['content'] === false) { rename($claimed, $fileQueueConfig['err'] . DIRECTORY_SEPARATOR . basename($path)); continue; }\n        $fileQueuePending[$id] = $file;\n        unlink($claimed);\n        $read[] = $file;\n        break;\n    }\n}\nif ($response && is_array($fileQueueConfig)) {\n    $responsePacket = array_shift($response);\n    $id = (string)($responsePacket['id'] ?? '');\n    if ($id !== '' && isset($fileQueuePending[$id])) {\n        $original = $fileQueuePending[$id];\n        $target = $fileQueueConfig['out'] . DIRECTORY_SEPARATOR . basename($original['filename']);\n        $temporary = $target . '.tmp';\n        if (file_put_contents($temporary, (string)($responsePacket['content'] ?? '')) !== false) rename($temporary, $target);\n        unset($fileQueuePending[$id]);\n    }\n}",
+        "specification": "Implements a folder-backed request/response queue.\n\nConfiguration contract: input port/link `config` supplies `FileQueueConfig` with the communication folders `in`, `out`, and `err`. All three paths are required and must resolve independently.\n\nTransport contract:\n- output port/link `read` emits one consumed input file as a `FilePacket`;\n- input port/link `response` accepts processed content correlated to the original input file;\n- input port/link `config` updates the folder configuration.\n\nPacket contract: `FilePacket` contains exactly `id`, `filename`, and `content`. The emitted packet receives a stable `id`, the original basename in `filename`, and the complete file data in `content`. A response should preserve `id`; the ID is used to recover the original filename when necessary.\n\nBehavior: atomically claim regular files from the `in` folder, emit them once through `read`, remember pending IDs, and write correlated responses to the `out` folder. Move malformed, unreadable, uncorrelated, timed-out, or failed files to `err`. Create no partial final output file: write a temporary file and atomically rename it.\n\nThe implementation may omit ID lookup when the response preserves an unambiguous safe filename, but it must still prevent cross-file response mixups and path traversal.",
+        "aiInstructions": "Keep file claiming and output publication atomic. Preserve `id`, `filename`, and `content`, and reject unsafe filenames."
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+# id	label	description	group/resource
+request-response	Request / Response	Receive, handle, and return a typed request.	integration/request-response.orch
+validation-pipeline	Validation Pipeline	Validate input, route failures, and emit accepted data.	quality/validation-pipeline.orch
+shutdown-signal-c	Shutdown Signal (C)	Probe SIGTERM and request an orderly C network shutdown.	runtime/shutdown-signal-c.orch
+shutdown-signal-php	Shutdown Signal (PHP)	Probe SIGTERM and request an orderly PHP network shutdown.	runtime/shutdown-signal-php.orch
+shutdown-signal-javascript	Shutdown Signal (JavaScript)	Probe SIGTERM and request an orderly Node.js network shutdown.	runtime/shutdown-signal-javascript.orch
+shutdown-signal-python	Shutdown Signal (Python)	Probe SIGTERM and request an orderly Python network shutdown.	runtime/shutdown-signal-python.orch
+shutdown-signal-go	Shutdown Signal (Go)	Probe SIGTERM and request an orderly Go network shutdown.	runtime/shutdown-signal-go.orch
+c-http-server	http_server	C: HTTP request/response adapter with ID-correlated pending state.	c/http-server.orch
+c-file-queue	file_queue	C: Folder-backed input/output/error queue with correlated file packets.	c/file-queue.orch
+c-config-reader	config_reader	C: Service library starter for reading configuration file content.	c/config-reader.orch
+c-http-reader	http_reader	C: Configured HTTP polling source that emits response content.	c/http-reader.orch
+c-http-writer	http_writer	C: Configured HTTP sink that sends incoming request packets.	c/http-writer.orch
+php-http-server	http_server	PHP: HTTP request/response adapter with ID-correlated pending state.	php/http-server.orch
+php-file-queue	file_queue	PHP: Folder-backed input/output/error queue with correlated file packets.	php/file-queue.orch
+php-config-reader	config_reader	PHP: Service library starter for reading configuration file content.	php/config-reader.orch
+php-http-reader	http_reader	PHP: Configured HTTP polling source that emits response content.	php/http-reader.orch
+php-http-writer	http_writer	PHP: Configured HTTP sink that sends incoming request packets.	php/http-writer.orch
+javascript-http-server	http_server	JavaScript: HTTP request/response adapter with ID-correlated pending state.	javascript/http-server.orch
+javascript-file-queue	file_queue	JavaScript: Folder-backed input/output/error queue with correlated file packets.	javascript/file-queue.orch
+javascript-config-reader	config_reader	JavaScript: Service library starter for reading configuration file content.	javascript/config-reader.orch
+javascript-http-reader	http_reader	JavaScript: Configured HTTP polling source that emits response content.	javascript/http-reader.orch
+javascript-http-writer	http_writer	JavaScript: Configured HTTP sink that sends incoming request packets.	javascript/http-writer.orch
+python-http-server	http_server	Python: HTTP request/response adapter with ID-correlated pending state.	python/http-server.orch
+python-file-queue	file_queue	Python: Folder-backed input/output/error queue with correlated file packets.	python/file-queue.orch
+python-config-reader	config_reader	Python: Service library starter for reading configuration file content.	python/config-reader.orch
+python-http-reader	http_reader	Python: Configured HTTP polling source that emits response content.	python/http-reader.orch
+python-http-writer	http_writer	Python: Configured HTTP sink that sends incoming request packets.	python/http-writer.orch
+go-http-server	http_server	Go: HTTP request/response adapter with ID-correlated pending state.	go/http-server.orch
+go-file-queue	file_queue	Go: Folder-backed input/output/error queue with correlated file packets.	go/file-queue.orch
+go-config-reader	config_reader	Go: Service library starter for reading configuration file content.	go/config-reader.orch
+go-http-reader	http_reader	Go: Configured HTTP polling source that emits response content.	go/http-reader.orch
+go-http-writer	http_writer	Go: Configured HTTP sink that sends incoming request packets.	go/http-writer.orch

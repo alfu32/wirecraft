@@ -10,8 +10,30 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let mode = args.next().unwrap_or_else(|| "help".into());
     if mode == "help" || mode == "--help" {
         println!(
-            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
+            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
             env!("CARGO_PKG_VERSION")
+        );
+        return Ok(());
+    }
+    if mode == "migrate-settings" {
+        let source = PathBuf::from(
+            args.next()
+                .ok_or_else(|| anyhow::anyhow!("Missing Java Preferences export path"))?,
+        );
+        let output = PathBuf::from(
+            args.next()
+                .ok_or_else(|| anyhow::anyhow!("Missing Wirecraft settings output path"))?,
+        );
+        if output.exists() {
+            anyhow::bail!(
+                "Refusing to overwrite existing settings; import into a new file and review it first"
+            );
+        }
+        let settings = crate::config::import_preferences(&std::fs::read_to_string(source)?)?;
+        settings.save(&output)?;
+        println!(
+            "{}",
+            json!({"imported":true,"retainedPreferences":settings.legacy_preferences.len(),"activeSettings":["editorIndentSpaces"],"deferred":"Appearance and panel geometry are archived for later UI parity; identity and AI credentials were not imported."})
         );
         return Ok(());
     }

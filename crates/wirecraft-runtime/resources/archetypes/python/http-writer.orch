@@ -1,0 +1,57 @@
+{
+  "id": "workflow-template-python-http-writer",
+  "name": "http_writer",
+  "rootNodeId": "template_root_python_http_writer",
+  "nodes": [
+    {
+      "id": "template_root_python_http_writer",
+      "name": "http_writer",
+      "kind": "Group",
+      "children": [
+        "http_writer"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_writer",
+      "name": "http_writer",
+      "kind": "Processor",
+      "parentId": "template_root_python_http_writer",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "python",
+        "technologyId": "python",
+        "compilerId": "python-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "HttpWriterConfig"
+        },
+        {
+          "id": "request",
+          "name": "request",
+          "direction": "Input",
+          "dataType": "HttpRequest"
+        }
+      ],
+      "text": {
+        "source": "from urllib.request import Request, urlopen\n\ntry:\n    settings = config[0]\n    packet = request.popleft()\nexcept (IndexError, TypeError):\n    return\nif not settings.get(\"url\"):\n    raise ValueError(\"http_writer requires config.url\")\nbody = str(packet.get(\"request_text\", packet.get(\"content\", \"\"))).encode(\"utf-8\")\nmessage = Request(settings[\"url\"], data=body, method=str(settings.get(\"method\", \"POST\")).upper(), headers=settings.get(\"headers\", {}))\nwith urlopen(message, timeout=float(settings.get(\"timeout\", 10))) as reply:\n    if reply.status >= 400:\n        raise RuntimeError(f\"HTTP writer returned status {reply.status}\")",
+        "specification": "Consumes request packets and sends each one to the configured HTTP endpoint.\n\nPort contract: input port/link `config` supplies `HttpWriterConfig`; input port/link `request` supplies packets to send.\n\nConfiguration contains `method`, `url`, and `headers`. `method` and `url` are required; headers are merged predictably with packet-specific content metadata without creating contradictory Content-Length or transfer-encoding values.\n\nFor every packet received on `request`, send one bounded HTTP request. Preserve packet order unless concurrency is explicitly enabled. Treat non-success status codes and transport failures according to the project's error policy; do not silently discard failed packets. Do not block the Threadwork run cycle while waiting on remote I/O.",
+        "aiInstructions": "Send exactly one HTTP request per input packet using the configured method, URL, and headers. Make retry and idempotency behavior explicit."
+      }
+    }
+  ]
+}

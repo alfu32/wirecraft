@@ -1,0 +1,80 @@
+{
+  "id": "workflow-template-request-response",
+  "name": "Request Response Template",
+  "rootNodeId": "template_root",
+  "nodes": [
+    {
+      "id": "template_root",
+      "name": "Request Response Template",
+      "kind": "Group",
+      "layout": { "x": 40, "y": 40, "width": 760, "height": 310 }
+    },
+    {
+      "id": "request_response",
+      "name": "request_response",
+      "kind": "Group",
+      "parentId": "template_root",
+      "layout": { "x": 70, "y": 70, "width": 680, "height": 220 },
+      "text": {
+        "specification": "Coordinates one request from reception through processing to response delivery.",
+        "aiInstructions": "Preserve request correlation and return exactly one response for each accepted request."
+      }
+    },
+    {
+      "id": "receive_request",
+      "name": "receive_request",
+      "kind": "Processor",
+      "parentId": "request_response",
+      "layout": { "x": 100, "y": 130, "width": 170, "height": 70 },
+      "text": { "specification": "Receives and normalizes an external request information package." },
+      "ports": [{ "id": "out_request", "name": "request", "direction": "Output" }]
+    },
+    {
+      "id": "handle_request",
+      "name": "handle_request",
+      "kind": "Processor",
+      "parentId": "request_response",
+      "layout": { "x": 600, "y": 130, "width": 170, "height": 70 },
+      "text": { "specification": "Applies the route-specific behavior and constructs a response package." },
+      "ports": [
+        { "id": "in_request", "name": "request", "direction": "Input" },
+        { "id": "out_response", "name": "response", "direction": "Output" }
+      ]
+    },
+    {
+      "id": "send_response",
+      "name": "send_response",
+      "kind": "Processor",
+      "parentId": "request_response",
+      "layout": { "x": 1100, "y": 130, "width": 170, "height": 70 },
+      "text": { "specification": "Returns the response over the request's originating connection." },
+      "ports": [{ "id": "in_response", "name": "response", "direction": "Input" }]
+    },
+    {
+      "id": "request_link",
+      "name": "request",
+      "kind": "Link",
+      "parentId": "request_response",
+      "link": {
+        "sourceNodeId": "receive_request",
+        "sourcePortName": "request",
+        "targetNodeId": "handle_request",
+        "targetPortName": "request",
+        "typeName": "Request"
+      }
+    },
+    {
+      "id": "response_link",
+      "name": "response",
+      "kind": "Link",
+      "parentId": "request_response",
+      "link": {
+        "sourceNodeId": "handle_request",
+        "sourcePortName": "response",
+        "targetNodeId": "send_response",
+        "targetPortName": "response",
+        "typeName": "Response"
+      }
+    }
+  ]
+}

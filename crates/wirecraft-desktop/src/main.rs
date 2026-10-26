@@ -4,7 +4,7 @@ use client::{Client, Message, Update};
 use gpui::{prelude::*, *};
 use gpui_component::{
     Root, Theme, ThemeMode,
-    input::{Input, InputEvent, InputState},
+    input::{Input, InputEvent, InputState, TabSize},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -30,7 +30,10 @@ actions!(
         LinkMode,
         Fit,
         Apply,
-        Quit
+        Quit,
+        CopyEntities,
+        CutEntities,
+        PasteEntities
     ]
 );
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -93,17 +96,26 @@ struct Wirecraft {
     token: String,
     output: String,
     tree: Vec<(String, usize)>,
+    archetypes: Vec<Value>,
 }
 impl Wirecraft {
     fn new(
         client: Client,
         rx: async_channel::Receiver<Update>,
         session: UiSession,
+        indent: usize,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Entity name"));
-        let editor = cx.new(|cx| InputState::new(window, cx).code_editor("plain"));
+        let editor = cx.new(|cx| {
+            InputState::new(window, cx)
+                .code_editor("plain")
+                .tab_size(TabSize {
+                    tab_size: indent,
+                    hard_tabs: false,
+                })
+        });
         let properties = cx.new(|cx| InputState::new(window, cx).code_editor("json"));
         let snapshot = Arc::new(Snapshot {
             document: Document::new("Connecting…"),
@@ -158,6 +170,7 @@ impl Wirecraft {
             token: String::new(),
             output: String::new(),
             tree: vec![],
+            archetypes: vec![],
         };
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(update) = rx.recv().await {
@@ -232,10 +245,37 @@ impl Wirecraft {
                     }
                     self.base_properties = serde_json::to_string_pretty(&props).unwrap();
                 }
+                if command == "entities.copy" || command == "entities.cut" {
+                    cx.write_to_clipboard(ClipboardItem::new_string(value.to_string()));
+                }
+                if [
+                    "entities.paste",
+                    "archetypes.import",
+                    "archetypes.import_file",
+                ]
+                .contains(&command.as_str())
+                {
+                    self.selected = value["nodeIds"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|id| id.as_str().map(str::to_string))
+                        .collect();
+                    self.editor_entity = None;
+                }
+                if command == "archetypes.list" {
+                    self.archetypes = value["archetypes"].as_array().cloned().unwrap_or_default();
+                }
+                if command == "export.markdown"
+                    && let Some(text) = value["markdown"].as_str()
+                {
+                    cx.write_to_clipboard(ClipboardItem::new_string(text.to_string()));
+                }
                 if command.starts_with("lsp.")
                     || command.starts_with("jobs.")
                     || command == "threadwork.analyze_network"
                     || command == "threadwork.validate_design"
+                    || command == "analysis.report"
                 {
                     self.output = serde_json::to_string_pretty(&value).unwrap_or_default();
                 }
@@ -616,18 +656,38 @@ impl Wirecraft {
             return;
         }
         let world = self.viewport.world(local);
+        let tolerance = 6. / self.viewport.zoom;
         let hits = self.scene.index.query(Rect {
-            x: world[0],
-            y: world[1],
-            width: 1.,
-            height: 1.,
+            x: world[0] - tolerance,
+            y: world[1] - tolerance,
+            width: tolerance * 2.,
+            height: tolerance * 2.,
         });
-        let hit = hits.into_iter().find(|id| {
-            self.scene
-                .nodes
-                .get(id)
-                .is_some_and(|n| n.2.contains(world))
-        });
+        let hit = hits
+            .iter()
+            .find(|id| {
+                self.scene
+                    .nodes
+                    .get(*id)
+                    .is_some_and(|n| n.2.contains(world))
+            })
+            .cloned()
+            .or_else(|| {
+                if self.mode != Mode::Select {
+                    return None;
+                }
+                hits.iter()
+                    .find(|id| {
+                        self.scene.links.get(*id).is_some_and(|(_, points)| {
+                            points.windows(2).any(|pair| {
+                                wirecraft_core::viewport::distance_to_segment(
+                                    world, pair[0], pair[1],
+                                ) <= tolerance
+                            })
+                        })
+                    })
+                    .cloned()
+            });
         match self.mode {
             Mode::Node | Mode::Type => {
                 self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"name":if self.mode==Mode::Type{"New type"}else{"New processor"},"kind":if self.mode==Mode::Type{"Type"}else{"Processor"},"attributes":{"layout":{"x":world[0],"y":world[1]}}}));
@@ -661,8 +721,10 @@ impl Wirecraft {
                             self.tab = "Editor".into();
                         }
                     } else {
-                        self.drag_start = Some(world);
-                        self.drag_delta = [0., 0.];
+                        if self.scene.nodes.contains_key(&id) {
+                            self.drag_start = Some(world);
+                            self.drag_delta = [0., 0.];
+                        }
                     }
                 } else {
                     if !event.modifiers.shift {
@@ -729,6 +791,122 @@ impl Wirecraft {
         }
         self.persist_ui(cx);
         cx.notify();
+    }
+    fn copy(&mut self, _: &CopyEntities, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.has_draft(cx) {
+            self.client
+                .send("entities.copy", json!({"nodeIds":self.selected}));
+        }
+    }
+    fn cut(&mut self, _: &CutEntities, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.has_draft(cx) {
+            self.client
+                .send("entities.cut", json!({"nodeIds":self.selected}));
+        }
+    }
+    fn paste(&mut self, _: &PasteEntities, _: &mut Window, cx: &mut Context<Self>) {
+        if self.has_draft(cx) {
+            self.status = "Apply the editor draft before pasting".into();
+            cx.notify();
+            return;
+        }
+        if let Some(text) = cx.read_from_clipboard().and_then(|i| i.text()) {
+            match serde_json::from_str::<Value>(&text) {
+                Ok(fragment) => self.client.send(
+                    "entities.paste",
+                    json!({"fragment":fragment,"parentId":self.parent}),
+                ),
+                Err(_) => {
+                    self.status = "Clipboard does not contain a Wirecraft graph fragment".into();
+                    cx.notify();
+                }
+            }
+        }
+    }
+    fn export_dialog(&mut self, format: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        let directory = self
+            .snapshot
+            .path
+            .as_ref()
+            .and_then(|p| p.parent())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let prompt = cx.prompt_for_new_path(&directory, Some(&format!("diagram.{format}")));
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(mut path))) = prompt.await {
+                if path.extension().is_none() {
+                    path.set_extension(format);
+                }
+                let _ = this.update_in(cx, |this, _, _| {
+                    this.client.send(
+                        "export.diagram",
+                        json!({"nodeId":this.parent,"path":path,"format":format}),
+                    )
+                });
+            }
+        })
+        .detach();
+    }
+    fn artifact_dialog(&mut self, archetype: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.has_draft(cx) {
+            self.status = "Apply the editor draft before generating or saving an archetype".into();
+            cx.notify();
+            return;
+        }
+        let directory = self
+            .snapshot
+            .path
+            .as_ref()
+            .and_then(|p| p.parent())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let prompt = cx.prompt_for_new_path(
+            &directory,
+            Some(if archetype {
+                "archetype.orch"
+            } else {
+                "generated-project"
+            }),
+        );
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(path))) = prompt.await {
+                let _ = this.update_in(cx, |this, _, _| {
+                    if archetype {
+                        if let Some(id) = this.selected.first() {
+                            this.client
+                                .send("archetypes.save", json!({"nodeId":id,"path":path}));
+                        }
+                    } else {
+                        this.client.send(
+                            "generate.files",
+                            json!({"nodeId":this.parent,"outputDir":path}),
+                        );
+                    }
+                });
+            }
+        })
+        .detach();
+    }
+    fn import_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let prompt = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Import a .orch archetype".into()),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = prompt.await
+                && let Some(path) = paths.first()
+            {
+                let _ = this.update_in(cx, |this, _, _| {
+                    this.client.send(
+                        "archetypes.import_file",
+                        json!({"path":path,"parentId":this.parent}),
+                    )
+                });
+            }
+        })
+        .detach();
     }
     fn analyze(&mut self, cpp: bool, build: bool, cx: &mut Context<Self>) {
         if self.section != "source" {
@@ -808,6 +986,8 @@ impl Render for Wirecraft {
             "Editor",
             "Project Management",
             "Analysis",
+            "Archetypes",
+            "Export",
             "Tools",
             "MCP",
         ] {
@@ -816,6 +996,9 @@ impl Render for Wirecraft {
                     .when(self.tab == tab, |b| b.bg(rgb(0x3c536c)))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.tab = tab.into();
+                        if tab == "Archetypes" {
+                            this.tool("archetypes.list");
+                        }
                         this.persist_ui(cx);
                         cx.notify();
                     })),
@@ -909,6 +1092,13 @@ impl Render for Wirecraft {
                                 .child(format!("{parent_name} · {:?}", self.mode)),
                         ),
                 )
+                .child(div().flex().gap_2().p_2()
+                   .child(button("copy-graph","Copy").on_click(cx.listener(|this,_,w,cx|this.copy(&CopyEntities,w,cx))))
+                   .child(button("cut-graph","Cut").on_click(cx.listener(|this,_,w,cx|this.cut(&CutEntities,w,cx))))
+                   .child(button("paste-graph","Paste").on_click(cx.listener(|this,_,w,cx|this.paste(&PasteEntities,w,cx))))
+                   .child(button("move-here","Move selection here").on_click(cx.listener(|this,_,_,_|{for id in &this.selected{this.client.send("threadwork.move_entity",json!({"nodeId":id,"parentId":this.parent}));}})))
+                   .child(button("align-left","Align left").on_click(cx.listener(|this,_,_,_|this.client.send("entities.align",json!({"nodeIds":this.selected,"operation":"left"})))))
+                   .child(button("distribute-x","Distribute horizontally").on_click(cx.listener(|this,_,_,_|this.client.send("entities.align",json!({"nodeIds":this.selected,"operation":"distribute-horizontal"}))))))
                 .child(
                     div()
                         .id("canvas")
@@ -1022,6 +1212,11 @@ impl Render for Wirecraft {
                         .child(button("validate", "Validate design").on_click(
                             cx.listener(|this, _, _, _| this.tool("threadwork.validate_design")),
                         ))
+                        .child(
+                            button("report-full", "Graph report").on_click(
+                                cx.listener(|this, _, _, _| this.tool("analysis.report")),
+                            ),
+                        )
                         .child(button("counts", "Network counts").on_click(
                             cx.listener(|this, _, _, _| this.tool("threadwork.analyze_network")),
                         )),
@@ -1034,6 +1229,21 @@ impl Render for Wirecraft {
                         .p_4()
                         .child(self.output.clone()),
                 );
+        } else if self.tab == "Archetypes" {
+            let parent = self.parent.clone();
+            content=content.child(div().flex().gap_2().p_3().child(button("refresh-archetypes","Refresh catalog").on_click(cx.listener(|this,_,_,_|this.tool("archetypes.list")))).child(button("import-archetype","Import .orch file").on_click(cx.listener(|this,_,window,cx|this.import_dialog(window,cx)))))
+              .child(div().p_3().child("Import a reusable workflow into the focused composite. Every imported entity gets a fresh ID; originals are retained."))
+              .child(div().id("archetype-list").flex_1().overflow_y_scroll().children(self.archetypes.iter().enumerate().map(|(i,a)|{
+                let id=a["id"].as_str().unwrap_or("").to_string();let label=format!("{} · {}",a["name"].as_str().unwrap_or(&id),id);let parent=parent.clone();
+                div().id(i).p_3().border_b_1().border_color(rgb(0x233347)).cursor_pointer().hover(|s|s.bg(rgb(0x233347))).on_click(cx.listener(move|this,_,_,_|this.client.send("archetypes.import",json!({"id":id,"parentId":parent})))).child(label)
+              })));
+        } else if self.tab == "Export" {
+            content=content.child(div().p_4().child("Export the focused graph as a free-size drawing. ISO sheets, rolls and poster tiling remain pending."))
+              .child(div().flex().gap_2().p_3().child(button("generate-files","Generate literal file entities").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog(false,window,cx)))).child(button("save-archetype","Save selected subtree as archetype").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog(true,window,cx)))))
+              .child(div().flex().gap_2().p_3().child(button("export-svg","SVG").on_click(cx.listener(|this,_,window,cx|this.export_dialog("svg",window,cx))))
+              .child(button("export-png","PNG").on_click(cx.listener(|this,_,window,cx|this.export_dialog("png",window,cx))))
+              .child(button("export-pdf","PDF").on_click(cx.listener(|this,_,window,cx|this.export_dialog("pdf",window,cx))))
+              .child(button("copy-fiches","Copy component fiches · Markdown").on_click(cx.listener(|this,_,_,_|this.client.send("export.markdown",json!({"nodeIds":this.selected}))))));
         } else if self.tab == "Tools" {
             content=content.child(div().p_3().child("Analyze the selected source section as a standalone C/C++ file. Graph-generated translation units are a separate migration milestone."))
              .child(div().flex().gap_2().p_3()
@@ -1048,7 +1258,7 @@ impl Render for Wirecraft {
             let config = json!({"mcpServers":{"wirecraft":{"url":format!("{}/mcp",self.endpoint),"headers":{"Authorization":format!("Bearer {}",self.token)}}}});
             content=content.child(div().p_4().child("Local MCP server · owned by this desktop session")).child(div().p_4().child(format!("{}/mcp",self.endpoint))).child(button("copy-mcp","Copy MCP client configuration").on_click(move|_,_,cx|cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string_pretty(&config).unwrap())))).child(div().p_4().child("Clients share this open design. Closing Wirecraft shuts down this server. The previous Threadworks server runs independently."));
         }
-        div().key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(|_:&Quit,_,cx|cx.quit()).size_full().flex().flex_col().bg(rgb(0x0d1520)).text_color(rgb(0xe1e9ef)).text_sm().child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().child(sidebar).child(content)).child(div().px_3().py_2().bg(rgb(0x111d2b)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.)))
+        div().key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(|_:&Quit,_,cx|cx.quit()).size_full().flex().flex_col().bg(rgb(0x0d1520)).text_color(rgb(0xe1e9ef)).text_sm().child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().child(sidebar).child(content)).child(div().px_3().py_2().bg(rgb(0x111d2b)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.)))
     }
 }
 fn main() -> anyhow::Result<()> {
@@ -1090,12 +1300,17 @@ fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|s| serde_json::from_slice(&s).ok())
         .unwrap_or_default();
-    let (client, rx, worker) = Client::start(state_dir.clone(), project);
+    let settings = wirecraft_runtime::config::Settings::load(&state_dir.join("settings.json"))?;
+    let indent = settings.editor_indent_spaces;
+    let (client, rx, worker) = Client::start(state_dir.clone(), settings, project);
     gpui::Application::new().run(move |cx| {
         gpui_component::init(cx);
         Theme::change(ThemeMode::Dark, None, cx);
         cx.bind_keys([
             KeyBinding::new("ctrl-o", Open, Some("Wirecraft")),
+            KeyBinding::new("ctrl-c", CopyEntities, Some("Wirecraft")),
+            KeyBinding::new("ctrl-x", CutEntities, Some("Wirecraft")),
+            KeyBinding::new("ctrl-v", PasteEntities, Some("Wirecraft")),
             KeyBinding::new("ctrl-q", Quit, Some("Wirecraft")),
             KeyBinding::new("ctrl-s", Save, Some("Wirecraft")),
             KeyBinding::new("ctrl-shift-s", SaveAs, Some("Wirecraft")),
@@ -1121,7 +1336,7 @@ fn main() -> anyhow::Result<()> {
             },
             move |window, cx| {
                 window.set_window_title("Wirecraft");
-                let view = cx.new(|cx| Wirecraft::new(client, rx, session, window, cx));
+                let view = cx.new(|cx| Wirecraft::new(client, rx, session, indent, window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             },
         )

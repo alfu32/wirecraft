@@ -1,0 +1,63 @@
+{
+  "id": "workflow-template-python-file-queue",
+  "name": "file_queue",
+  "rootNodeId": "template_root_python_file_queue",
+  "nodes": [
+    {
+      "id": "template_root_python_file_queue",
+      "name": "file_queue",
+      "kind": "Group",
+      "children": [
+        "file_queue"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "file_queue",
+      "name": "file_queue",
+      "kind": "Processor",
+      "parentId": "template_root_python_file_queue",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "python",
+        "technologyId": "python",
+        "compilerId": "python-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "FileQueueConfig"
+        },
+        {
+          "id": "read",
+          "name": "read",
+          "direction": "Output",
+          "dataType": "FilePacket"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "FilePacket"
+        }
+      ],
+      "text": {
+        "source": "from pathlib import Path\nimport os\nimport uuid\n\nstate = context.setdefault(\"file_queue\", {\"config\": None, \"pending\": {}})\ntry:\n    state[\"config\"] = config.popleft()\nexcept IndexError:\n    pass\nsettings = state[\"config\"]\nif settings:\n    for path in Path(settings[\"in\"]).iterdir():\n        if not path.is_file():\n            continue\n        claimed = path.with_name(path.name + \".threadwork-processing\")\n        try:\n            os.replace(path, claimed)\n            item = {\"id\": uuid.uuid4().hex, \"filename\": path.name, \"content\": claimed.read_text(encoding=\"utf-8\")}\n            claimed.unlink()\n            state[\"pending\"][item[\"id\"]] = item\n            read.append(item)\n        except (OSError, UnicodeError):\n            try:\n                os.replace(claimed, Path(settings[\"err\"]) / path.name)\n            except OSError:\n                pass\n        break\ntry:\n    item = response.popleft()\n    original = state[\"pending\"].pop(str(item[\"id\"]), None)\n    if original:\n        target = Path(settings[\"out\"]) / Path(original[\"filename\"]).name\n        temporary = target.with_name(target.name + \".tmp\")\n        temporary.write_text(str(item.get(\"content\", \"\")), encoding=\"utf-8\")\n        os.replace(temporary, target)\nexcept (IndexError, KeyError, OSError):\n    pass",
+        "specification": "Implements a folder-backed request/response queue.\n\nConfiguration contract: input port/link `config` supplies `FileQueueConfig` with the communication folders `in`, `out`, and `err`. All three paths are required and must resolve independently.\n\nTransport contract:\n- output port/link `read` emits one consumed input file as a `FilePacket`;\n- input port/link `response` accepts processed content correlated to the original input file;\n- input port/link `config` updates the folder configuration.\n\nPacket contract: `FilePacket` contains exactly `id`, `filename`, and `content`. The emitted packet receives a stable `id`, the original basename in `filename`, and the complete file data in `content`. A response should preserve `id`; the ID is used to recover the original filename when necessary.\n\nBehavior: atomically claim regular files from the `in` folder, emit them once through `read`, remember pending IDs, and write correlated responses to the `out` folder. Move malformed, unreadable, uncorrelated, timed-out, or failed files to `err`. Create no partial final output file: write a temporary file and atomically rename it.\n\nThe implementation may omit ID lookup when the response preserves an unambiguous safe filename, but it must still prevent cross-file response mixups and path traversal.",
+        "aiInstructions": "Keep file claiming and output publication atomic. Preserve `id`, `filename`, and `content`, and reject unsafe filenames."
+      }
+    }
+  ]
+}

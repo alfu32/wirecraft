@@ -145,3 +145,16 @@ pub fn route(a: Rect, b: Rect) -> Vec<[f64; 2]> {
     };
     vec![start, [mid, start[1]], [mid, end[1]], end]
 }
+
+pub fn distance_to_segment(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
+    let dx = b[0] - a[0];
+    let dy = b[1] - a[1];
+    let length = dx * dx + dy * dy;
+    let t = if length == 0. {
+        0.
+    } else {
+        ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length
+    }
+    .clamp(0., 1.);
+    ((p[0] - a[0] - t * dx).powi(2) + (p[1] - a[1] - t * dy).powi(2)).sqrt()
+}

@@ -1,0 +1,43 @@
+{
+  "id": "workflow-template-php-config-reader",
+  "name": "config_reader",
+  "rootNodeId": "template_root_php_config_reader",
+  "nodes": [
+    {
+      "id": "template_root_php_config_reader",
+      "name": "config_reader",
+      "kind": "Group",
+      "children": [
+        "config_reader_lib"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "config_reader_lib",
+      "name": "config_reader_lib",
+      "kind": "Processor",
+      "parentId": "template_root_php_config_reader",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 270,
+        "height": 80
+      },
+      "technology": {
+        "languageId": "php",
+        "technologyId": "php",
+        "compilerId": "php-compiler"
+      },
+      "text": {
+        "source": "function config_reader_read_config(string $path): string\n{\n    if (!is_file($path)) {\n        throw new RuntimeException(\"Configuration file is not a regular file: \" . $path);\n    }\n    $content = file_get_contents($path);\n    if ($content === false) {\n        throw new RuntimeException(\"Unable to read configuration file: \" . $path);\n    }\n    return $content;\n}",
+        "specification": "Service library that reads the complete content of a caller-supplied file path and returns it as text. It must distinguish an empty file from a read failure, close resources deterministically, preserve UTF-8 content, reject directories, and report the path in errors without exposing unrelated filesystem data. Parsing JSON, YAML, properties, or another configuration syntax belongs to the caller.",
+        "aiInstructions": "Expose a small `read_config(path)`-style API in the effective language. Return file text; do not silently parse or substitute defaults."
+      }
+    }
+  ]
+}

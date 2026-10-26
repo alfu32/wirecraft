@@ -497,6 +497,286 @@
         "idempotentHint": true,
         "openWorldHint": false
       }
+    },
+    {
+      "name": "wirecraft.open_project",
+      "description": "Open a .orch project; reject unsaved changes unless explicitly discarded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "discardChanges": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.save_project",
+      "description": "Save the current project atomically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.undo",
+      "description": "Undo the last document transaction.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.redo",
+      "description": "Redo the last undone transaction.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.copy_entities",
+      "description": "Copy selected subtrees and internal links as a portable graph fragment.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "nodeIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.paste_entities",
+      "description": "Paste a portable fragment with fresh entity IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fragment": {
+            "type": "object"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "offsetX": {
+            "type": "number"
+          },
+          "offsetY": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "fragment"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.list_archetypes",
+      "description": "List bundled reusable workflows.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.import_archetype",
+      "description": "Import a bundled archetype into the open design.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.analyze_network",
+      "description": "Analyze principal, error, dependency and structural graphs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.export_diagram",
+      "description": "Export the focused graph as a free-size SVG, PNG or vector PDF. ISO sheets and tiling are pending.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "png",
+              "pdf"
+            ]
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.component_fiches",
+      "description": "Create Markdown component dossiers; optionally save them to a file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.language_server",
+      "description": "Operate a supervised LSP session; arguments follow the documented application API.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop",
+              "status",
+              "open",
+              "change",
+              "close",
+              "request",
+              "cancel",
+              "diagnostics"
+            ]
+          },
+          "arguments": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.build",
+      "description": "Start, inspect or cancel an external build using executable/argv/cwd, independent of editor diagnostics.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "start",
+              "get",
+              "list",
+              "cancel"
+            ]
+          },
+          "arguments": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.generate_files",
+      "description": "Generate literal file-export/multi-tech entities with source mappings. Graph language compilers remain unavailable; nonempty output directories are never overwritten.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "outputDir": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.save_archetype",
+      "description": "Save one entity subtree as a reusable .orch archetype.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "nodeId",
+          "path"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

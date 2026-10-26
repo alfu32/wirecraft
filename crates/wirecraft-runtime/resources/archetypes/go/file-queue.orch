@@ -1,0 +1,63 @@
+{
+  "id": "workflow-template-go-file-queue",
+  "name": "file_queue",
+  "rootNodeId": "template_root_go_file_queue",
+  "nodes": [
+    {
+      "id": "template_root_go_file_queue",
+      "name": "file_queue",
+      "kind": "Group",
+      "children": [
+        "file_queue"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "file_queue",
+      "name": "file_queue",
+      "kind": "Processor",
+      "parentId": "template_root_go_file_queue",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "go",
+        "technologyId": "go",
+        "compilerId": "go-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "FileQueueConfig"
+        },
+        {
+          "id": "read",
+          "name": "read",
+          "direction": "Output",
+          "dataType": "FilePacket"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "FilePacket"
+        }
+      ],
+      "text": {
+        "source": "state, _ := context.Imports[\"fileQueue\"].(map[string]any)\nif state == nil { state = map[string]any{\"config\": map[string]any(nil), \"pending\": map[string]string{}}; context.Imports[\"fileQueue\"] = state }\nvar settings map[string]any\nif value := map[string]any{}; pop(config, &value) { settings = value; state[\"config\"] = settings } else if saved, ok := state[\"config\"].(map[string]any); ok { settings = saved }\nif settings != nil {\n    inputDir, _ := settings[\"in\"].(string); outputDir, _ := settings[\"out\"].(string); errorDir, _ := settings[\"err\"].(string)\n    if entries, err := os.ReadDir(inputDir); err == nil { for _, entry := range entries { if entry.IsDir() { continue }; path := strings.TrimRight(inputDir, \"/\") + \"/\" + entry.Name(); claimed := path + \".threadwork-processing\"; if os.Rename(path, claimed) != nil { continue }; content, err := os.ReadFile(claimed); if err != nil { _ = os.Rename(claimed, strings.TrimRight(errorDir, \"/\") + \"/\" + entry.Name()); continue }; id := fmt.Sprintf(\"%d-%s\", os.Getpid(), entry.Name()); packet := map[string]any{\"id\": id, \"filename\": entry.Name(), \"content\": string(content)}; state[\"pending\"].(map[string]string)[id] = entry.Name(); _ = os.Remove(claimed); push(read, packet); break } }\n}\nif packet := map[string]any{}; pop(response, &packet) { if id, ok := packet[\"id\"].(string); ok { if filename, found := state[\"pending\"].(map[string]string)[id]; found { outputDir, _ := settings[\"out\"].(string); target := strings.TrimRight(outputDir, \"/\") + \"/\" + filename; temporary := target + \".tmp\"; if os.WriteFile(temporary, []byte(fmt.Sprint(packet[\"content\"])), 0600) == nil { _ = os.Rename(temporary, target); delete(state[\"pending\"].(map[string]string), id) } } } }",
+        "specification": "Implements a folder-backed request/response queue.\n\nConfiguration contract: input port/link `config` supplies `FileQueueConfig` with the communication folders `in`, `out`, and `err`. All three paths are required and must resolve independently.\n\nTransport contract:\n- output port/link `read` emits one consumed input file as a `FilePacket`;\n- input port/link `response` accepts processed content correlated to the original input file;\n- input port/link `config` updates the folder configuration.\n\nPacket contract: `FilePacket` contains exactly `id`, `filename`, and `content`. The emitted packet receives a stable `id`, the original basename in `filename`, and the complete file data in `content`. A response should preserve `id`; the ID is used to recover the original filename when necessary.\n\nBehavior: atomically claim regular files from the `in` folder, emit them once through `read`, remember pending IDs, and write correlated responses to the `out` folder. Move malformed, unreadable, uncorrelated, timed-out, or failed files to `err`. Create no partial final output file: write a temporary file and atomically rename it.\n\nThe implementation may omit ID lookup when the response preserves an unambiguous safe filename, but it must still prevent cross-file response mixups and path traversal.",
+        "aiInstructions": "Keep file claiming and output publication atomic. Preserve `id`, `filename`, and `content`, and reject unsafe filenames."
+      }
+    }
+  ]
+}

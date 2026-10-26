@@ -1,0 +1,57 @@
+{
+  "id": "workflow-template-python-http-reader",
+  "name": "http_reader",
+  "rootNodeId": "template_root_python_http_reader",
+  "nodes": [
+    {
+      "id": "template_root_python_http_reader",
+      "name": "http_reader",
+      "kind": "Group",
+      "children": [
+        "http_reader"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_reader",
+      "name": "http_reader",
+      "kind": "Processor",
+      "parentId": "template_root_python_http_reader",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "python",
+        "technologyId": "python",
+        "compilerId": "python-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "HttpRequestConfig"
+        },
+        {
+          "id": "result",
+          "name": "result",
+          "direction": "Output",
+          "dataType": "HttpResult"
+        }
+      ],
+      "text": {
+        "source": "from urllib.parse import urlencode\nfrom urllib.request import Request, urlopen\n\ntry:\n    settings = config.popleft()\nexcept IndexError:\n    settings = None\nif settings and settings.get(\"url\"):\n    method = str(settings.get(\"method\", \"GET\")).upper()\n    encoded = urlencode(settings.get(\"params\", {}), doseq=True)\n    url = settings[\"url\"] + ((\"?\" + encoded) if encoded and method == \"GET\" else \"\")\n    body = encoded.encode(\"utf-8\") if encoded and method != \"GET\" else None\n    request = Request(url, data=body, method=method, headers=settings.get(\"headers\", {}))\n    with urlopen(request, timeout=float(settings.get(\"timeout\", 10))) as reply:\n        result.append({\"status\": reply.status, \"headers\": dict(reply.headers.items()), \"content\": reply.read().decode(\"utf-8\")})\nelse:\n    return",
+        "specification": "Polls an HTTP endpoint from configuration and emits the received content into the network.\n\nPort contract: input port/link `config` supplies `HttpRequestConfig`; output port/link `result` emits `HttpResult` packets.\n\nConfiguration contains exactly the request controls `method`, `url`, `params`, and `headers`. `method` defaults to GET only when absent; `url` is required; `params` are encoded according to the method; `headers` are copied without allowing transport-owned headers to become inconsistent.\n\nEach polling cycle must be bounded and non-blocking with respect to network progress. Emit a result only after a complete response. Preserve status, response headers, and content in the effective `HttpResult` model, and route transport failures through the project's error policy rather than emitting partial content.",
+        "aiInstructions": "Use the configured method, URL, params, and headers exactly. Respect timeouts and avoid overlapping polls unless explicitly configured."
+      }
+    }
+  ]
+}

@@ -5,4 +5,10 @@ pub mod lsp;
 pub mod mcp;
 pub mod service;
 
+pub mod archetypes;
 pub mod cli;
+pub mod export;
+
+pub mod generation;
+
+pub mod config;

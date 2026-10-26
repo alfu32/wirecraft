@@ -1,0 +1,63 @@
+{
+  "id": "workflow-template-c-file-queue",
+  "name": "file_queue",
+  "rootNodeId": "template_root_c_file_queue",
+  "nodes": [
+    {
+      "id": "template_root_c_file_queue",
+      "name": "file_queue",
+      "kind": "Group",
+      "children": [
+        "file_queue"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "file_queue",
+      "name": "file_queue",
+      "kind": "Processor",
+      "parentId": "template_root_c_file_queue",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "c",
+        "technologyId": "c-native",
+        "compilerId": "c-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "FileQueueConfig"
+        },
+        {
+          "id": "read",
+          "name": "read",
+          "direction": "Output",
+          "dataType": "FilePacket"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "FilePacket"
+        }
+      ],
+      "text": {
+        "source": "typedef struct { char id[64]; char filename[256]; char content[4096]; } FilePacket;\ntypedef struct { const char *in; const char *out; const char *err; } FileQueueConfig;\nextern FILE *popen(const char *, const char *);\nextern int pclose(FILE *);\nstatic unsigned long long file_queue_next_id = 1ULL;\nstatic FileQueueConfig queue_config = {0};\nFilePacket packet;\nif (pop(config, &queue_config) == THREADWORK_QUEUE_OK && queue_config.in != NULL && queue_config.out != NULL && queue_config.err != NULL) {\n    const char *allowed = \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./-\";\n    if (strspn(queue_config.in, allowed) == strlen(queue_config.in)) {\n        char command[1024];\n        char path[256];\n        snprintf(command, sizeof(command), \"find '%s' -maxdepth 1 -type f -print -quit\", queue_config.in);\n        FILE *listing = popen(command, \"r\");\n        if (listing != NULL && fgets(path, sizeof(path), listing) != NULL) {\n            path[strcspn(path, \"\\r\\n\")] = '\\0';\n            FILE *input = fopen(path, \"rb\");\n            if (input != NULL) {\n                memset(&packet, 0, sizeof(packet));\n                snprintf(packet.id, sizeof(packet.id), \"%llu\", file_queue_next_id++);\n                snprintf(packet.filename, sizeof(packet.filename), \"%s\", strrchr(path, '/') != NULL ? strrchr(path, '/') + 1 : path);\n                packet.content[0] = '\\0';\n                fread(packet.content, 1U, sizeof(packet.content) - 1U, input);\n                fclose(input);\n                push(read, &packet);\n                remove(path);\n            }\n        }\n        if (listing != NULL) pclose(listing);\n    }\n}\nif (pop(response, &packet) == THREADWORK_QUEUE_OK && queue_config.out != NULL) {\n    char output_path[512];\n    snprintf(output_path, sizeof(output_path), \"%s/%s\", queue_config.out, packet.filename);\n    FILE *output = fopen(output_path, \"wb\");\n    if (output != NULL) { fwrite(packet.content, 1U, strlen(packet.content), output); fclose(output); }\n}",
+        "specification": "Implements a folder-backed request/response queue.\n\nConfiguration contract: input port/link `config` supplies `FileQueueConfig` with the communication folders `in`, `out`, and `err`. All three paths are required and must resolve independently.\n\nTransport contract:\n- output port/link `read` emits one consumed input file as a `FilePacket`;\n- input port/link `response` accepts processed content correlated to the original input file;\n- input port/link `config` updates the folder configuration.\n\nPacket contract: `FilePacket` contains exactly `id`, `filename`, and `content`. The emitted packet receives a stable `id`, the original basename in `filename`, and the complete file data in `content`. A response should preserve `id`; the ID is used to recover the original filename when necessary.\n\nBehavior: atomically claim regular files from the `in` folder, emit them once through `read`, remember pending IDs, and write correlated responses to the `out` folder. Move malformed, unreadable, uncorrelated, timed-out, or failed files to `err`. Create no partial final output file: write a temporary file and atomically rename it.\n\nThe implementation may omit ID lookup when the response preserves an unambiguous safe filename, but it must still prevent cross-file response mixups and path traversal.",
+        "aiInstructions": "Keep file claiming and output publication atomic. Preserve `id`, `filename`, and `content`, and reject unsafe filenames."
+      }
+    }
+  ]
+}

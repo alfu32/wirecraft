@@ -29,3 +29,11 @@ Keep .orch extension, current list/legacy map, field names source/initialization
 ## Release procedure
 
 Commit small verified milestones with Conventional Commits; push configured origin. Tag only verified milestone releases with SemVer. Only patch/minor increments are authorized; major changes require the user to set the version explicitly.
+
+## ADR 004 — Portable exports and explicit configuration import
+
+Free-size diagram SVG is generated from domain geometry; raster/PDF conversion lives in runtime adapters. resvg 0.45.1 and svg2pdf 0.13.0 were checked against official API documentation (https://docs.rs/resvg/0.45.1/resvg/ and https://docs.rs/svg2pdf/0.13.0/svg2pdf/). PDF remains vector; PNG has a 40 megapixel allocation limit. This does not stand in for ISO/roll sheets or poster assembly.
+
+Built-in archetypes are copied from the recorded source revision and embedded in the backend binary. Clipboard and archetype import share ID/type/link remapping. Literal file generation has explicit source mappings, rejects unmigrated graph technologies and unsafe/duplicate paths, stages output atomically and refuses nonempty output directories. Language wrapper/template generation is still a separate pending capability.
+
+Settings import reads a user-supplied Java Preferences XML export into a new Wirecraft JSON file. It activates indentation and archives UI/designer/appearance values for later fidelity work. It excludes identity/AI preference nodes, does not resolve an external DTD, and never edits the old preference store. Runtime executable/argv settings remain explicit and transport-neutral.

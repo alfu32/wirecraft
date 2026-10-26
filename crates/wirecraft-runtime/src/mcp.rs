@@ -58,11 +58,38 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                 .iter()
                 .any(|t| t["name"] == name);
             let operation = if known {
-                app.execute(Request::new(
-                    name,
-                    params.get("arguments").cloned().unwrap_or(json!({})),
-                ))
-                .await
+                let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
+                if name == "wirecraft.language_server" || name == "wirecraft.build" {
+                    let prefix = if name == "wirecraft.build" {
+                        "jobs"
+                    } else {
+                        "lsp"
+                    };
+                    let operation = arguments["operation"].as_str().unwrap_or("");
+                    app.execute(Request::new(
+                        &format!("{prefix}.{operation}"),
+                        arguments.get("arguments").cloned().unwrap_or(json!({})),
+                    ))
+                    .await
+                } else {
+                    let command = match name {
+                        "wirecraft.open_project" => "file.open",
+                        "wirecraft.generate_files" => "generate.files",
+                        "wirecraft.save_archetype" => "archetypes.save",
+                        "wirecraft.save_project" => "file.save",
+                        "wirecraft.undo" => "edit.undo",
+                        "wirecraft.redo" => "edit.redo",
+                        "wirecraft.copy_entities" => "entities.copy",
+                        "wirecraft.paste_entities" => "entities.paste",
+                        "wirecraft.list_archetypes" => "archetypes.list",
+                        "wirecraft.import_archetype" => "archetypes.import",
+                        "wirecraft.analyze_network" => "analysis.report",
+                        "wirecraft.export_diagram" => "export.diagram",
+                        "wirecraft.component_fiches" => "export.markdown",
+                        other => other,
+                    };
+                    app.execute(Request::new(command, arguments)).await
+                }
             } else {
                 Err(wirecraft_core::Error::new(
                     "not_found",

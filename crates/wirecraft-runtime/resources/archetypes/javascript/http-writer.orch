@@ -1,0 +1,57 @@
+{
+  "id": "workflow-template-javascript-http-writer",
+  "name": "http_writer",
+  "rootNodeId": "template_root_javascript_http_writer",
+  "nodes": [
+    {
+      "id": "template_root_javascript_http_writer",
+      "name": "http_writer",
+      "kind": "Group",
+      "children": [
+        "http_writer"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_writer",
+      "name": "http_writer",
+      "kind": "Processor",
+      "parentId": "template_root_javascript_http_writer",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "javascript",
+        "technologyId": "nodejs",
+        "compilerId": "nodejs-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "HttpWriterConfig"
+        },
+        {
+          "id": "request",
+          "name": "request",
+          "direction": "Input",
+          "dataType": "HttpRequest"
+        }
+      ],
+      "text": {
+        "source": "const state = context.__httpWriter ??= { busy: false };\nif (!state.busy && config.length > 0 && request.length > 0) {\n  const settings = config[0];\n  const packet = request.shift();\n  if (!settings?.url) throw new Error(\"http_writer requires config.url\");\n  state.busy = true;\n  fetch(settings.url, { method: settings.method || \"POST\", headers: settings.headers || {}, body: packet.request_text ?? packet.content ?? \"\" }).finally(() => { state.busy = false; });\n}",
+        "specification": "Consumes request packets and sends each one to the configured HTTP endpoint.\n\nPort contract: input port/link `config` supplies `HttpWriterConfig`; input port/link `request` supplies packets to send.\n\nConfiguration contains `method`, `url`, and `headers`. `method` and `url` are required; headers are merged predictably with packet-specific content metadata without creating contradictory Content-Length or transfer-encoding values.\n\nFor every packet received on `request`, send one bounded HTTP request. Preserve packet order unless concurrency is explicitly enabled. Treat non-success status codes and transport failures according to the project's error policy; do not silently discard failed packets. Do not block the Threadwork run cycle while waiting on remote I/O.",
+        "aiInstructions": "Send exactly one HTTP request per input packet using the configured method, URL, and headers. Make retry and idempotency behavior explicit."
+      }
+    }
+  ]
+}

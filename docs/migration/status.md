@@ -27,3 +27,11 @@ Milestone: domain + headless services implemented. `cargo test -p wirecraft-core
 Still incomplete: full old compiler/templates/layout/source maps, technical sheets and exports, rich graph analysis, archetype UX, clipboard/align/distribute, dedicated project management, OAuth/AI workflows, Java settings import, packaging and non-Linux verification. No complete migration claim.
 
 Next implementation slice: expand graph operations/analysis and portable exports/archetypes, then packaging/config migration. Keep parity.md synchronized. Commits and tags are pushed to origin/master; use patch/minor releases only.
+
+## 0.2.0 expansion (release verification in progress)
+
+Implemented graph fragments/clipboard with internal link and type remapping; embedded source archetypes and import/save; alignment/distribution; sparse typed network reports; free-size SVG/PNG/vector PDF; Markdown component fiches; literal filesystem virtual files, source maps and staged output; explicit Java Preferences import and active indentation/tool configuration; Linux packaging/install scripts and CI checks. The original 19 MCP tools remain, with 15 extensions using the same services.
+
+`cargo test --workspace --locked`: 23 integration tests passed (10 core, 13 runtime). All bundled archetypes import with fresh IDs. Export tests check real SVG/PNG/PDF output. The generation workflow produces a C source file, runs a real clang build, and executes the resulting binary. Unsafe paths/nonempty output and invalid settings are tested. `cargo clippy --workspace --all-targets --locked -- -D warnings` passes. Canvas benchmark in unoptimized build: 100,000 primitives indexed in 309ms; 1,000 1400×900 viewport queries in 172ms (mean 64 visible). This is an index measurement, not a full GPU frame benchmark.
+
+Release package is building with two jobs. Pending verification before tagging: release build/install smoke, updated desktop smoke, final formatting/tests/lints and source-clean check. Next unresolved functionality remains language graph compiler/template parity and complete sheets/editor/project management/identity/AI behavior.

@@ -1,0 +1,57 @@
+{
+  "id": "workflow-template-javascript-http-reader",
+  "name": "http_reader",
+  "rootNodeId": "template_root_javascript_http_reader",
+  "nodes": [
+    {
+      "id": "template_root_javascript_http_reader",
+      "name": "http_reader",
+      "kind": "Group",
+      "children": [
+        "http_reader"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_reader",
+      "name": "http_reader",
+      "kind": "Processor",
+      "parentId": "template_root_javascript_http_reader",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "javascript",
+        "technologyId": "nodejs",
+        "compilerId": "nodejs-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "HttpRequestConfig"
+        },
+        {
+          "id": "result",
+          "name": "result",
+          "direction": "Output",
+          "dataType": "HttpResult"
+        }
+      ],
+      "text": {
+        "source": "const state = context.__httpReader ??= { busy: false };\nif (!state.busy && config.length > 0) {\n  const settings = config.shift();\n  if (!settings?.url) throw new Error(\"http_reader requires config.url\");\n  state.busy = true;\n  const query = new URLSearchParams(settings.params || {}).toString();\n  const method = String(settings.method || \"GET\").toUpperCase();\n  const url = query && method === \"GET\" ? `${settings.url}?${query}` : settings.url;\n  fetch(url, { method, headers: settings.headers || {}, body: query && method !== \"GET\" ? query : undefined }).then(async reply => { result.push({ status: reply.status, headers: Object.fromEntries(reply.headers), content: await reply.text() }); }).finally(() => { state.busy = false; });\n}",
+        "specification": "Polls an HTTP endpoint from configuration and emits the received content into the network.\n\nPort contract: input port/link `config` supplies `HttpRequestConfig`; output port/link `result` emits `HttpResult` packets.\n\nConfiguration contains exactly the request controls `method`, `url`, `params`, and `headers`. `method` defaults to GET only when absent; `url` is required; `params` are encoded according to the method; `headers` are copied without allowing transport-owned headers to become inconsistent.\n\nEach polling cycle must be bounded and non-blocking with respect to network progress. Emit a result only after a complete response. Preserve status, response headers, and content in the effective `HttpResult` model, and route transport failures through the project's error policy rather than emitting partial content.",
+        "aiInstructions": "Use the configured method, URL, params, and headers exactly. Respect timeouts and avoid overlapping polls unless explicitly configured."
+      }
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "id": "workflow-template-php-http-server",
+  "name": "http_server",
+  "rootNodeId": "template_root_php_http_server",
+  "nodes": [
+    {
+      "id": "template_root_php_http_server",
+      "name": "http_server",
+      "kind": "Group",
+      "children": [
+        "http_server",
+        "http_request_registry_lib"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 760,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_server",
+      "name": "http_server",
+      "kind": "Processor",
+      "parentId": "template_root_php_http_server",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 250,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "php",
+        "technologyId": "php",
+        "compilerId": "php-compiler"
+      },
+      "ports": [
+        {
+          "id": "request",
+          "name": "request",
+          "direction": "Output",
+          "dataType": "HttpExchange"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "HttpExchange"
+        }
+      ],
+      "text": {
+        "source": "$state =& $context['http_server'];\nif (!isset($state)) { $state = ['accepting' => true, 'next_id' => 1, 'pending' => []]; $state['listener'] = stream_socket_server('tcp://' . (getenv('HOST') ?: '127.0.0.1') . ':' . (getenv('PORT') ?: '8080'), $errno, $error); if ($state['listener'] !== false) stream_set_blocking($state['listener'], false); }\nif (threadwork_runner()->getShutdownSignal() > 0) { $state['accepting'] = false; if (isset($state['listener'])) fclose($state['listener']); }\nif ($state['accepting'] && isset($state['listener']) && ($client = @stream_socket_accept($state['listener'], 0)) !== false) { stream_set_timeout($client, 0, 100000); $raw = ''; while (!feof($client) && strpos($raw, \"\\r\\n\\r\\n\") === false) { $raw .= fgets($client, 4096); } $parts = explode(\"\\r\\n\\r\\n\", $raw, 2); $id = (string)$state['next_id']++; $state['pending'][$id] = $client; $request[] = ['id' => $id, 'request_text' => $parts[1] ?? '', 'response_text' => '']; }\nif ($response) { $exchange = array_shift($response); $id = (string)($exchange['id'] ?? ''); if (isset($state['pending'][$id])) { $client = $state['pending'][$id]; unset($state['pending'][$id]); $body = (string)($exchange['response_text'] ?? ''); fwrite($client, \"HTTP/1.1 200 OK\\r\\nContent-Type: text/plain; charset=utf-8\\r\\nContent-Length: \" . strlen($body) . \"\\r\\nConnection: close\\r\\n\\r\\n\" . $body); fclose($client); } }",
+        "specification": "Accepts HTTP requests, emits each request into the Threadwork network, and returns the correlated response to the original client.\n\nPort and link contract:\n- `request` is the only output port and its transport link must also be named `request`.\n- `response` is the only input port and its transport link must also be named `response`.\n- The node may have exactly these two data ports and exactly these two data links. No additional data port or data link is permitted.\n\nPacket contract: `HttpExchange` contains exactly `id`, `request_text`, and `response_text`. A request sets `id` and `request_text`; the correlated response preserves `id` and sets `response_text`.\n\nShutdown contract: on a recorded SIGTERM, stop accepting new requests, keep the request registry available for already accepted requests, and request Threadwork shutdown. The runtime drain phase may then deliver residual responses while the network converges.\n\nThe companion `http_request_registry_lib` owns the map from packet `id` to the pending HTTP exchange. IDs must remain unique while pending; a response removes its entry after delivery. Unknown, duplicate, expired, or disconnected IDs are rejected without being delivered to another client.\n\nConfiguration supplies the listening address, port, request-size limit, and request timeout. Network I/O must remain non-blocking with respect to a Threadwork run cycle.",
+        "aiInstructions": "Preserve the exact request/response port contract, packet field names, ID correlation, and shutdown behavior. Bind a platform HTTP implementation without adding data ports."
+      }
+    },
+    {
+      "id": "http_request_registry_lib",
+      "name": "http_request_registry_lib",
+      "kind": "Processor",
+      "parentId": "template_root_php_http_server",
+      "layout": {
+        "x": 430,
+        "y": 115,
+        "width": 280,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "php",
+        "technologyId": "php",
+        "compilerId": "php-compiler"
+      },
+      "text": {
+        "source": "$GLOBALS['threadwork_http_registry'] ??= [];\nfunction remember_http_request(string $id, mixed $client): bool { if (isset($GLOBALS['threadwork_http_registry'][$id])) return false; $GLOBALS['threadwork_http_registry'][$id] = $client; return true; }\nfunction resolve_http_request(string $id): mixed { $client = $GLOBALS['threadwork_http_registry'][$id] ?? null; unset($GLOBALS['threadwork_http_registry'][$id]); return $client; }",
+        "specification": "Service library for `http_server`. It allocates request IDs, records pending client exchanges, resolves responses by ID, expires stale entries, closes disconnected clients, and stops listener acceptance without discarding pending state. It exposes no data port; it is implementation support for the two-port `http_server` contract.",
+        "aiInstructions": "Implement request-registry state with deterministic ownership and cleanup. Never route a response by arrival order when an ID is available."
+      }
+    }
+  ]
+}

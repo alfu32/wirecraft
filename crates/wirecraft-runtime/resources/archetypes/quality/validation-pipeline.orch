@@ -1,0 +1,77 @@
+{
+  "id": "workflow-template-validation",
+  "name": "Validation Pipeline Template",
+  "rootNodeId": "template_root",
+  "nodes": [
+    { "id": "template_root", "name": "Validation Pipeline Template", "kind": "Group" },
+    {
+      "id": "validation_pipeline",
+      "name": "validation_pipeline",
+      "kind": "Group",
+      "parentId": "template_root",
+      "layout": { "x": 70, "y": 70, "width": 720, "height": 260 },
+      "text": {
+        "specification": "Validates incoming information packages and separates accepted data from validation failures.",
+        "aiInstructions": "Validation failures must retain enough context to identify the rejected package and rule."
+      }
+    },
+    {
+      "id": "receive_data",
+      "name": "receive_data",
+      "kind": "Processor",
+      "parentId": "validation_pipeline",
+      "layout": { "x": 100, "y": 150, "width": 170, "height": 70 },
+      "text": { "specification": "Receives candidate information packages for validation." },
+      "ports": [{ "id": "candidate_out", "name": "candidate", "direction": "Output" }]
+    },
+    {
+      "id": "validate_data",
+      "name": "validate_data",
+      "kind": "Processor",
+      "parentId": "validation_pipeline",
+      "layout": { "x": 600, "y": 150, "width": 170, "height": 70 },
+      "text": { "specification": "Evaluates all configured validation rules and classifies the package." },
+      "ports": [
+        { "id": "candidate_in", "name": "candidate", "direction": "Input" },
+        { "id": "accepted_out", "name": "accepted", "direction": "Output" },
+        { "id": "failure_out", "name": "failure", "direction": "Output" }
+      ]
+    },
+    {
+      "id": "accept_data",
+      "name": "accept_data",
+      "kind": "Processor",
+      "parentId": "validation_pipeline",
+      "layout": { "x": 1100, "y": 100, "width": 170, "height": 70 },
+      "text": { "specification": "Emits packages that satisfy every validation rule." },
+      "ports": [{ "id": "accepted_in", "name": "accepted", "direction": "Input" }]
+    },
+    {
+      "id": "report_failure",
+      "name": "report_failure",
+      "kind": "Processor",
+      "parentId": "validation_pipeline",
+      "layout": { "x": 1100, "y": 220, "width": 170, "height": 70 },
+      "text": { "specification": "Reports rejected packages together with validation diagnostics." },
+      "ports": [{ "id": "failure_in", "name": "failure", "direction": "Input" }]
+    },
+    {
+      "id": "candidate_link",
+      "name": "candidate",
+      "kind": "Link",
+      "link": { "sourceNodeId": "receive_data", "sourcePortName": "candidate", "targetNodeId": "validate_data", "targetPortName": "candidate", "typeName": "Candidate" }
+    },
+    {
+      "id": "accepted_link",
+      "name": "accepted",
+      "kind": "Link",
+      "link": { "sourceNodeId": "validate_data", "sourcePortName": "accepted", "targetNodeId": "accept_data", "targetPortName": "accepted", "typeName": "AcceptedData" }
+    },
+    {
+      "id": "failure_link",
+      "name": "validation_error",
+      "kind": "Link",
+      "link": { "sourceNodeId": "validate_data", "sourcePortName": "failure", "targetNodeId": "report_failure", "targetPortName": "failure", "typeName": "ValidationError" }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "workflow-template-c-http-reader",
+  "name": "http_reader",
+  "rootNodeId": "template_root_c_http_reader",
+  "nodes": [
+    {
+      "id": "template_root_c_http_reader",
+      "name": "http_reader",
+      "kind": "Group",
+      "children": [
+        "http_reader"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "http_reader",
+      "name": "http_reader",
+      "kind": "Processor",
+      "parentId": "template_root_c_http_reader",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "c",
+        "technologyId": "c-native",
+        "compilerId": "c-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "HttpRequestConfig"
+        },
+        {
+          "id": "result",
+          "name": "result",
+          "direction": "Output",
+          "dataType": "HttpResult"
+        }
+      ],
+      "text": {
+        "source": "typedef struct { const char *method; const char *url; const char *params; const char *headers; } HttpRequestConfig;\ntypedef struct { int status; char content[8192]; } HttpResult;\nextern FILE *popen(const char *, const char *);\nextern int pclose(FILE *);\nHttpRequestConfig settings;\nHttpResult result_packet;\nif (pop(config, &settings) != THREADWORK_QUEUE_OK) return THREADWORK_OK;\nif (settings.url == NULL || settings.method == NULL) return THREADWORK_ERROR;\nmemset(&result_packet, 0, sizeof(result_packet));\nchar command[2048];\nsnprintf(command, sizeof(command), \"curl --silent --show-error --max-time 10 -X '%s' '%s'\", settings.method, settings.url);\nFILE *reply = popen(command, \"r\");\nif (reply == NULL) return THREADWORK_ERROR;\nsize_t length = fread(result_packet.content, 1U, sizeof(result_packet.content) - 1U, reply);\nresult_packet.content[length] = '\\0';\nif (pclose(reply) != 0) return THREADWORK_ERROR;\nresult_packet.status = 200;\npush(result, &result_packet);",
+        "specification": "Polls an HTTP endpoint from configuration and emits the received content into the network.\n\nPort contract: input port/link `config` supplies `HttpRequestConfig`; output port/link `result` emits `HttpResult` packets.\n\nConfiguration contains exactly the request controls `method`, `url`, `params`, and `headers`. `method` defaults to GET only when absent; `url` is required; `params` are encoded according to the method; `headers` are copied without allowing transport-owned headers to become inconsistent.\n\nEach polling cycle must be bounded and non-blocking with respect to network progress. Emit a result only after a complete response. Preserve status, response headers, and content in the effective `HttpResult` model, and route transport failures through the project's error policy rather than emitting partial content.",
+        "aiInstructions": "Use the configured method, URL, params, and headers exactly. Respect timeouts and avoid overlapping polls unless explicitly configured."
+      }
+    }
+  ]
+}

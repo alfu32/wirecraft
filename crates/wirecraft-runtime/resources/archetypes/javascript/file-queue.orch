@@ -1,0 +1,63 @@
+{
+  "id": "workflow-template-javascript-file-queue",
+  "name": "file_queue",
+  "rootNodeId": "template_root_javascript_file_queue",
+  "nodes": [
+    {
+      "id": "template_root_javascript_file_queue",
+      "name": "file_queue",
+      "kind": "Group",
+      "children": [
+        "file_queue"
+      ],
+      "layout": {
+        "x": 40,
+        "y": 40,
+        "width": 500,
+        "height": 240
+      }
+    },
+    {
+      "id": "file_queue",
+      "name": "file_queue",
+      "kind": "Processor",
+      "parentId": "template_root_javascript_file_queue",
+      "layout": {
+        "x": 100,
+        "y": 115,
+        "width": 260,
+        "height": 90
+      },
+      "technology": {
+        "languageId": "javascript",
+        "technologyId": "nodejs",
+        "compilerId": "nodejs-compiler"
+      },
+      "ports": [
+        {
+          "id": "config",
+          "name": "config",
+          "direction": "Input",
+          "dataType": "FileQueueConfig"
+        },
+        {
+          "id": "read",
+          "name": "read",
+          "direction": "Output",
+          "dataType": "FilePacket"
+        },
+        {
+          "id": "response",
+          "name": "response",
+          "direction": "Input",
+          "dataType": "FilePacket"
+        }
+      ],
+      "text": {
+        "source": "const fs = require(\"node:fs\");\nconst state = context.__fileQueue ??= { config: null, pending: new Map() };\nif (config.length > 0) state.config = config.shift();\nif (state.config?.in && state.config?.out && state.config?.err && read.length === 0) {\n  for (const filename of fs.readdirSync(state.config.in)) {\n    const input = `${state.config.in}/${filename}`;\n    if (!fs.statSync(input).isFile()) continue;\n    const id = `${Date.now()}-${filename}`;\n    const claimed = `${input}.threadwork-processing`;\n    try { fs.renameSync(input, claimed); const packet = { id, filename, content: fs.readFileSync(claimed, \"utf8\") }; state.pending.set(id, packet); fs.unlinkSync(claimed); read.push(packet); }\n    catch (error) { try { fs.renameSync(claimed, `${state.config.err}/${filename}`); } catch (_) {} }\n    break;\n  }\n}\nif (response.length > 0) {\n  const packet = response.shift(); const original = state.pending.get(String(packet.id));\n  if (original) { const target = `${state.config.out}/${original.filename}`; const temporary = `${target}.tmp`; fs.writeFileSync(temporary, String(packet.content ?? \"\"), \"utf8\"); fs.renameSync(temporary, target); state.pending.delete(String(packet.id)); }\n}",
+        "specification": "Implements a folder-backed request/response queue.\n\nConfiguration contract: input port/link `config` supplies `FileQueueConfig` with the communication folders `in`, `out`, and `err`. All three paths are required and must resolve independently.\n\nTransport contract:\n- output port/link `read` emits one consumed input file as a `FilePacket`;\n- input port/link `response` accepts processed content correlated to the original input file;\n- input port/link `config` updates the folder configuration.\n\nPacket contract: `FilePacket` contains exactly `id`, `filename`, and `content`. The emitted packet receives a stable `id`, the original basename in `filename`, and the complete file data in `content`. A response should preserve `id`; the ID is used to recover the original filename when necessary.\n\nBehavior: atomically claim regular files from the `in` folder, emit them once through `read`, remember pending IDs, and write correlated responses to the `out` folder. Move malformed, unreadable, uncorrelated, timed-out, or failed files to `err`. Create no partial final output file: write a temporary file and atomically rename it.\n\nThe implementation may omit ID lookup when the response preserves an unambiguous safe filename, but it must still prevent cross-file response mixups and path traversal.",
+        "aiInstructions": "Keep file claiming and output publication atomic. Preserve `id`, `filename`, and `content`, and reject unsafe filenames."
+      }
+    }
+  ]
+}
