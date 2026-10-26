@@ -65,6 +65,9 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
     fields=line.split()
     if fields[3]=='0A' and f'socket:[{fields[9]}]' in sockets:return f'http://127.0.0.1:{int(fields[1].split(":")[1],16)}'
   endpoint=wait(discover);wait(lambda:api('session.snapshot')['document']['name']=='WebServer');time.sleep(.5)
+  # Client shadows can be included or excluded from the WM's initial bounds.
+  # Set a deterministic content size before using content-relative coordinates.
+  dx,dy=content_inset();xd('windowsize','--sync',window,1400+2*dx,900+2*dy);time.sleep(.4)
  try:
   launch();command('Zoom Extents');shot('001-designer')
   # Arrow selection must choose the second filtered command; Escape dismisses Help.
