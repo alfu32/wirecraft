@@ -37,7 +37,14 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   return subprocess.run(['xdotool',*map(str,args)],env=env,check=True,capture_output=True,text=True).stdout.strip()
  def click(x,y):xd('mousemove','--window',window,x,y,'click',1);time.sleep(.3)
  def shot(name):
-  time.sleep(.35);path=ARTIFACT/(name+'.png');subprocess.run(['import','-window',window,str(path)],env=env,check=True);return path
+  path=ARTIFACT/(name+'.png');dx,dy=content_inset()
+  # Some X11 captures contain backgrounds without text; wait for visible menu labels.
+  for attempt in range(12):
+   time.sleep(.2);subprocess.run(['import','-window',window,str(path)],env=env,check=True)
+   deviation=float(subprocess.check_output(['convert',str(path),'-crop',f'400x18+{20+dx}+{7+dy}','-colorspace','gray','-format','%[fx:standard_deviation]','info:'],text=True))
+   if deviation>.015:return path
+   xd('mousemove','--window',window,900+attempt%2,300)
+  raise RuntimeError('Owned window capture never displayed menu text')
  def ui():return json.loads((state/'ui.json').read_text())
  def document():return api('session.snapshot')['document']
  def command(text):
@@ -133,9 +140,9 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   # A blank type's structured collections can be edited and invalid drafts recover intact.
   click(100,270);wait(lambda:ui()['selected']=='packet');click(165,102);wait(lambda:ui()['tab']=='Editor')
   def bottom_inspector():xd('mousemove','--window',window,1240,780);xd('click','--repeat',60,'--delay',5,5);time.sleep(.3)
-  def inspector_regions(buttons=False):
+  def inspector_regions(buttons=False,path=None):
    xd('mousemove','--window',window,900,300)
-   path=shot('inspector-fields-detection');dx,dy=content_inset()
+   path=path or shot('inspector-fields-detection');dx,dy=content_inset()
    args=['convert',str(path),'-crop',f'350x688+{1045+dx}+{172+dy}']
    if buttons:args+=['-fill','white','+opaque','#242c36','-fill','black','-opaque','#242c36']
    args+=['-colorspace','gray','-threshold','8%','-define','connected-components:verbose=true','-connected-components','8','null:']
@@ -148,18 +155,30 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
      width,height,x,y=map(int,match.groups())
      if (width>280 if buttons else width>=70) and 18<=height<=40:fields.append((1045+x+width//2,172+y+height//2))
    return sorted(fields,key=lambda p:(p[1],p[0]))
-  def inspector_inputs():return inspector_regions()
+  def inspector_inputs():
+   tables=(ui().get('draft') or {}).get('tables',{});key='metadata' if tables.get('metadata') else 'types'
+   for _ in range(10):
+    path=shot('inspector-fields-detection');fields=inspector_regions(False,path);buttons=inspector_regions(True,path)
+    if not tables.get(key):return fields
+    target=buttons[-2 if key=='metadata' else -3][1]-30
+    if len(fields)>=2 and abs(fields[-1][1]-target)<7 and fields[-1][1]==fields[-2][1]:return fields
+    bottom_inspector()
+   raise RuntimeError(f'Inline {key} row has not repainted: {fields}, {buttons}')
   def add_table_row(field=False):
    bottom_inspector();buttons=inspector_regions(True);assert len(buttons)>=3,buttons
-   click(*buttons[-3 if field else -2]);bottom_inspector()
+   key='types' if field else 'metadata';before=len((ui().get('draft') or {}).get('tables',{}).get(key,[]))
+   if os.environ.get('WIRECRAFT_SMOKE_TRACE'):print('add table row',key,'buttons',buttons,'before',before,flush=True)
+   click(*buttons[-3 if field else -2])
+   wait(lambda:len((ui().get('draft') or {}).get('tables',{}).get(key,[]))==before+1)
+   bottom_inspector()
   def fill(position,text):click(*position);xd('key','ctrl+a');xd('type','--clearmodifiers',text)
   # Restore Dark for deterministic input-color detection, using the normal Options editor.
   command('Options…');click(480,273);xd('key','ctrl+a');xd('type','--clearmodifiers','dark');click(60,833)
   wait(lambda:json.loads((state/'settings.json').read_text())['appearance']['theme']=='dark');click(165,102)
   add_table_row(True);fields=inspector_inputs();assert len(fields)>=2,fields
   fill(fields[-2],'sequence')
-  add_table_row();fields=inspector_inputs();assert len(fields)>=2;fill(fields[-2],'fixture_note');fill(fields[-1],'first')
-  add_table_row();fields=inspector_inputs();fill(fields[-2],'fixture_note');fill(fields[-1],'second')
+  add_table_row();fields=inspector_inputs();assert len(fields)>=2;fill(fields[-2],'fixture_note');wait(lambda:ui()['draft']['tables']['metadata'][-1][0]=='fixture_note');fill(fields[-1],'first');wait(lambda:ui()['draft']['tables']['metadata'][-1][1]=='first')
+  add_table_row();fields=inspector_inputs();fill(fields[-2],'fixture_note');wait(lambda:ui()['draft']['tables']['metadata'][-1][0]=='fixture_note');fill(fields[-1],'second');wait(lambda:ui()['draft']['tables']['metadata'][-1][1]=='second')
   click(950,151);time.sleep(.5);assert document()['nodes']['packet']['typeDefinition']['fields']==[]
   wait(lambda:len((ui().get('draft') or {}).get('tables',{}).get('metadata',[]))==2);shot('002-invalid-table-draft')
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0

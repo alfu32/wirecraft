@@ -21,6 +21,10 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
    except (subprocess.CalledProcessError,FileNotFoundError,json.JSONDecodeError,KeyError,IndexError):pass
    time.sleep(.12)
   raise TimeoutError('walkthrough condition timed out')
+ def content_inset():
+  text=subprocess.check_output(['xprop','-id',str(window),'_GTK_FRAME_EXTENTS'],env=env,text=True)
+  if '=' not in text:return (0,0)
+  values=[int(v.strip()) for v in text.split('=',1)[1].split(',')];return (values[0],values[2])
  def xd(*args):
   if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
    subprocess.run(['xdotool','windowactivate','--sync',window],env=env,check=True,capture_output=True)
@@ -29,7 +33,14 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   return subprocess.run(['xdotool',*map(str,args)],env=env,check=True,capture_output=True,text=True).stdout.strip()
  def click(x,y):xd('mousemove','--window',window,x,y,'click',1);time.sleep(.3)
  def shot(name):
-  time.sleep(.35);path=ARTIFACT/(name+'.png');subprocess.run(['import','-window',window,str(path)],env=env,check=True);return path
+  path=ARTIFACT/(name+'.png');dx,dy=content_inset()
+  # Some X11 captures contain backgrounds without text; wait for visible menu labels.
+  for attempt in range(12):
+   time.sleep(.2);subprocess.run(['import','-window',window,str(path)],env=env,check=True)
+   deviation=float(subprocess.check_output(['convert',str(path),'-crop',f'400x18+{20+dx}+{7+dy}','-colorspace','gray','-format','%[fx:standard_deviation]','info:'],text=True))
+   if deviation>.015:return path
+   xd('mousemove','--window',window,900+attempt%2,300)
+  raise RuntimeError('Owned window capture never displayed menu text')
  def ui():return json.loads((state/'ui.json').read_text())
  def document():return api('session.snapshot')['document']
  def command(text):
