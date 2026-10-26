@@ -19,7 +19,7 @@ cargo run -p wirecraft-runtime -- new /tmp/new-project.orch
 
 The workbench has Designer, Editor, Project Management, Analysis, Archetypes, Export, Tools and MCP views, with categorized menus and a searchable keyboard command palette (Ctrl-Shift-P, Up/Down, Enter, Escape). The icon set uses consistent GPU strokes rather than the old Swing toolbar artwork. [All 25 reference photos](docs/migration/threadworks/README.md) have chronological names and feature mappings; [walkthrough parity](docs/migration/walkthrough.md) records the implementation and its limits.
 
-Designer supports node/type/link creation, shift and box selection, composite subtree drag, resizing, collapse/expand, named typed ports and type-usage callouts. Middle/right-button pan, wheel pan, Ctrl-wheel zoom, Fit, hierarchy navigation and double-click entry/edit retain familiar workflows. Editor has the five source sections, C/C++ syntax highlighting, section language, compact label/value rows and dropdowns, inline metadata/type/history tables, inherited values, revision tracking and advanced JSON. Apply drafts before changing entities or sections; Reload entity explicitly discards a draft. Drafts, including invalid metadata tables, recover after restart. Ctrl N/O/S/Shift-S/Z/Y/Shift-Z/Enter/Q are supported. Unsaved graph changes block New/Open until saved.
+Designer supports node/type/link creation, shift and box selection, composite subtree drag, resizing, collapse/expand, named typed ports and type-usage callouts. Wheel zooms about the pointer; middle/right-button drag pans. Left-to-right windows select enclosed objects; right-to-left windows also select intersecting objects. Shift adds and Control removes; unmodified clicks replace selection. Dragging a selected member moves the selected group, with debounced background rerouting and one undo step. The canvas shows individual contours and selection bounds, and tree rows share the selection; drag a tree row onto another processing entity to reparent. Fit, hierarchy navigation and double-click entry/edit retain familiar workflows. Editor has the five source sections, C/C++ syntax highlighting, section language, compact label/value rows and dropdowns, inline metadata/type/history tables, inherited values, revision tracking and advanced JSON. Apply drafts before changing entities or sections; Reload entity explicitly discards a draft. Drafts, including invalid metadata tables, recover after restart. Ctrl N/O/S/Shift-S/Z/Y/Shift-Z/Enter/Q are supported. Unsaved graph changes block New/Open until saved.
 
 Project Management provides six status lanes, drag/drop, remove-to-backlog and undo. Archetypes provides grouped descriptions and a read-only preview before explicit insertion. Analysis shows sparse P/E/D/U matrices, clickable endpoints, indicators and findings. Root master revision and inherited node revisions retain their source storage semantics. Sidebar widths, hierarchy expansion, viewport, selection and export profiles restore across restarts.
 
@@ -96,7 +96,7 @@ Review the output and place it at your chosen state directory's `settings.json`.
 
 ```sh
 scripts/package-linux.sh release
-# Extract dist/wirecraft-0.4.0-linux-<architecture>.tar.gz, then:
+# Extract dist/wirecraft-0.4.1-linux-<architecture>.tar.gz, then:
 ./install.sh /your/prefix
 ```
 
@@ -111,7 +111,8 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 python3 scripts/desktop_smoke.py
 python3 scripts/walkthrough_smoke.py
 python3 scripts/editor_smoke.py
-python3 scripts/package_smoke.py dist/wirecraft-0.4.0-linux-x86_64.tar.gz --desktop --walkthrough --editor
+python3 scripts/canvas_smoke.py
+python3 scripts/package_smoke.py dist/wirecraft-0.4.1-linux-x86_64.tar.gz --desktop --walkthrough --editor --canvas
 ```
 
 Full integration verification also needs clang/clangd, uuid-dev, poppler-utils (pdfimages/pdftotext) and fonts-dejavu-core. The desktop smoke requires a real X11/XWayland display with Vulkan/DRI3, xdotool and ImageMagick. It launches its own PID-scoped window with temporary state. Xvfb on this machine lacks DRI3 and cannot present GPUI. Available-platform evidence is Linux only. macOS/Windows packaging and interaction have not been verified.

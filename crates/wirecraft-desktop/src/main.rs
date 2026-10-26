@@ -5,6 +5,7 @@ mod fonts;
 mod icons;
 mod inspector;
 mod inspector_widgets;
+mod interaction;
 mod options;
 mod reports;
 mod scene;
@@ -20,7 +21,7 @@ use serde_json::{Value, json};
 use std::{cell::Cell, collections::BTreeSet, path::PathBuf, rc::Rc, sync::Arc};
 use wirecraft_core::{
     Document,
-    viewport::{Rect, Viewport},
+    viewport::{Rect, SelectionOperation, Viewport},
 };
 use wirecraft_runtime::service::{Request, Snapshot};
 
@@ -113,6 +114,14 @@ struct Wirecraft {
     drag_start: Option<[f64; 2]>,
     drag_delta: [f64; 2],
     drag_ids: BTreeSet<String>,
+    pending_pick: Option<String>,
+    selection_base: BTreeSet<String>,
+    selection_operation: SelectionOperation,
+    reroute_timer: Option<Task<()>>,
+    reroute_inflight: bool,
+    reroute_epoch: u64,
+    drag_scene: Option<(Arc<scene::Scene>, [f64; 2])>,
+    move_pending: bool,
     resize_start: Option<(String, [f64; 2], Rect)>,
     selection_end: Option<[f64; 2]>,
     pan_start: Option<([f64; 2], Viewport)>,
@@ -247,6 +256,14 @@ impl Wirecraft {
             drag_start: None,
             drag_delta: [0., 0.],
             drag_ids: BTreeSet::new(),
+            pending_pick: None,
+            selection_base: BTreeSet::new(),
+            selection_operation: SelectionOperation::Replace,
+            reroute_timer: None,
+            reroute_inflight: false,
+            reroute_epoch: 0,
+            drag_scene: None,
+            move_pending: false,
             resize_start: None,
             selection_end: None,
             pan_start: None,
@@ -347,6 +364,10 @@ impl Wirecraft {
             Update::Error { message, commit } => {
                 self.completion = None;
                 self.status = message;
+                if self.move_pending {
+                    self.clear_drag_preview();
+                    self.move_pending = false;
+                }
                 if commit {
                     self.editor_request_pending = false;
                     self.submitted_editor = None;
@@ -520,6 +541,12 @@ impl Wirecraft {
                     || (!self.connected_document
                         && !self.initial_document_id.is_empty()
                         && self.initial_document_id != snapshot.document.id);
+                if snapshot.revision != self.snapshot.revision || document_changed {
+                    self.clear_drag_preview();
+                    self.drag_start = None;
+                    self.pending_pick = None;
+                    self.move_pending = false;
+                }
                 self.connected_document = true;
                 if snapshot.document.id != self.snapshot.document.id {
                     self.editor_entity = None;
@@ -538,10 +565,13 @@ impl Wirecraft {
                 }
                 self.selected
                     .retain(|id| self.snapshot.document.nodes.contains_key(id));
-                if self.selected.is_empty() {
+                if document_changed {
                     self.selected.insert(self.parent.clone());
                 }
                 self.rebuild();
+                if self.tab == "Designer" {
+                    self.reveal_tree_selection(window, cx);
+                }
                 if document_changed {
                     self.fit(&Fit, window, cx);
                 }
@@ -774,6 +804,24 @@ impl Wirecraft {
             self.properties.update(cx, |state, cx| {
                 state.set_value(self.base_properties.clone(), window, cx)
             });
+        } else {
+            self.editor_entity = None;
+            self.base_name.clear();
+            self.base_text.clear();
+            self.base_properties = "{}".into();
+            self.tables = inspector::Tables::load(&json!({"metadata":{}}), window, cx);
+            for field in &mut self.inspector {
+                field.baseline.clear();
+                field
+                    .input
+                    .update(cx, |state, cx| state.set_value("", window, cx));
+            }
+            self.name
+                .update(cx, |state, cx| state.set_value("", window, cx));
+            self.editor
+                .update(cx, |state, cx| state.set_value("", window, cx));
+            self.properties
+                .update(cx, |state, cx| state.set_value("{}", window, cx));
         }
     }
     fn editor_fingerprint(&self, cx: &App) -> Value {
@@ -1030,237 +1078,6 @@ impl Wirecraft {
             f64::from(f32::from(b.size.width)),
             f64::from(f32::from(b.size.height)),
         ]);
-        self.persist_ui(cx);
-        cx.notify();
-    }
-    fn local(&self, p: Point<Pixels>) -> [f64; 2] {
-        let b = self.bounds.get();
-        [
-            f64::from(f32::from(p.x - b.origin.x)),
-            f64::from(f32::from(p.y - b.origin.y)),
-        ]
-    }
-    fn down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        self.focus.focus(window);
-        let local = self.local(event.position);
-        if event.button == MouseButton::Middle || event.button == MouseButton::Right {
-            self.pan_start = Some((local, self.viewport));
-            return;
-        }
-        if self.has_draft(cx) || self.editor_request_pending {
-            self.status = "Apply the editor draft before changing selection".into();
-            cx.notify();
-            return;
-        }
-        let world = self.viewport.world(local);
-        let tolerance = 6. / self.viewport.zoom;
-        let hits = self.scene.query(Rect {
-            x: world[0] - tolerance,
-            y: world[1] - tolerance,
-            width: tolerance * 2.,
-            height: tolerance * 2.,
-        });
-        let hit = hits
-            .iter()
-            .filter(|id| {
-                self.scene
-                    .nodes
-                    .get(*id)
-                    .is_some_and(|n| n.2.contains(world))
-            })
-            .max_by_key(|id| {
-                self.scene
-                    .drawing
-                    .shapes
-                    .get(*id)
-                    .map(|s| s.depth)
-                    .unwrap_or(0)
-            })
-            .cloned()
-            .or_else(|| {
-                hits.iter().find_map(|id| {
-                    self.scene
-                        .drawing
-                        .annotations
-                        .get(id)
-                        .filter(|a| a.rect.contains(world))
-                        .map(|a| a.target.clone())
-                })
-            })
-            .or_else(|| {
-                if self.mode != Mode::Select {
-                    return None;
-                }
-                hits.iter()
-                    .find(|id| {
-                        self.scene.links.get(*id).is_some_and(|(_, points)| {
-                            points.windows(2).any(|pair| {
-                                wirecraft_core::viewport::distance_to_segment(
-                                    world, pair[0], pair[1],
-                                ) <= tolerance
-                            })
-                        })
-                    })
-                    .cloned()
-            });
-        match self.mode {
-            Mode::Node | Mode::Type => {
-                self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"name":if self.mode==Mode::Type{"New type"}else{"New processor"},"kind":if self.mode==Mode::Type{"Type"}else{"Processor"},"attributes":{"layout":{"x":world[0],"y":world[1]}}}));
-            }
-            Mode::Link => {
-                if let Some(id) = hit {
-                    if let Some(source) = self.link_source.take() {
-                        self.client.send("threadwork.create_link",json!({"name":"packet","sourceNodeId":source,"targetNodeId":id,"sourcePortName":"out","targetPortName":"in"}));
-                    } else {
-                        self.link_source = Some(id);
-                        self.status = "Choose the target entity".into();
-                    }
-                }
-            }
-            Mode::Select => {
-                if let Some(id) = hit {
-                    if event.modifiers.shift {
-                        if !self.selected.insert(id.clone()) {
-                            self.selected.remove(&id);
-                        }
-                    } else if !self.selected.contains(&id) {
-                        self.selected = BTreeSet::from([id.clone()]);
-                    }
-                    self.load_editor(window, cx);
-                    if let Some(shape) = self.scene.drawing.shapes.get(&id) {
-                        let r = shape.rect;
-                        if (world[0] - r.x - r.width).abs() < 10. / self.viewport.zoom
-                            && (world[1] - r.y - r.height).abs() < 10. / self.viewport.zoom
-                        {
-                            self.resize_start = Some((id, world, r));
-                            cx.notify();
-                            return;
-                        }
-                        if shape.composite && world[0] < r.x + 28. && world[1] < r.y + 28. {
-                            let expanded = !shape.expanded;
-                            let layout = &self.snapshot.document.nodes[&id].layout;
-                            self.client.send("threadwork.update_entity",json!({"nodeId":id,"patch":{"layout":{"isExpanded":expanded,"width":if expanded{layout.open_width}else{layout.closed_width},"height":if expanded{layout.open_height}else{layout.closed_height}}}}));
-                            cx.notify();
-                            return;
-                        }
-                    }
-                    if event.click_count == 2 {
-                        if self.snapshot.document.nodes[&id].is_composite() {
-                            self.parent = id;
-                            self.rebuild();
-                            self.viewport = Viewport::default();
-                        } else {
-                            self.tab = "Editor".into();
-                        }
-                    } else {
-                        if self.scene.nodes.contains_key(&id) {
-                            self.drag_start = Some(world);
-                            self.drag_ids = self
-                                .selected
-                                .iter()
-                                .flat_map(|id| self.snapshot.document.descendants(id))
-                                .collect();
-                            self.drag_delta = [0., 0.];
-                        }
-                    }
-                } else {
-                    if !event.modifiers.shift {
-                        self.selected.clear();
-                    }
-                    self.selection_start = Some(world);
-                }
-            }
-        }
-        cx.notify();
-    }
-    fn moved(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let local = self.local(event.position);
-        if let Some((start, view)) = self.pan_start {
-            self.viewport.x = view.x + local[0] - start[0];
-            self.viewport.y = view.y + local[1] - start[1];
-            cx.notify();
-        } else if let Some((_, start, _)) = &self.resize_start {
-            let world = self.viewport.world(local);
-            self.drag_delta = [world[0] - start[0], world[1] - start[1]];
-            cx.notify();
-        } else if let Some(start) = self.drag_start {
-            let world = self.viewport.world(local);
-            self.drag_delta = [world[0] - start[0], world[1] - start[1]];
-            cx.notify();
-        } else if let Some(start) = self.selection_start {
-            let end = self.viewport.world(local);
-            self.selection_end = Some(end);
-            let rect = Rect {
-                x: start[0].min(end[0]),
-                y: start[1].min(end[1]),
-                width: (end[0] - start[0]).abs(),
-                height: (end[1] - start[1]).abs(),
-            };
-            self.selected = self
-                .scene
-                .query(rect)
-                .into_iter()
-                .filter(|id| self.scene.nodes.contains_key(id))
-                .collect();
-            cx.notify();
-        }
-    }
-    fn up(&mut self, _: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if let Some((id, _, r)) = self.resize_start.take() {
-            let n = &self.snapshot.document.nodes[&id];
-            let width = (r.width + self.drag_delta[0]).max(100.);
-            let height = (r.height + self.drag_delta[1]).max(70.);
-            let mut layout = json!({"width":width,"height":height});
-            if n.is_composite() && n.layout.is_expanded {
-                layout["openWidth"] = json!(width);
-                layout["openHeight"] = json!(height);
-            } else {
-                layout["closedWidth"] = json!(width);
-                layout["closedHeight"] = json!(height);
-            }
-            self.client.send(
-                "threadwork.update_entity",
-                json!({"nodeId":id,"patch":{"layout":layout}}),
-            );
-        } else if self.drag_start.take().is_some()
-            && (self.drag_delta[0].abs() > 0.5 || self.drag_delta[1].abs() > 0.5)
-        {
-            let mut ids = self.selected.clone();
-            let mut stack = self.selected.iter().cloned().collect::<Vec<_>>();
-            while let Some(id) = stack.pop() {
-                if let Some(n) = self.snapshot.document.nodes.get(&id) {
-                    for child in &n.children {
-                        if ids.insert(child.clone()) {
-                            stack.push(child.clone());
-                        }
-                    }
-                }
-            }
-            let changes=ids.iter().filter_map(|id|self.snapshot.document.nodes.get(id)).filter(|n|!n.is_link()).map(|n|json!({"nodeId":n.id,"patch":{"layout":{"x":n.layout.x+self.drag_delta[0],"y":n.layout.y+self.drag_delta[1]}}})).collect::<Vec<_>>();
-            self.client
-                .send("entities.patch", json!({"changes":changes}));
-        }
-        self.drag_delta = [0., 0.];
-        self.drag_ids.clear();
-        self.pan_start = None;
-        self.selection_start = None;
-        self.selection_end = None;
-        self.persist_ui(cx);
-        cx.notify();
-    }
-    fn wheel(&mut self, event: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let delta = event
-            .delta
-            .pixel_delta(px(20. * self.options.saved.appearance.wheel_rows / 3.));
-        if event.modifiers.control {
-            self.viewport.zoom_at(
-                self.local(event.position),
-                (f64::from(f32::from(delta.y)) * 0.005).exp(),
-            );
-        } else {
-            self.viewport.x += f64::from(f32::from(delta.x));
-            self.viewport.y += f64::from(f32::from(delta.y));
-        }
         self.persist_ui(cx);
         cx.notify();
     }
@@ -1585,6 +1402,7 @@ impl Render for Wirecraft {
                         };
                         div()
                             .id(i)
+                            .w_full()
                             .h(px(28.))
                             .pl(px(10. + depth as f32 * 14.))
                             .pr_2()
@@ -1593,22 +1411,16 @@ impl Render for Wirecraft {
                                 b.bg(crate::chrome::color(0x253f45))
                             })
                             .cursor_pointer()
-                            .on_click(_cx.listener(move |this, _, window, cx| {
-                                this.select(id.clone(), window, cx)
-                            }))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                _cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                                    this.tree_pick(id.clone(), event.modifiers, window, cx);
+                                }),
+                            )
                             .on_drag(ticket, |ticket, _, _, cx| cx.new(|_| ticket.clone()))
                             .on_drop(_cx.listener(
                                 move |this, ticket: &workbench::Ticket, _, cx| {
-                                    if !this.has_draft(cx) {
-                                        this.client.send(
-                                            "threadwork.move_entity",
-                                            json!({"nodeId":ticket.id,"parentId":target}),
-                                        );
-                                    } else {
-                                        this.status =
-                                            "Apply the editor draft before moving entities".into();
-                                        cx.notify();
-                                    }
+                                    this.reparent_from_tree(&ticket.id, &target, cx);
                                 },
                             ))
                             .flex()
@@ -1709,14 +1521,21 @@ impl Render for Wirecraft {
             .child(tree);
         let mut content = div().flex_1().min_w_0().min_h_0().flex().flex_col();
         if self.tab == "Designer" {
-            let scene = self.scene.clone();
+            let (scene, routed_delta) = self
+                .drag_scene
+                .as_ref()
+                .map(|(s, d)| (s.clone(), *d))
+                .unwrap_or((self.scene.clone(), [0., 0.]));
             let bounds = self.bounds.clone();
             let view = self.viewport;
             let selected = self.selected.clone();
             let drag = if self.resize_start.is_some() {
                 [0., 0.]
             } else {
-                self.drag_delta
+                [
+                    self.drag_delta[0] - routed_delta[0],
+                    self.drag_delta[1] - routed_delta[1],
+                ]
             };
             let moving = self.drag_ids.clone();
             let resize = self
@@ -1780,11 +1599,6 @@ impl Render for Wirecraft {
                         .on_mouse_down(MouseButton::Left, cx.listener(Self::down))
                         .on_mouse_down(MouseButton::Middle, cx.listener(Self::down))
                         .on_mouse_down(MouseButton::Right, cx.listener(Self::down))
-                        .on_mouse_move(cx.listener(Self::moved))
-                        .on_mouse_up(MouseButton::Left, cx.listener(Self::up))
-                        .on_mouse_up_out(MouseButton::Left, cx.listener(Self::up))
-                        .on_mouse_up(MouseButton::Middle, cx.listener(Self::up))
-                        .on_mouse_up(MouseButton::Right, cx.listener(Self::up))
                         .on_scroll_wheel(cx.listener(Self::wheel))
                         .child(
                             canvas(
@@ -1836,7 +1650,11 @@ impl Render for Wirecraft {
                                             rgba(0x70d5c630),
                                             px(1.),
                                             crate::chrome::color(0x70d5c6),
-                                            BorderStyle::Dashed,
+                                            if a[0] <= z[0] {
+                                                BorderStyle::Solid
+                                            } else {
+                                                BorderStyle::Dashed
+                                            },
                                         ));
                                     }
                                 },
@@ -1873,7 +1691,7 @@ impl Render for Wirecraft {
         } else {
             content = content.child(self.render_mcp(cx));
         }
-        div().on_mouse_move(cx.listener(Self::move_panel)).on_mouse_up(MouseButton::Left,cx.listener(Self::end_panel)).capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_completion(window,cx)).children(self.render_menu(cx))
+        div().on_mouse_move(cx.listener(Self::pointer_moved)).on_mouse_up(MouseButton::Left,cx.listener(Self::pointer_up)).on_mouse_up_out(MouseButton::Left,cx.listener(Self::pointer_up)).on_mouse_up(MouseButton::Middle,cx.listener(Self::pointer_up)).on_mouse_up_out(MouseButton::Middle,cx.listener(Self::pointer_up)).on_mouse_up(MouseButton::Right,cx.listener(Self::pointer_up)).on_mouse_up_out(MouseButton::Right,cx.listener(Self::pointer_up)).capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_completion(window,cx)).children(self.render_menu(cx))
     }
 }
 fn main() -> anyhow::Result<()> {

@@ -66,6 +66,9 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
   if '--editor' in sys.argv[2:]:
    env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
    subprocess.run([sys.executable,str(root/'scripts/editor_smoke.py')],env=env,check=True)
-  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'workbenchMcp':True,'nativeC17Graph':True,'generatedClangd':True,'installedDesktop':'--desktop' in sys.argv[2:],'installedWalkthrough':'--walkthrough' in sys.argv[2:],'installedEditor':'--editor' in sys.argv[2:]}))
+  if '--canvas' in sys.argv[2:]:
+   env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
+   subprocess.run([sys.executable,str(root/'scripts/canvas_smoke.py')],env=env,check=True)
+  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'workbenchMcp':True,'nativeC17Graph':True,'generatedClangd':True,'installedDesktop':'--desktop' in sys.argv[2:],'installedWalkthrough':'--walkthrough' in sys.argv[2:],'installedEditor':'--editor' in sys.argv[2:],'installedCanvas':'--canvas' in sys.argv[2:]}))
  finally:
   if app.poll() is None:app.terminate();app.wait(timeout=10)

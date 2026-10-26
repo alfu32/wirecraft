@@ -38,7 +38,74 @@ pub struct Rect {
     pub width: f64,
     pub height: f64,
 }
+/// Selection modifiers are idempotent: adding an existing hit never toggles it off.
+#[derive(Clone, Copy, Debug, Default)]
+pub enum SelectionOperation {
+    #[default]
+    Replace,
+    Add,
+    Remove,
+}
+impl SelectionOperation {
+    pub fn apply(self, base: &BTreeSet<String>, hits: BTreeSet<String>) -> BTreeSet<String> {
+        match self {
+            Self::Replace => hits,
+            Self::Add => base.union(&hits).cloned().collect(),
+            Self::Remove => base.difference(&hits).cloned().collect(),
+        }
+    }
+}
 impl Rect {
+    pub fn from_points(a: [f64; 2], b: [f64; 2]) -> Self {
+        Self {
+            x: a[0].min(b[0]),
+            y: a[1].min(b[1]),
+            width: (a[0] - b[0]).abs(),
+            height: (a[1] - b[1]).abs(),
+        }
+    }
+    pub fn encloses(self, other: Self) -> bool {
+        self.contains([other.x, other.y])
+            && self.contains([other.x + other.width, other.y + other.height])
+    }
+    pub fn union(self, other: Self) -> Self {
+        Self::from_points(
+            [self.x.min(other.x), self.y.min(other.y)],
+            [
+                (self.x + self.width).max(other.x + other.width),
+                (self.y + self.height).max(other.y + other.height),
+            ],
+        )
+    }
+    /// Liang–Barsky clipping, including touching edges and degenerate segments.
+    pub fn intersects_segment(self, a: [f64; 2], b: [f64; 2]) -> bool {
+        let delta = [b[0] - a[0], b[1] - a[1]];
+        let mut lo: f64 = 0.;
+        let mut hi: f64 = 1.;
+        for (p, q) in [
+            (-delta[0], a[0] - self.x),
+            (delta[0], self.x + self.width - a[0]),
+            (-delta[1], a[1] - self.y),
+            (delta[1], self.y + self.height - a[1]),
+        ] {
+            if p == 0. {
+                if q < 0. {
+                    return false;
+                }
+            } else {
+                let t = q / p;
+                if p < 0. {
+                    lo = lo.max(t);
+                } else {
+                    hi = hi.min(t);
+                }
+                if lo > hi {
+                    return false;
+                }
+            }
+        }
+        true
+    }
     pub fn intersects(self, other: Self) -> bool {
         self.x <= other.x + other.width
             && self.x + self.width >= other.x

@@ -26,3 +26,5 @@ Reorder the next slices around immutable threadworks/example-c.orch and ticker-p
 The reference PDF currently embeds a first-page JPEG despite the described vector renderer; retain this observation and test Wirecraft's vector contract directly. Do not equate the PDF container or a preview thumbnail with vector output.
 
 The 0.4.0 checkpoint also includes compiler-context C17 Ctrl-Space completion, compact dropdown/inline-table inspector and real Linux window controls. Source capabilities are the next compiler slice; see status.md for the exact implementation entry point.
+
+0.4.1 corrects canvas/tree gestures at the user's request before the next compiler slice. Acceptance: real mouse input for anchored wheel zoom, middle drag/outside release, directional windows and modifier picks, visible individual/group contours, tree selection/drop reparent, one undoable group/subtree move and no document mutation while previewing. Run scripts/canvas_smoke.py and include --canvas in package verification.

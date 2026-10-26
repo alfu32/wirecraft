@@ -40,6 +40,8 @@ pub struct Annotation {
     pub rect: Rect,
 }
 pub struct Drawing {
+    /// Includes hidden descendants projected to their visible collapsed ancestor.
+    pub visible_ancestor: BTreeMap<String, String>,
     pub annotations: BTreeMap<String, Annotation>,
     pub shapes: BTreeMap<String, Shape>,
     pub edges: BTreeMap<String, Edge>,
@@ -317,6 +319,7 @@ impl Drawing {
             }
         }
         Self {
+            visible_ancestor,
             shapes,
             edges,
             annotations,

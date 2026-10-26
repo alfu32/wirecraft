@@ -5,20 +5,24 @@ use wirecraft_core::{
     viewport::{Rect, RouteIndex, SceneIndex, Viewport},
 };
 pub struct Scene {
+    parent: String,
     appearance: wirecraft_runtime::config::Appearance,
     pub drawing: wirecraft_core::drawing::Drawing,
     index: SceneIndex,
     routes: RouteIndex,
+    incident: BTreeMap<String, Vec<String>>,
     pub nodes: BTreeMap<String, (String, NodeKind, Rect)>,
     pub links: BTreeMap<String, (String, Vec<[f64; 2]>)>,
 }
 impl Scene {
     pub fn new(d: &Document, parent: &str) -> Self {
         let mut s = Self {
+            parent: parent.into(),
             appearance: wirecraft_runtime::config::Appearance::default(),
             drawing: wirecraft_core::drawing::Drawing::new(d, "__empty__"),
             index: SceneIndex::default(),
             routes: RouteIndex::default(),
+            incident: BTreeMap::new(),
             nodes: BTreeMap::new(),
             links: BTreeMap::new(),
         };
@@ -29,6 +33,12 @@ impl Scene {
                 .insert(id.clone(), (shape.name.clone(), shape.kind, shape.rect));
         }
         for (id, edge) in &drawing.edges {
+            for endpoint in [&edge.source, &edge.target] {
+                s.incident
+                    .entry(endpoint.clone())
+                    .or_default()
+                    .push(id.clone());
+            }
             s.links
                 .insert(id.clone(), (edge.name.clone(), edge.points.clone()));
         }
@@ -55,6 +65,167 @@ impl Scene {
         let mut ids = self.index.query(rect);
         ids.extend(self.routes.query(rect));
         ids
+    }
+    pub fn pick(&self, world: [f64; 2], tolerance: f64, include_links: bool) -> Option<String> {
+        let hits = self.query(Rect {
+            x: world[0] - tolerance,
+            y: world[1] - tolerance,
+            width: 2. * tolerance,
+            height: 2. * tolerance,
+        });
+        let shape = hits
+            .iter()
+            .filter_map(|id| {
+                self.drawing
+                    .shapes
+                    .get(id)
+                    .filter(|s| s.rect.contains(world))
+                    .map(|s| (id, s))
+            })
+            .max_by_key(|(_, s)| s.depth);
+        // Ports and routes inside a composite must remain pickable through its background.
+        if let Some((id, s)) = shape
+            && (!s.composite || !s.expanded || world[1] < s.rect.y + 55.)
+        {
+            return Some(id.clone());
+        }
+        if let Some(target) = hits.iter().find_map(|id| {
+            self.drawing
+                .annotations
+                .get(id)
+                .filter(|a| a.rect.contains(world))
+                .map(|a| a.target.clone())
+        }) {
+            return Some(target);
+        }
+        if include_links
+            && let Some(id) = hits.iter().find(|id| {
+                self.links.get(*id).is_some_and(|(_, p)| {
+                    p.windows(2).any(|s| {
+                        wirecraft_core::viewport::distance_to_segment(world, s[0], s[1])
+                            <= tolerance
+                    })
+                })
+            })
+        {
+            return Some(id.clone());
+        }
+        shape.map(|(id, _)| id.clone())
+    }
+    pub fn window_selection(&self, start: [f64; 2], end: [f64; 2]) -> BTreeSet<String> {
+        let r = Rect::from_points(start, end);
+        let crossing = end[0] < start[0];
+        let matches = |other: Rect| {
+            if crossing {
+                r.intersects(other)
+            } else {
+                r.encloses(other)
+            }
+        };
+        self.query(r)
+            .into_iter()
+            .filter_map(|id| {
+                if let Some(n) = self.nodes.get(&id) {
+                    return matches(n.2).then_some(id);
+                }
+                if let Some(a) = self.drawing.annotations.get(&id) {
+                    return matches(a.rect).then(|| a.target.clone());
+                }
+                self.links
+                    .get(&id)
+                    .filter(|(_, p)| {
+                        if crossing {
+                            p.windows(2).any(|s| r.intersects_segment(s[0], s[1]))
+                        } else {
+                            p.iter().all(|p| r.contains(*p))
+                        }
+                    })
+                    .map(|_| id)
+            })
+            .collect()
+    }
+    fn project_selection(&self, selected: &BTreeSet<String>) -> BTreeSet<String> {
+        selected
+            .iter()
+            .map(|id| self.drawing.visible_ancestor.get(id).unwrap_or(id).clone())
+            .collect()
+    }
+    pub fn selection_bounds(
+        &self,
+        selected: &BTreeSet<String>,
+        moving: &BTreeSet<String>,
+        delta: [f64; 2],
+    ) -> Option<Rect> {
+        let projected = self.project_selection(selected);
+        let selected = &projected;
+        let mut rects = Vec::new();
+        if selected.contains(&self.parent) {
+            rects.extend(self.nodes.values().map(|n| n.2));
+        }
+        for id in selected {
+            if let Some(n) = self.nodes.get(id) {
+                let mut r = n.2;
+                if moving.contains(id) {
+                    r.x += delta[0];
+                    r.y += delta[1];
+                }
+                rects.push(r);
+            }
+            if let Some(edge) = self.drawing.edges.get(id) {
+                rects.extend(
+                    self.preview_route(edge, moving, delta)
+                        .into_iter()
+                        .map(|p| Rect {
+                            x: p[0],
+                            y: p[1],
+                            width: 0.,
+                            height: 0.,
+                        }),
+                );
+            }
+        }
+        for annotation in self
+            .drawing
+            .annotations
+            .values()
+            .filter(|a| selected.contains(&a.target))
+        {
+            let mut r = annotation.rect;
+            if moving.contains(&annotation.owner) {
+                r.x += delta[0];
+                r.y += delta[1];
+            }
+            rects.push(r);
+        }
+        rects.into_iter().reduce(Rect::union)
+    }
+    fn preview_route(
+        &self,
+        edge: &wirecraft_core::drawing::Edge,
+        moving: &BTreeSet<String>,
+        delta: [f64; 2],
+    ) -> Vec<[f64; 2]> {
+        let mut points = edge.points.clone();
+        if moving.contains(&edge.source) && moving.contains(&edge.target) {
+            for p in &mut points {
+                p[0] += delta[0];
+                p[1] += delta[1];
+            }
+        } else if moving.contains(&edge.source) || moving.contains(&edge.target) {
+            let mut a = points[0];
+            let mut b = *points.last().unwrap();
+            if moving.contains(&edge.source) {
+                a[0] += delta[0];
+                a[1] += delta[1];
+            }
+            if moving.contains(&edge.target) {
+                b[0] += delta[0];
+                b[1] += delta[1];
+            }
+            let mid = (a[0] + b[0]) / 2.;
+            points = vec![a, [mid, a[1]], [mid, b[1]], b];
+        }
+        points
     }
     pub fn with_appearance(mut self, appearance: wirecraft_runtime::config::Appearance) -> Self {
         self.appearance = appearance;
@@ -128,16 +299,45 @@ impl Scene {
         window: &mut Window,
         cx: &mut App,
     ) {
+        let projected = self.project_selection(selected);
+        let selected = &projected;
         window.paint_quad(fill(bounds, rgb(self.color(0x10161e))));
         let width = f64::from(f32::from(bounds.size.width));
         let height = f64::from(f32::from(bounds.size.height));
         let origin = view.world([0., 0.]);
-        let visible = self.query(Rect {
+        let viewport_rect = Rect {
             x: origin[0] - 200.,
             y: origin[1] - 100.,
             width: width / view.zoom + 400.,
             height: height / view.zoom + 200.,
-        });
+        };
+        let mut visible = self
+            .query(viewport_rect)
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        for id in moving {
+            if let Some(n) = self.nodes.get(id)
+                && viewport_rect.intersects(Rect {
+                    x: n.2.x + drag[0],
+                    y: n.2.y + drag[1],
+                    ..n.2
+                })
+            {
+                visible.insert(id.clone());
+            }
+        }
+        if !moving.is_empty() {
+            for id in moving {
+                if let Some(edges) = self.incident.get(id) {
+                    visible.extend(edges.iter().cloned());
+                }
+            }
+            for (id, a) in &self.drawing.annotations {
+                if moving.contains(&a.owner) {
+                    visible.insert(id.clone());
+                }
+            }
+        }
         let screen = |p: [f64; 2]| {
             let p = view.screen(p);
             point(
@@ -190,28 +390,9 @@ impl Scene {
             }
         }
         for id in &visible {
-            if let Some((name, points)) = self.links.get(id) {
+            if let Some((name, _)) = self.links.get(id) {
                 let edge = &self.drawing.edges[id];
-                let mut shifted = points.clone();
-                if moving.contains(&edge.source) && moving.contains(&edge.target) {
-                    for p in &mut shifted {
-                        p[0] += drag[0];
-                        p[1] += drag[1];
-                    }
-                } else if moving.contains(&edge.source) || moving.contains(&edge.target) {
-                    let mut a = shifted[0];
-                    let mut b = *shifted.last().unwrap();
-                    if moving.contains(&edge.source) {
-                        a[0] += drag[0];
-                        a[1] += drag[1];
-                    }
-                    if moving.contains(&edge.target) {
-                        b[0] += drag[0];
-                        b[1] += drag[1];
-                    }
-                    let mid = (a[0] + b[0]) / 2.;
-                    shifted = vec![a, [mid, a[1]], [mid, b[1]], b];
-                }
+                let shifted = self.preview_route(edge, moving, drag);
                 let points = &shifted;
                 let mut builder =
                     PathBuilder::stroke(px(if selected.contains(id) { 3. } else { 1.5 }));
@@ -346,6 +527,23 @@ impl Scene {
                     );
                 }
             }
+        }
+        if let Some(r) = self.selection_bounds(selected, moving, drag) {
+            let origin = screen([r.x, r.y]) - point(px(5.), px(5.));
+            window.paint_quad(quad(
+                Bounds::new(
+                    origin,
+                    size(
+                        px((r.width * view.zoom) as f32 + 10.),
+                        px((r.height * view.zoom) as f32 + 10.),
+                    ),
+                ),
+                px(0.),
+                rgba(0x00000000),
+                px(1.),
+                rgb(self.color(0x70d5c6)),
+                BorderStyle::Dashed,
+            ));
         }
     }
     #[allow(clippy::too_many_arguments)]
@@ -497,5 +695,107 @@ impl Scene {
             .text_system()
             .shape_line(clean.into(), px(font_size), &[run], None);
         let _ = line.paint(origin, px(font_size + 5.), window, cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Scene;
+    use serde_json::json;
+    use std::collections::BTreeSet;
+    use wirecraft_core::{Document, NodeKind};
+    fn fixture() -> (Scene, Document, String, String, String) {
+        let mut d = Document::new("Canvas");
+        let a = d.create("root", "A", NodeKind::Processor).unwrap();
+        let b = d.create("root", "B", NodeKind::Processor).unwrap();
+        d.patch(
+            &a,
+            &json!({"layout":{"x":100,"y":100,"width":100,"height":80}}),
+        )
+        .unwrap();
+        d.patch(
+            &b,
+            &json!({"layout":{"x":400,"y":100,"width":100,"height":80}}),
+        )
+        .unwrap();
+        let wire = d
+            .create_link(
+                "wire",
+                wirecraft_core::Link {
+                    source_node_id: a.clone(),
+                    target_node_id: b.clone(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        (Scene::new(&d, "root"), d, a, b, wire)
+    }
+    #[test]
+    fn directional_windows_select_whole_objects_or_crossed_nodes_and_routes() {
+        let (s, _, a, _, wire) = fixture();
+        assert_eq!(
+            s.window_selection([90., 90.], [190., 190.]),
+            BTreeSet::new()
+        );
+        assert_eq!(
+            s.window_selection([190., 190.], [90., 90.]),
+            BTreeSet::from([a.clone()])
+        );
+        assert_eq!(
+            s.window_selection([90., 90.], [210., 190.]),
+            BTreeSet::from([a])
+        );
+        assert_eq!(
+            s.window_selection([290., 130.], [310., 150.]),
+            BTreeSet::new()
+        );
+        assert_eq!(
+            s.window_selection([310., 150.], [290., 130.]),
+            BTreeSet::from([wire])
+        );
+    }
+    #[test]
+    fn pick_and_selection_bounds_follow_all_moving_nodes_and_selected_links() {
+        let (s, _, a, b, wire) = fixture();
+        assert_eq!(s.pick([110., 120.], 5., true), Some(a.clone()));
+        assert_eq!(s.pick([300., 140.], 5., true), Some(wire.clone()));
+        let selection = BTreeSet::from([a, b]);
+        let r = s
+            .selection_bounds(&selection, &selection, [50., 25.])
+            .unwrap();
+        assert_eq!([r.x, r.y, r.width, r.height], [150., 125., 400., 80.]);
+        let r = s
+            .selection_bounds(&BTreeSet::from([wire]), &selection, [50., 25.])
+            .unwrap();
+        assert_eq!([r.x, r.y, r.width, r.height], [250., 165., 200., 0.]);
+    }
+    #[test]
+    fn links_inside_composite_remain_pickable() {
+        let (_, mut d, a, b, wire) = fixture();
+        let group = d.create("root", "Group", NodeKind::Group).unwrap();
+        d.patch(
+            &group,
+            &json!({"layout":{"x":50,"y":50,"width":600,"height":300,"isExpanded":true}}),
+        )
+        .unwrap();
+        d.move_node(&a, Some(&group)).unwrap();
+        d.move_node(&b, Some(&group)).unwrap();
+        let s = Scene::new(&d, "root");
+        assert_eq!(s.pick([300., 140.], 5., true), Some(wire));
+        assert_eq!(s.pick([60., 60.], 5., true), Some(group));
+    }
+    #[test]
+    fn hidden_selected_descendant_projects_to_visible_composite_contour() {
+        let (_, mut d, a, _, _) = fixture();
+        let group = d.create("root", "Group", NodeKind::Group).unwrap();
+        d.patch(&group,&json!({"layout":{"x":60,"y":220,"closedWidth":180,"closedHeight":70,"isExpanded":false}})).unwrap();
+        d.move_node(&a, Some(&group)).unwrap();
+        let s = Scene::new(&d, "root");
+        let selection = BTreeSet::from([a]);
+        assert_eq!(s.project_selection(&selection), BTreeSet::from([group]));
+        let r = s
+            .selection_bounds(&selection, &BTreeSet::new(), [0., 0.])
+            .unwrap();
+        assert_eq!([r.x, r.y, r.width, r.height], [60., 220., 180., 70.]);
     }
 }

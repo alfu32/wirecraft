@@ -75,3 +75,11 @@ Documentation composition embeds the shared drawing as nested SVG paths and text
 GPUI client decorations and gpui-component TitleBar supply actual minimize, zoom/maximize/restore and close actions. The title bar shares the menu row instead of taking space from the editor. Non-Linux platforms retain native decorations and require platform verification. Native smoke tests exercise the window-manager state and process cleanup, using only their owned window. Tests normalize content bounds because initial X11 bounds may include or exclude client shadows.
 
 The inspector uses compact label/value rows, native dropdown menus and inline metadata/type/history tables. Existing staged InputState values remain the source of patches; selecting a dropdown does not bypass validation or commit immediately. Root capture handlers intercept input actions for completion and secondary Enter for Apply. Consumed actions explicitly stop propagation so Ctrl-Enter cannot insert a newline after submitting its fingerprint.
+
+## Canvas gesture corrections (0.4.1)
+
+Selection operations are idempotent Replace/Add/Remove over an anchor set. Left-to-right windows require complete enclosure; right-to-left windows also intersect primitives. Routes use segment clipping instead of only their bounding rectangle. Visible ancestor projection highlights selected hidden descendants on a collapsed composite. The tree and canvas share one selected-ID set, with full-width tree hit targets and a separate whole-selection contour.
+
+A plain press on a selected member defers replacement until mouse-up, allowing the group to drag. Descendant IDs are deduplicated, and the backend receives one revision-checked batch. Pointer previews persist until the authoritative snapshot arrives. Root mouse handlers end gestures when released outside the canvas. Wheel zoom anchors at the cursor; middle/right dragging pans.
+
+Drag rerouting has an 80 ms quiet timer and at most one CPU projection in flight. Snapshot cloning, topology projection and route/index construction run on the background executor. Immediate movement uses cheap endpoint previews; completed routes carry their own translation, with subsequent movement applied as a residual. Epoch/revision guards discard work after a drag ends or the document changes. This is bounded background work, not a GPU frame-rate claim.
