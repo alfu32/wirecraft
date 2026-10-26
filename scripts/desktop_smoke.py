@@ -10,7 +10,19 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
  env=os.environ.copy();env.pop('WAYLAND_DISPLAY',None);env['XDG_SESSION_TYPE']='x11'
  log=open(artifact/'desktop.log','w')
  app=subprocess.Popen([binary,'--state-dir',str(state)],env=env,stdout=log,stderr=log)
- def xd(*args):return subprocess.check_output(['xdotool',*map(str,args)],env=env,text=True).strip()
+ def xd(*args):
+  if args and args[0] in ('key','type') and window is not None:args=(args[0],'--window',window,*args[1:])
+  result=subprocess.run(['xdotool',*map(str,args)],env=env,text=True,capture_output=True)
+  if result.returncode and args[-1]!='ctrl+q':raise subprocess.CalledProcessError(result.returncode,result.args,result.stdout,result.stderr)
+  return result.stdout.strip()
+ def caption():return subprocess.check_output(['import','-window',window,'-crop','300x32+620+98','rgba:-'],env=env)
+ def choose_mode(x,y):
+  before=caption();until=time.monotonic()+8
+  while time.monotonic()<until:
+   xd('windowraise',window);xd('mousemove','--window',window,x,y);xd('click',1)
+   time.sleep(.25)
+   if caption()!=before:return
+  raise TimeoutError('tool mode did not repaint in the owned window')
  def wait_for(f,timeout=12):
   until=time.monotonic()+timeout
   while time.monotonic()<until:
@@ -30,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   time.sleep(1)
   subprocess.run(['import','-window',window,str(artifact/'initial.png')],env=env,check=True)
   # Node mode button then two canvas positions; never addresses Threadworks' display.
-  xd('mousemove','--window',window,370,114);xd('click',1)
+  choose_mode(370,114)
   xd('mousemove','--window',window,450,300);xd('click',1)
   wait_for(lambda:state.joinpath('recovery.json').exists())
   recovery=lambda:json.loads(state.joinpath('recovery.json').read_text())
@@ -43,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   subprocess.run(['import','-window',window,str(artifact/'canvas.png')],env=env,check=True)
   # Synthetic clicks are paced across frames; completion is checked in persisted state.
   wait_for(lambda:json.loads(state.joinpath('ui.json').read_text()).get('draft') is None)
-  xd('mousemove','--window',window,483,114);xd('click',1);time.sleep(.2)
+  choose_mode(483,114)
   xd('mousemove','--window',window,530,350);xd('click',1);time.sleep(.2)
   xd('mousemove','--window',window,800,470);xd('click',1)
   wait_for(lambda:sum(n['kind']=='Link' for n in recovery()['document']['nodes'].values())==1)
