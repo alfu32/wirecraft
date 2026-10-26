@@ -206,6 +206,11 @@ impl Scene {
         delta: [f64; 2],
     ) -> Vec<[f64; 2]> {
         let mut points = edge.points.clone();
+        // The cached scene is already routed at its own drag offset. Preserve that
+        // obstacle-aware path when no newer pointer delta needs a cheap preview.
+        if delta == [0., 0.] {
+            return points;
+        }
         if moving.contains(&edge.source) && moving.contains(&edge.target) {
             for p in &mut points {
                 p[0] += delta[0];
@@ -259,6 +264,60 @@ impl Scene {
         };
         self.appearance.color(key, value)
     }
+    fn visible_for(
+        &self,
+        viewport: Rect,
+        moving: &BTreeSet<String>,
+        delta: [f64; 2],
+    ) -> BTreeSet<String> {
+        let mut visible = self.query(viewport).into_iter().collect::<BTreeSet<_>>();
+        let mut edges = BTreeSet::new();
+        for id in moving {
+            if let Some(n) = self.nodes.get(id) {
+                let translated = Rect {
+                    x: n.2.x + delta[0],
+                    y: n.2.y + delta[1],
+                    ..n.2
+                };
+                if viewport.intersects(translated) {
+                    visible.insert(id.clone());
+                } else {
+                    visible.remove(id);
+                }
+            }
+            if let Some(incident) = self.incident.get(id) {
+                edges.extend(incident.iter());
+            }
+        }
+        for id in edges {
+            if self
+                .preview_route(&self.drawing.edges[id], moving, delta)
+                .windows(2)
+                .any(|p| viewport.intersects_segment(p[0], p[1]))
+            {
+                visible.insert(id.clone());
+            } else {
+                visible.remove(id);
+            }
+        }
+        if !moving.is_empty() {
+            for (id, a) in &self.drawing.annotations {
+                if moving.contains(&a.owner) {
+                    let r = Rect {
+                        x: a.rect.x + delta[0],
+                        y: a.rect.y + delta[1],
+                        ..a.rect
+                    };
+                    if viewport.intersects(r) {
+                        visible.insert(id.clone());
+                    } else {
+                        visible.remove(id);
+                    }
+                }
+            }
+        }
+        visible
+    }
     pub fn fitted(&self, size: [f64; 2]) -> Viewport {
         if self.nodes.is_empty() {
             return Viewport::default();
@@ -311,33 +370,7 @@ impl Scene {
             width: width / view.zoom + 400.,
             height: height / view.zoom + 200.,
         };
-        let mut visible = self
-            .query(viewport_rect)
-            .into_iter()
-            .collect::<BTreeSet<_>>();
-        for id in moving {
-            if let Some(n) = self.nodes.get(id)
-                && viewport_rect.intersects(Rect {
-                    x: n.2.x + drag[0],
-                    y: n.2.y + drag[1],
-                    ..n.2
-                })
-            {
-                visible.insert(id.clone());
-            }
-        }
-        if !moving.is_empty() {
-            for id in moving {
-                if let Some(edges) = self.incident.get(id) {
-                    visible.extend(edges.iter().cloned());
-                }
-            }
-            for (id, a) in &self.drawing.annotations {
-                if moving.contains(&a.owner) {
-                    visible.insert(id.clone());
-                }
-            }
-        }
+        let visible = self.visible_for(viewport_rect, moving, drag);
         let screen = |p: [f64; 2]| {
             let p = view.screen(p);
             point(
@@ -797,5 +830,39 @@ mod tests {
             .selection_bounds(&selection, &BTreeSet::new(), [0., 0.])
             .unwrap();
         assert_eq!([r.x, r.y, r.width, r.height], [60., 220., 180., 70.]);
+    }
+    #[test]
+    fn moving_primitives_are_culled_at_their_preview_positions() {
+        let (s, _, a, b, wire) = fixture();
+        let moving = BTreeSet::from([a.clone(), b]);
+        let old = wirecraft_core::viewport::Rect::from_points([90., 90.], [240., 190.]);
+        assert!(s.visible_for(old, &moving, [10000., 0.]).is_empty());
+        let translated = wirecraft_core::viewport::Rect::from_points([10090., 90.], [10240., 190.]);
+        assert_eq!(
+            s.visible_for(translated, &moving, [10000., 0.]),
+            BTreeSet::from([a, wire])
+        );
+        let empty = wirecraft_core::viewport::Rect::from_points([10250., 90.], [10300., 120.]);
+        assert!(s.visible_for(empty, &moving, [10000., 0.]).is_empty());
+    }
+    #[test]
+    fn completed_reroute_retains_its_obstacle_detour() {
+        let (_, mut d, a, _, wire) = fixture();
+        let obstacle = d.create("root", "Obstacle", NodeKind::Processor).unwrap();
+        d.patch(
+            &obstacle,
+            &json!({"layout":{"x":260,"y":90,"width":80,"height":100}}),
+        )
+        .unwrap();
+        let s = Scene::new(&d, "root");
+        let edge = &s.drawing.edges[&wire];
+        assert!(
+            edge.points.len() > 4,
+            "fixture must route around the obstacle"
+        );
+        assert_eq!(
+            s.preview_route(edge, &BTreeSet::from([a]), [0., 0.]),
+            edge.points
+        );
     }
 }
