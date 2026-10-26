@@ -88,7 +88,7 @@ impl OwnedBackend {
 impl Drop for OwnedBackend {
     fn drop(&mut self) {
         let _ = self.call(&Request::new("system.shutdown", json!({})));
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(10);
         while Instant::now() < deadline {
             if self.child.try_wait().ok().flatten().is_some() {
                 return;
@@ -241,10 +241,10 @@ fn worker(
             );
         }
         let status = backend.call(&Request::new("session.status", json!({})))?;
-        if revision != status["revision"].as_u64() {
+        if revision.as_ref() != Some(&status) {
             let value = backend.call(&Request::new("session.snapshot", json!({})))?;
             let snapshot: Snapshot = serde_json::from_value(value)?;
-            revision = Some(snapshot.revision);
+            revision = Some(status);
             updates.send_blocking(Update::Snapshot(Box::new(snapshot)))?;
         }
     }

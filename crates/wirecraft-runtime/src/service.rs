@@ -43,8 +43,11 @@ pub struct Service {
     pub revision: u64,
     pub path: Option<PathBuf>,
     saved: Value,
-    undo: Vec<Document>,
-    redo: Vec<Document>,
+    undo: Vec<(Document, u64)>,
+    redo: Vec<(Document, u64)>,
+    state_id: u64,
+    saved_state_id: u64,
+    next_state_id: u64,
 }
 impl Service {
     pub fn new(document: Document, path: Option<PathBuf>) -> Self {
@@ -56,6 +59,9 @@ impl Service {
             saved,
             undo: vec![],
             redo: vec![],
+            state_id: 0,
+            saved_state_id: 0,
+            next_state_id: 1,
         }
     }
     pub fn write_recovery(&self, path: &Path) -> Result<()> {
@@ -73,10 +79,13 @@ impl Service {
         document.ensure_valid()?;
         let mut service = Self::new(document, v["path"].as_str().map(PathBuf::from));
         service.saved = v["saved"].clone();
+        if serde_json::to_value(&service.document)? != service.saved {
+            service.saved_state_id = u64::MAX;
+        }
         Ok(service)
     }
     pub fn dirty(&self) -> bool {
-        serde_json::to_value(&self.document).unwrap() != self.saved
+        self.state_id != self.saved_state_id
     }
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
@@ -143,6 +152,7 @@ impl Service {
                 store::save(&self.document, &path)?;
                 self.path = Some(path);
                 self.saved = serde_json::to_value(&self.document)?;
+                self.saved_state_id = self.state_id;
                 return Ok(json!({"path":self.path,"saved":true}));
             }
             "edit.undo" => {
@@ -150,8 +160,11 @@ impl Service {
                     .undo
                     .pop()
                     .ok_or_else(|| Error::new("unavailable", "Nothing to undo"))?;
-                self.redo
-                    .push(std::mem::replace(&mut self.document, previous));
+                self.redo.push((
+                    std::mem::replace(&mut self.document, previous.0),
+                    self.state_id,
+                ));
+                self.state_id = previous.1;
                 self.revision += 1;
                 return Ok(serde_json::to_value(self.snapshot())?);
             }
@@ -160,7 +173,9 @@ impl Service {
                     .redo
                     .pop()
                     .ok_or_else(|| Error::new("unavailable", "Nothing to redo"))?;
-                self.undo.push(std::mem::replace(&mut self.document, next));
+                self.undo
+                    .push((std::mem::replace(&mut self.document, next.0), self.state_id));
+                self.state_id = next.1;
                 self.revision += 1;
                 return Ok(serde_json::to_value(self.snapshot())?);
             }
@@ -539,8 +554,12 @@ impl Service {
         };
         candidate.ensure_valid()?;
         if serde_json::to_value(&candidate)? != serde_json::to_value(&self.document)? {
-            self.undo
-                .push(std::mem::replace(&mut self.document, candidate));
+            self.undo.push((
+                std::mem::replace(&mut self.document, candidate),
+                self.state_id,
+            ));
+            self.state_id = self.next_state_id;
+            self.next_state_id += 1;
             if self.undo.len() > 100 {
                 self.undo.remove(0);
             }
@@ -561,6 +580,9 @@ impl Service {
     }
     fn reset_history(&mut self) {
         self.saved = serde_json::to_value(&self.document).unwrap();
+        self.state_id = self.next_state_id;
+        self.next_state_id += 1;
+        self.saved_state_id = self.state_id;
         self.undo.clear();
         self.redo.clear();
         self.revision += 1;

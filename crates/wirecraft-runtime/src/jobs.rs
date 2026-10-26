@@ -48,6 +48,7 @@ impl Jobs {
             .kill_on_drop(true);
         #[cfg(unix)]
         cmd.process_group(0);
+        crate::process::terminate_with_parent(&mut cmd);
         let mut child = cmd.spawn().map_err(|e| {
             Error::new(
                 "tool_unavailable",

@@ -277,8 +277,32 @@ impl Node {
             .iter()
             .any(|p| p.name == name && p.direction == direction)
         {
+            let clean: String = name
+                .chars()
+                .map(|c| {
+                    if c.is_alphanumeric() {
+                        c.to_ascii_lowercase()
+                    } else {
+                        '_'
+                    }
+                })
+                .collect();
+            let clean = clean.trim_matches('_');
+            let clean = if clean.is_empty() { "port" } else { clean };
+            let prefix = if direction == Direction::Input {
+                "input"
+            } else {
+                "output"
+            };
+            let base = format!("{prefix}_{clean}");
+            let mut id = base.clone();
+            let mut suffix = 2;
+            while self.ports.iter().any(|p| p.id == id) {
+                id = format!("{base}_{suffix}");
+                suffix += 1;
+            }
             self.ports.push(Port {
-                id: Uuid::new_v4().to_string(),
+                id,
                 name: name.into(),
                 direction,
                 data_type: String::new(),

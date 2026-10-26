@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Run under xvfb-run. Uses only an isolated state directory and owned desktop."""
-import os, pathlib, subprocess, time, tempfile, json
+"""Requires X11/XWayland with Vulkan/DRI3. Uses only temporary state and an owned PID."""
+import os, pathlib, subprocess, time, tempfile, json, urllib.request
 root=pathlib.Path(__file__).resolve().parent.parent
+binary=os.environ.get('WIRECRAFT_SMOKE_BINARY',str(root/'target/debug/wirecraft-desktop'))
 artifact=root/'target'/'desktop-smoke'
 artifact.mkdir(parents=True,exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
  state=pathlib.Path(tmp)
  env=os.environ.copy();env.pop('WAYLAND_DISPLAY',None);env['XDG_SESSION_TYPE']='x11'
  log=open(artifact/'desktop.log','w')
- app=subprocess.Popen([str(root/'target/debug/wirecraft-desktop'),'--state-dir',str(state)],env=env,stdout=log,stderr=log)
+ app=subprocess.Popen([binary,'--state-dir',str(state)],env=env,stdout=log,stderr=log)
  def xd(*args):return subprocess.check_output(['xdotool',*map(str,args)],env=env,text=True).strip()
  def wait_for(f,timeout=12):
   until=time.monotonic()+timeout
@@ -40,6 +41,17 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   xd('key','Escape');xd('mousemove','--window',window,480,320);xd('mousedown',1);xd('mousemove','--window',window,530,350);xd('mouseup',1)
   time.sleep(.4)
   subprocess.run(['import','-window',window,str(artifact/'canvas.png')],env=env,check=True)
+  # Create a directed link through the canvas, then copy/paste/undo an entity.
+  xd('mousemove','--window',window,483,114);xd('click',1)
+  xd('mousemove','--window',window,530,350);xd('click',1)
+  xd('mousemove','--window',window,800,470);xd('click',1)
+  wait_for(lambda:sum(n['kind']=='Link' for n in recovery()['document']['nodes'].values())==1)
+  xd('key','Escape');xd('mousemove','--window',window,530,350);xd('click',1)
+  xd('key','ctrl+c');time.sleep(.2);xd('key','ctrl+v')
+  wait_for(lambda:len(recovery()['document']['nodes'])==5)
+  xd('key','ctrl+z');wait_for(lambda:len(recovery()['document']['nodes'])==4)
+  xd('mousemove','--window',window,530,350);xd('click',1)
+  subprocess.run(['import','-window',window,str(artifact/'canvas.png')],env=env,check=True)
   # A draft must survive process exit and recovery without being silently applied.
   xd('mousemove','--window',window,132,70);xd('click',1)
   time.sleep(.3)
@@ -50,20 +62,42 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   # Quit through our own registered action and check process lifecycle.
   xd('key','ctrl+q');app.wait(timeout=10)
   assert app.returncode==0, app.returncode
-  assert len(recovery()['document']['nodes'])==3
+  assert len(recovery()['document']['nodes'])==4
   assert state.joinpath('ui.json').exists()
   # Reopen the same isolated session, apply its recovered editor draft, then use clangd.
-  app=subprocess.Popen([str(root/'target/debug/wirecraft-desktop'),'--state-dir',str(state)],env=env,stdout=log,stderr=log)
+  app=subprocess.Popen([binary,'--state-dir',str(state)],env=env,stdout=log,stderr=log)
   window=wait_for(lambda:xd('search','--onlyvisible','--pid',app.pid).splitlines()[0])
   assert int(xd('getwindowpid',window))==app.pid
   time.sleep(.7);xd('windowfocus','--sync',window)
   xd('mousemove','--window',window,1320,116);xd('click',1)
   wait_for(lambda:any(n['text']['source']=='int main(void) { return missing; }' for n in recovery()['document']['nodes'].values()))
   # Tool output is visually recorded; real LSP result assertions also run in cargo tests.
-  xd('mousemove','--window',window,445,70);xd('click',1);time.sleep(.2)
+  xd('mousemove','--window',window,650,70);xd('click',1);time.sleep(.2)
+  subprocess.run(['import','-window',window,str(artifact/'tools.png')],env=env,check=True)
+  # Inspect only the backend child launched by this owned desktop.
+  backend_pid=int(subprocess.check_output(['pgrep','-P',str(app.pid)],text=True).splitlines()[0])
+  args=pathlib.Path(f'/proc/{backend_pid}/cmdline').read_bytes().decode().split('\0');assert '--backend' in args
+  token=args[args.index('--token')+1]
+  sockets={p.readlink().name for p in pathlib.Path(f'/proc/{backend_pid}/fd').iterdir() if str(p.readlink()).startswith('socket:')}
+  port=None
+  for line in pathlib.Path(f'/proc/{backend_pid}/net/tcp').read_text().splitlines()[1:]:
+   fields=line.split()
+   if fields[3]=='0A' and f'socket:[{fields[9]}]' in sockets:port=int(fields[1].split(':')[1],16)
+  assert port is not None
+  def api(command):
+   request=urllib.request.Request(f'http://127.0.0.1:{port}/api',json.dumps({'command':command,'arguments':{}}).encode(),{'Content-Type':'application/json','Authorization':f'Bearer {token}'})
+   with urllib.request.urlopen(request,timeout=5) as response:return json.load(response)['result']
+  xd('mousemove','--window',window,300,167);xd('click',1)
+  diagnostics=wait_for(lambda:next((d for d in api('lsp.diagnostics').values() if any('missing' in e.get('message','') for e in d.get('diagnostics',[]))),None))
+  lsp_pid=api('lsp.status')['pid'];assert lsp_pid
+  xd('mousemove','--window',window,530,167);xd('click',1)
+  wait_for(lambda:any(j['status']=='failed' and 'missing' in j.get('stderr','') for j in api('jobs.list')['jobs']))
   subprocess.run(['import','-window',window,str(artifact/'tools.png')],env=env,check=True)
   xd('key','ctrl+q');app.wait(timeout=10)
-  print(json.dumps({'desktop':'passed','editorDraft':True,'draftRestoredAndApplied':True,'nodes':3,'recovery':True,'exitCode':app.returncode,'artifacts':str(artifact)}))
+  until=time.monotonic()+5
+  while any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,lsp_pid]) and time.monotonic()<until:time.sleep(.05)
+  assert not any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,lsp_pid]), 'owned child survived shutdown'
+  print(json.dumps({'desktop':'passed','clangdDiagnostics':True,'externalCompilerDiagnostics':True,'ownedChildrenStopped':True,'editorDraft':True,'draftRestoredAndApplied':True,'nodes':4,'canvasLink':True,'clipboardUndo':True,'recovery':True,'exitCode':app.returncode,'artifacts':str(artifact)}))
  finally:
   if app.poll() is None:
    try:

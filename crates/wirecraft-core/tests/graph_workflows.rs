@@ -128,3 +128,23 @@ fn vector_and_markdown_exports_escape_untrusted_content() {
     assert!(md.contains("````plain"));
     assert!(md.contains("int a;"));
 }
+
+#[test]
+fn repaired_endpoint_port_ids_match_the_source_naming_contract() {
+    let mut d = Document::new("ports");
+    let a = d.create("root", "a", NodeKind::Processor).unwrap();
+    let b = d.create("root", "b", NodeKind::Processor).unwrap();
+    d.create_link(
+        "data",
+        Link {
+            source_node_id: a.clone(),
+            target_node_id: b.clone(),
+            source_port_name: "packet out".into(),
+            target_port_name: "packet in".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(d.nodes[&a].ports[0].id, "output_packet_out");
+    assert_eq!(d.nodes[&b].ports[0].id, "input_packet_in");
+}

@@ -18,7 +18,10 @@ use futures::StreamExt;
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Duration,
 };
 use tokio::{
@@ -37,13 +40,16 @@ pub struct Application {
     pub token: String,
     stop: watch::Sender<bool>,
     recovery: Option<PathBuf>,
+    revision: Arc<AtomicU64>,
 }
 impl Application {
     pub fn new(service: Service, token: String, recovery: Option<PathBuf>) -> Self {
         let (events, _) = broadcast::channel(256);
         let (stop, _) = watch::channel(false);
+        let revision = Arc::new(AtomicU64::new(service.revision));
         Self {
             service: Arc::new(Mutex::new(service)),
+            revision,
             jobs: Jobs::new(events.clone()),
             events,
             lsp: Arc::new(AsyncMutex::new(None)),
@@ -54,9 +60,12 @@ impl Application {
         }
     }
     pub fn revision(&self) -> u64 {
-        self.service.lock().unwrap().revision
+        self.revision.load(Ordering::SeqCst)
     }
     pub async fn execute(&self, r: Request) -> Result<Value> {
+        if *self.stop.borrow() && r.command != "system.shutdown" {
+            return Err(Error::new("shutting_down", "Backend is shutting down"));
+        }
         let a = &r.arguments;
         match r.command.as_str() {
             "system.shutdown" => {
@@ -180,23 +189,39 @@ impl Application {
         let service = self.service.clone();
         let events = self.events.clone();
         let recovery = self.recovery.clone();
+        let revision = self.revision.clone();
         tokio::task::spawn_blocking(move || {
             let mut s = service
                 .lock()
                 .map_err(|_| Error::new("internal", "Project lock is poisoned"))?;
             let before = s.revision;
-            let persists = matches!(r.command.as_str(), "file.save" | "file.commit_and_save");
-            let result = s.execute(r)?;
+            let before_dirty = s.dirty();
+            let before_path = s.path.clone();
+            let mut result = s.execute(r);
+            revision.store(s.revision, Ordering::SeqCst);
             if before != s.revision {
                 let _ = events.send(json!({"type":"document.changed","revision":s.revision}));
             }
-            if (before != s.revision || persists)
+            let session_changed = before_dirty != s.dirty() || before_path != s.path;
+            if session_changed {
+                let _ = events.send(json!({"type":"session.changed","revision":s.revision}));
+            }
+            if (before != s.revision || session_changed)
                 && let Some(path) = recovery
                 && let Err(error) = s.write_recovery(&path)
             {
                 let _ = events.send(json!({"type":"recovery.failed","error":error}));
+                match &mut result {
+                    Ok(value) => {
+                        value["_wirecraftWarnings"] =
+                            json!([{"code":"recovery_failed","message":error.message}])
+                    }
+                    Err(original) => original
+                        .message
+                        .push_str(&format!("; recovery also failed: {}", error.message)),
+                }
             }
-            Ok(result)
+            result
         })
         .await
         .map_err(|e| Error::new("internal", e.to_string()))?
@@ -219,11 +244,13 @@ impl Application {
     }
     pub async fn serve(&self, listener: TcpListener) -> std::io::Result<()> {
         let mut stop = self.stop.subscribe();
+        let shutdown = self.clone();
         let result = axum::serve(listener, self.router())
             .with_graceful_shutdown(async move {
                 if !*stop.borrow() {
                     let _ = stop.changed().await;
                 }
+                shutdown.shutdown().await;
             })
             .await;
         self.shutdown().await;
@@ -297,12 +324,18 @@ async fn events(State(app): State<Application>, headers: HeaderMap) -> Response 
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let rx = app.events.subscribe();
+    let mut stop = app.stop.subscribe();
     let stream = tokio_stream::wrappers::BroadcastStream::new(rx).map(|v| {
         Ok::<_, std::convert::Infallible>(
             Event::default()
                 .json_data(v.unwrap_or_else(|_| json!({"type":"resync"})))
                 .unwrap(),
         )
+    });
+    let stream = stream.take_until(async move {
+        if !*stop.borrow() {
+            let _ = stop.changed().await;
+        }
     });
     Sse::new(stream)
         .keep_alive(KeepAlive::default())

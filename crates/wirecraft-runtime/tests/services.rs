@@ -148,6 +148,45 @@ async fn real_http_mcp_client_and_shared_revision() {
         .await
         .unwrap();
     assert_eq!(created["result"]["isError"], false);
+    let report: Value = client
+        .post(format!("{url}/mcp"))
+        .bearer_auth("temporary-test-token")
+        .json(&rpc(
+            5,
+            "tools/call",
+            json!({"name":"wirecraft.analyze_network","arguments":{}}),
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        report["result"]["structuredContent"]["counts"]["entities"],
+        2
+    );
+    assert!(report["result"]["structuredContent"]["graphs"]["principal"].is_object());
+    let prompts = mcp::handle(&app, rpc(6, "prompts/list", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(prompts["result"]["prompts"].as_array().unwrap().len(), 2);
+    let resources = mcp::handle(&app, rpc(7, "resources/list", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(
+        resources["result"]["resources"].as_array().unwrap().len(),
+        5
+    );
+    let resource = mcp::handle(
+        &app,
+        rpc(8, "resources/read", json!({"uri":"threadwork://design"})),
+    )
+    .await
+    .unwrap();
+    let design: Value =
+        serde_json::from_str(resource["result"]["contents"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(design["nodes"].as_object().unwrap().len(), 2);
     let snapshot: Value = client
         .post(format!("{url}/api"))
         .bearer_auth("temporary-test-token")
@@ -426,4 +465,224 @@ fn stdio_client_initializes_lists_calls_and_stops() {
     assert_eq!(messages.len(), 3);
     assert_eq!(messages[1]["result"]["tools"].as_array().unwrap().len(), 34);
     assert_eq!(messages[2]["result"]["structuredContent"]["valid"], true);
+}
+
+#[test]
+fn inverse_positions_reject_surrogate_and_utf8_splits() {
+    use wirecraft_runtime::lsp::offset;
+    let text = "a\r\nb😀é";
+    for encoding in ["utf-8", "utf-16", "utf-32"] {
+        let byte = "a\r\nb😀".len();
+        let p = position(text, byte, encoding).unwrap();
+        assert_eq!(
+            offset(
+                text,
+                p["line"].as_u64().unwrap() as usize,
+                p["character"].as_u64().unwrap() as usize,
+                encoding
+            )
+            .unwrap(),
+            byte
+        );
+    }
+    assert!(offset(text, 1, 2, "utf-16").is_err());
+    assert!(offset(text, 1, 2, "utf-8").is_err());
+    assert!(offset(text, 9, 0, "utf-16").is_err());
+}
+#[tokio::test]
+async fn lsp_cancellation_stale_results_and_abrupt_crash() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("peer.c");
+    std::fs::write(&path, "").unwrap();
+    let uri = url::Url::from_file_path(&path).unwrap().to_string();
+    let peer = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lsp_peer.py");
+    let session = LanguageSession::start("python3", &[peer.to_string_lossy().into()], temp.path())
+        .await
+        .unwrap();
+    assert_eq!(session.encoding, "utf-8");
+    session.open(&uri, "c", "int a;", 1).await.unwrap();
+    let mut events = session.subscribe();
+    let pending = session.clone();
+    let task = tokio::spawn(async move {
+        pending
+            .request_id(900, "workspace/symbol", json!({"query":"slow"}))
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let event = events.recv().await.unwrap();
+            if event["method"] == "fixture/pending" && event["data"]["id"] == 900 {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    session.cancel(900).await.unwrap();
+    assert_eq!(task.await.unwrap().unwrap_err().code, "cancelled");
+    let pending = session.clone();
+    let document = uri.clone();
+    let task = tokio::spawn(async move {
+        pending
+            .request_id(
+                901,
+                "textDocument/documentSymbol",
+                json!({"textDocument":{"uri":document}}),
+            )
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let event = events.recv().await.unwrap();
+            if event["method"] == "fixture/pending" && event["data"]["id"] == 901 {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    session.change(&uri, "int b;", 2).await.unwrap();
+    assert_eq!(task.await.unwrap().unwrap_err().code, "stale_result");
+    let until = std::time::Instant::now() + Duration::from_secs(2);
+    while session.diagnostics()[&uri]["version"] != 2 {
+        assert!(std::time::Instant::now() < until);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        session.diagnostics()[&uri]["diagnostics"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let pending = session.clone();
+    let task = tokio::spawn(async move {
+        pending
+            .request_id(902, "workspace/symbol", json!({"query":"aborted"}))
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let event = events.recv().await.unwrap();
+            if event["method"] == "fixture/pending" && event["data"]["id"] == 902 {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    task.abort();
+    assert!(task.await.unwrap_err().is_cancelled());
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let event = events.recv().await.unwrap();
+            if event["method"] == "fixture/cancelled" && event["data"]["id"] == 902 {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    session.shutdown().await;
+    let crashed = LanguageSession::start("clangd", &[], temp.path())
+        .await
+        .unwrap();
+    #[cfg(unix)]
+    {
+        let pid = crashed.pid().unwrap();
+        let status = std::process::Command::new("kill")
+            .args(["-KILL", &pid.to_string()])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while crashed.alive() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            crashed
+                .request("workspace/symbol", json!({"query":""}))
+                .await
+                .unwrap_err()
+                .code,
+            "process_failed"
+        );
+    }
+    crashed.shutdown().await;
+}
+
+#[tokio::test]
+async fn failed_save_reports_committed_revision_and_preserves_recovery() {
+    let temp = tempfile::tempdir().unwrap();
+    let recovery = temp.path().join("recovery.json");
+    let app = Application::new(service(), "fixture".into(), Some(recovery.clone()));
+    let failed = app
+        .execute(Request::new(
+            "file.commit_and_save",
+            json!({"path":temp.path(),"nodeId":"root","patch":{"name":"retained edit"}}),
+        ))
+        .await;
+    assert!(failed.is_err());
+    assert_eq!(app.revision(), 1);
+    let restored = Service::read_recovery(&recovery).unwrap();
+    assert_eq!(restored.document.project_name(), "retained edit");
+    assert!(restored.dirty());
+    let status = app
+        .execute(Request::new("session.status", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(status["revision"], 1);
+    assert_eq!(status["dirty"], true);
+    app.shutdown().await;
+}
+#[tokio::test]
+async fn recovery_failures_are_visible_without_repeating_committed_mutations() {
+    let temp = tempfile::tempdir().unwrap();
+    let blocker = temp.path().join("file");
+    std::fs::write(&blocker, b"existing").unwrap();
+    let app = Application::new(
+        service(),
+        "fixture".into(),
+        Some(blocker.join("recovery.json")),
+    );
+    let result = app
+        .execute(Request::new(
+            "threadwork.create_entity",
+            json!({"name":"committed once"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result["_wirecraftWarnings"][0]["code"], "recovery_failed");
+    assert_eq!(app.revision(), 1);
+    assert_eq!(app.service.lock().unwrap().document.nodes.len(), 2);
+    app.shutdown().await;
+}
+
+#[tokio::test]
+async fn shutdown_closes_live_event_subscriptions() {
+    let app = Application::new(service(), "temporary-test-token".into(), None);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/events", listener.local_addr().unwrap());
+    let server_app = app.clone();
+    let server = tokio::spawn(async move {
+        server_app.serve(listener).await.unwrap();
+    });
+    let client = reqwest::Client::new();
+    let response = client
+        .get(url)
+        .bearer_auth("temporary-test-token")
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    app.execute(Request::new("system.shutdown", json!({})))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
+    drop(response);
 }

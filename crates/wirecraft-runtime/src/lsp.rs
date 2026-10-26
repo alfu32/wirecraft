@@ -26,6 +26,27 @@ struct Inner {
     alive: AtomicBool,
     events: broadcast::Sender<Value>,
 }
+struct PendingRequest {
+    inner: Weak<Inner>,
+    id: u64,
+}
+impl Drop for PendingRequest {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.upgrade() {
+            let pending = inner.pending.lock().unwrap().remove(&self.id).is_some();
+            if pending && let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                let id = self.id;
+                runtime.spawn(async move {
+                    let _ = send(
+                        &inner,
+                        json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":id}}),
+                    )
+                    .await;
+                });
+            }
+        }
+    }
+}
 #[derive(Clone)]
 pub struct LanguageSession {
     inner: Arc<Inner>,
@@ -47,6 +68,7 @@ impl LanguageSession {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true);
+        crate::process::terminate_with_parent(&mut cmd);
         let mut child = cmd.spawn().map_err(|e| {
             Error::new(
                 "tool_unavailable",
@@ -124,6 +146,10 @@ impl LanguageSession {
         if !self.alive() {
             return Err(Error::new("process_failed", "Language server has exited"));
         }
+        let document = params["textDocument"]["uri"].as_str().map(str::to_string);
+        let document_version = document
+            .as_ref()
+            .and_then(|uri| self.inner.documents.lock().unwrap().get(uri).copied());
         let (tx, rx) = oneshot::channel();
         {
             let mut pending = self.inner.pending.lock().unwrap();
@@ -132,6 +158,10 @@ impl LanguageSession {
             }
             pending.insert(id, tx);
         }
+        let _pending = PendingRequest {
+            inner: Arc::downgrade(&self.inner),
+            id,
+        };
         if let Err(e) = send(
             &self.inner,
             json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),
@@ -142,7 +172,18 @@ impl LanguageSession {
             return Err(e);
         }
         match tokio::time::timeout(Duration::from_secs(15), rx).await {
-            Ok(Ok(r)) => r,
+            Ok(Ok(r)) => {
+                let current = document
+                    .as_ref()
+                    .and_then(|uri| self.inner.documents.lock().unwrap().get(uri).copied());
+                if document_version != current {
+                    return Err(Error::new(
+                        "stale_result",
+                        "Document changed while the language request was pending",
+                    ));
+                }
+                r
+            }
             Ok(Err(_)) => Err(Error::new(
                 "process_failed",
                 "Language server connection closed",
@@ -167,6 +208,7 @@ impl LanguageSession {
         Ok(())
     }
     pub async fn open(&self, uri: &str, language: &str, text: &str, version: i64) -> Result<()> {
+        validate_version(version)?;
         validate_uri(uri, &self.root)?;
         {
             let mut docs = self.inner.documents.lock().unwrap();
@@ -182,6 +224,7 @@ impl LanguageSession {
         .await
     }
     pub async fn change(&self, uri: &str, text: &str, version: i64) -> Result<()> {
+        validate_version(version)?;
         {
             let mut docs = self.inner.documents.lock().unwrap();
             let old = docs
@@ -386,4 +429,56 @@ pub fn position(text: &str, offset: usize, encoding: &str) -> Result<Value> {
         _ => return Err(Error::new("unsupported", "Unknown position encoding")),
     };
     Ok(json!({"line":line,"character":character}))
+}
+
+fn validate_version(version: i64) -> Result<()> {
+    if !(0..=i64::from(i32::MAX)).contains(&version) {
+        return Err(Error::new(
+            "invalid_input",
+            "Document version must be a nonnegative LSP integer",
+        ));
+    }
+    Ok(())
+}
+/// Convert a negotiated LSP coordinate to a UTF-8 byte offset, rejecting split characters.
+pub fn offset(text: &str, line: usize, character: usize, encoding: &str) -> Result<usize> {
+    if !["utf-8", "utf-16", "utf-32"].contains(&encoding) {
+        return Err(Error::new("unsupported", "Unknown position encoding"));
+    }
+    let mut start = 0;
+    for (row, raw) in text.split('\n').enumerate() {
+        let content = raw.strip_suffix('\r').unwrap_or(raw);
+        if row == line {
+            let mut units = 0;
+            for (byte, c) in content.char_indices() {
+                if units == character {
+                    return Ok(start + byte);
+                }
+                units += match encoding {
+                    "utf-8" => c.len_utf8(),
+                    "utf-16" => c.len_utf16(),
+                    "utf-32" => 1,
+                    _ => return Err(Error::new("unsupported", "Unknown position encoding")),
+                };
+                if units > character {
+                    return Err(Error::new(
+                        "invalid_input",
+                        "LSP position splits a character",
+                    ));
+                }
+            }
+            if units == character {
+                return Ok(start + content.len());
+            }
+            return Err(Error::new(
+                "invalid_input",
+                "LSP column exceeds line length",
+            ));
+        }
+        start += raw.len() + 1;
+    }
+    Err(Error::new(
+        "invalid_input",
+        "LSP line exceeds document length",
+    ))
 }

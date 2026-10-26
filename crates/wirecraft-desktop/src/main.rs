@@ -279,6 +279,13 @@ impl Wirecraft {
                 {
                     self.output = serde_json::to_string_pretty(&value).unwrap_or_default();
                 }
+                if let Some(warnings) = value["_wirecraftWarnings"].as_array() {
+                    self.status = warnings
+                        .iter()
+                        .filter_map(|w| w["message"].as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                }
             }
             Update::Snapshot(snapshot) => {
                 self.snapshot = Arc::new(*snapshot);
