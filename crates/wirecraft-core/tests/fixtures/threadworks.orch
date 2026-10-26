@@ -1,0 +1,1176 @@
+{
+    "id": "document_1791071183602",
+    "name": "CSV Result Workflow",
+    "rootNodeId": "root",
+    "nodes": [
+        {
+            "id": "root",
+            "name": "CSV Result Workflow",
+            "kind": "Processor",
+            "parentId": null,
+            "children": [
+                "node_6b578430-97d6-4105-82b2-4995b97f3ffb",
+                "node_824e0fc9-cd23-48b7-aebc-1d8fe40e222c",
+                "node_6cecd43e-ac7b-4287-816c-e91b850e9f1f",
+                "link_f0f4ba0a-a32a-40fa-a5f0-77b382b0db63",
+                "link_84ae475d-2acf-4ff4-b95c-0c5ac8492430",
+                "node_7c16e07f-d922-4e0d-bf9f-a4b5a4a9056e",
+                "node_3583f350-27c4-4c5a-9b22-87ce218de40d",
+                "node_457acd07-da56-4cc8-9c96-96cd2d563481",
+                "node_da35cebe-9481-409a-8adb-aa9c1d730605",
+                "link_5552ea52-1237-4873-9fe1-c6d00e1164f5",
+                "link_9ce5604a-b505-42cf-90b9-9fe7dbc7283d",
+                "link_b3b9b6dc-3d8b-4e95-bd1c-1ced611390a2",
+                "link_6891a16a-b6ec-42ba-8262-d5f0de2043da"
+            ],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 1220.0,
+                "height": 790.0,
+                "closedWidth": 1220.0,
+                "closedHeight": 790.0,
+                "openWidth": 1220.0,
+                "openHeight": 790.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "/* C17 entry point for the CSV city aggregation workflow. */\nint main(void) {\n    return 0;\n}\n",
+                "sourceLanguageId": "c",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "c",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:58:46.161182063Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {
+                "description": "Simple CSV read, extract, and result-write workflow"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "node_6b578430-97d6-4105-82b2-4995b97f3ffb",
+            "name": "read_csv_file",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [
+                "link_b3b9b6dc-3d8b-4e95-bd1c-1ced611390a2",
+                "link_6891a16a-b6ec-42ba-8262-d5f0de2043da"
+            ],
+            "outgoingLinks": [
+                "link_f0f4ba0a-a32a-40fa-a5f0-77b382b0db63"
+            ],
+            "layout": {
+                "x": 60.0,
+                "y": 90.0,
+                "width": 280.0,
+                "height": 78.0,
+                "closedWidth": 280.0,
+                "closedHeight": 78.0,
+                "openWidth": 280.0,
+                "openHeight": 78.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "static int csv_reader_emitted = 0;\n\nif (csv_reader_emitted == 0) {\n    char *csv_text = csv_reader_io__read_file_text(\"users.csv\");\n    CsvUsers users;\n\n    if (csv_text == NULL) return THREADWORK_ERROR;\n    users = csv_reader_table__csv_table_parse(csv_text);\n    free(csv_text);\n\n    if (users.cells == NULL || users.city_column >= users.column_count) {\n        return THREADWORK_ERROR;\n    }\n    if (push(rows, &users) != THREADWORK_OK) {\n        csv_reader_table__csv_table_free(&users);\n        return THREADWORK_ERROR;\n    }\n    csv_reader_emitted = 1;\n} else {\n    if (threadwork_runner__shutdown_request(&threadwork_runner) != THREADWORK_OK) {\n        return THREADWORK_ERROR;\n    }\n}",
+                "sourceLanguageId": "c",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "c",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-04T00:21:43.276677994Z",
+                "user": "devlin"
+            },
+            "ports": [
+                {
+                    "id": "read_csv_file_out",
+                    "name": "rows",
+                    "direction": "Output",
+                    "dataType": "node_7c16e07f-d922-4e0d-bf9f-a4b5a4a9056e",
+                    "metadata": {}
+                },
+                {
+                    "id": "read_csv_file_io",
+                    "name": "file_io",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "read_csv_file_table",
+                    "name": "table_service",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {
+                "role": "source",
+                "inputFile": "input.csv"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:51:30.093678863Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_824e0fc9-cd23-48b7-aebc-1d8fe40e222c",
+            "name": "extract_data",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [
+                "link_f0f4ba0a-a32a-40fa-a5f0-77b382b0db63",
+                "link_5552ea52-1237-4873-9fe1-c6d00e1164f5"
+            ],
+            "outgoingLinks": [
+                "link_84ae475d-2acf-4ff4-b95c-0c5ac8492430"
+            ],
+            "layout": {
+                "x": 465.0,
+                "y": 235.0,
+                "width": 280.0,
+                "height": 78.0,
+                "closedWidth": 280.0,
+                "closedHeight": 78.0,
+                "openWidth": 280.0,
+                "openHeight": 78.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "if (threadwork_buffer_count(rows_in) > 0U) {\n    CsvUsers users;\n    CityCount *groups;\n    size_t group_count = 0U;\n\n    if (pop(rows_in, &users) != THREADWORK_OK) {\n        return THREADWORK_ERROR;\n    }\n\n    groups = csv_table_service__csv_users_group_by_city(&users, &group_count);\n    if (group_count > 0U && groups == NULL) {\n        csv_table_service__csv_table_free(&users);\n        return THREADWORK_ERROR;\n    }\n\n    for (size_t index = 0U; index < group_count; ++index) {\n        if (push(data, &groups[index]) != THREADWORK_OK) {\n            free(groups);\n            csv_table_service__csv_table_free(&users);\n            return THREADWORK_ERROR;\n        }\n    }\n\n    free(groups);\n    csv_table_service__csv_table_free(&users);\n}",
+                "sourceLanguageId": "c",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "c",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-04T00:04:21.114155696Z",
+                "user": "devlin"
+            },
+            "ports": [
+                {
+                    "id": "extract_data_in",
+                    "name": "rows_in",
+                    "direction": "Input",
+                    "dataType": "node_7c16e07f-d922-4e0d-bf9f-a4b5a4a9056e",
+                    "metadata": {}
+                },
+                {
+                    "id": "extract_data_out",
+                    "name": "data",
+                    "direction": "Output",
+                    "dataType": "node_3583f350-27c4-4c5a-9b22-87ce218de40d",
+                    "metadata": {}
+                },
+                {
+                    "id": "extract_data_table",
+                    "name": "table_service",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {
+                "role": "transform",
+                "operation": "extract relevant CSV fields"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:51:32.360458539Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_6cecd43e-ac7b-4287-816c-e91b850e9f1f",
+            "name": "write_result",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [
+                "link_84ae475d-2acf-4ff4-b95c-0c5ac8492430",
+                "link_9ce5604a-b505-42cf-90b9-9fe7dbc7283d"
+            ],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 870.0,
+                "y": 90.0,
+                "width": 280.0,
+                "height": 78.0,
+                "closedWidth": 280.0,
+                "closedHeight": 78.0,
+                "openWidth": 280.0,
+                "openHeight": 78.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "static char result_csv[8192] = \"city,user_count\\n\";\nstatic int output_written = 0;\n\nwhile (threadwork_buffer_count(data_in) > 0U) {\n    CityCount record;\n    char line[256];\n    int line_length;\n\n    if (pop(data_in, &record) != THREADWORK_OK) {\n        return THREADWORK_ERROR;\n    }\n\n    line_length = snprintf(line, sizeof(line), \"\\\"%s\\\",%zu\\n\", record.city, record.user_count);\n    if (line_length < 0 || (size_t)line_length >= sizeof(line)) {\n        return THREADWORK_ERROR;\n    }\n    if (strlen(result_csv) + (size_t)line_length + 1U >= sizeof(result_csv)) {\n        return THREADWORK_ERROR;\n    }\n    strcat(result_csv, line);\n}\n\nif (!output_written) {\n    int shutdown_requested = 0;\n    if (threadwork_runner__get_shutdown_signal(&threadwork_runner, &shutdown_requested) == THREADWORK_OK && shutdown_requested != 0) {\n        if (csv_writer_io__write_file_text(\"result.csv\", result_csv) != 0) {\n            return THREADWORK_ERROR;\n        }\n        output_written = 1;\n    }\n}",
+                "sourceLanguageId": "c",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "c",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-04T00:04:21.320613992Z",
+                "user": "devlin"
+            },
+            "ports": [
+                {
+                    "id": "write_result_in",
+                    "name": "data_in",
+                    "direction": "Input",
+                    "dataType": "node_3583f350-27c4-4c5a-9b22-87ce218de40d",
+                    "metadata": {}
+                },
+                {
+                    "id": "write_result_io",
+                    "name": "file_io",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {
+                "role": "sink",
+                "outputFile": "result.csv"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:51:34.197397260Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "link_f0f4ba0a-a32a-40fa-a5f0-77b382b0db63",
+            "name": "csv_rows",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:56:43.989366290Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_6b578430-97d6-4105-82b2-4995b97f3ffb",
+                "sourcePortName": "rows",
+                "targetNodeId": "node_824e0fc9-cd23-48b7-aebc-1d8fe40e222c",
+                "targetPortName": "rows_in",
+                "transportKind": "in-process",
+                "typeName": "CsvUsers",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_7c16e07f-d922-4e0d-bf9f-a4b5a4a9056e",
+                "compositeBoundaryIds": [],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_84ae475d-2acf-4ff4-b95c-0c5ac8492430",
+            "name": "extracted_data",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:56:44.107959122Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_824e0fc9-cd23-48b7-aebc-1d8fe40e222c",
+                "sourcePortName": "data",
+                "targetNodeId": "node_6cecd43e-ac7b-4287-816c-e91b850e9f1f",
+                "targetPortName": "data_in",
+                "transportKind": "in-process",
+                "typeName": "CityCount",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_3583f350-27c4-4c5a-9b22-87ce218de40d",
+                "compositeBoundaryIds": [],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "node_7c16e07f-d922-4e0d-bf9f-a4b5a4a9056e",
+            "name": "CsvUsers",
+            "kind": "Type",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 60.0,
+                "y": 660.0,
+                "width": 350.0,
+                "height": 118.0,
+                "closedWidth": 350.0,
+                "closedHeight": 118.0,
+                "openWidth": 350.0,
+                "openHeight": 118.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "typedef struct CsvUsers {\n    char ***cells;\n    size_t row_count;\n    size_t column_count;\n    size_t city_column;\n} CsvUsers;",
+                "sourceLanguageId": "c",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "h",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-04T00:04:09.702234359Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": {
+                "fields": [
+                    {
+                        "name": "cells",
+                        "typeId": "char ***",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "row_count",
+                        "typeId": "number",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "column_count",
+                        "typeId": "number",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "city_column",
+                        "typeId": "number",
+                        "isReference": false,
+                        "typeExpression": null
+                    }
+                ],
+                "qualifier": "object",
+                "genericTypeIds": []
+            },
+            "diagnostics": [],
+            "metadata": {
+                "purpose": "CSV table represented as a char*** with dimensions"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:56:27.158562851Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_3583f350-27c4-4c5a-9b22-87ce218de40d",
+            "name": "CityCount",
+            "kind": "Type",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 810.0,
+                "y": 660.0,
+                "width": 350.0,
+                "height": 86.0,
+                "closedWidth": 350.0,
+                "closedHeight": 86.0,
+                "openWidth": 350.0,
+                "openHeight": 86.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "Wire type for the final aggregate. Each CityCount contains one normalized city name and the number of input users assigned to that city; the writer serializes these records as CSV.",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "h",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:57:16.447669257Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": {
+                "fields": [
+                    {
+                        "name": "city",
+                        "typeId": "string",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "user_count",
+                        "typeId": "number",
+                        "isReference": false,
+                        "typeExpression": null
+                    }
+                ],
+                "qualifier": "object",
+                "genericTypeIds": []
+            },
+            "diagnostics": [],
+            "metadata": {
+                "purpose": "Aggregated users per city"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:56:29.447716107Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_457acd07-da56-4cc8-9c96-96cd2d563481",
+            "name": "lib_csv_io",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [
+                "link_9ce5604a-b505-42cf-90b9-9fe7dbc7283d",
+                "link_b3b9b6dc-3d8b-4e95-bd1c-1ced611390a2"
+            ],
+            "layout": {
+                "x": 60.0,
+                "y": 455.0,
+                "width": 350.0,
+                "height": 82.0,
+                "closedWidth": 350.0,
+                "closedHeight": 82.0,
+                "openWidth": 350.0,
+                "openHeight": 82.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar *read_file_text(const char *path) {\n    FILE *file;\n    long size;\n    char *buffer;\n\n    if (path == NULL) {\n        return NULL;\n    }\n\n    file = fopen(path, \"rb\");\n    if (file == NULL) {\n        return NULL;\n    }\n\n    if (fseek(file, 0, SEEK_END) != 0) {\n        fclose(file);\n        return NULL;\n    }\n\n    size = ftell(file);\n    if (size < 0 || fseek(file, 0, SEEK_SET) != 0) {\n        fclose(file);\n        return NULL;\n    }\n\n    buffer = malloc((size_t)size + 1U);\n    if (buffer == NULL) {\n        fclose(file);\n        return NULL;\n    }\n\n    if (fread(buffer, 1U, (size_t)size, file) != (size_t)size) {\n        free(buffer);\n        fclose(file);\n        return NULL;\n    }\n\n    buffer[size] = '\\0';\n    fclose(file);\n    return buffer;\n}\n\nint write_file_text(const char *path, const char *content) {\n    FILE *file;\n    size_t length;\n\n    if (path == NULL || content == NULL) {\n        return -1;\n    }\n\n    file = fopen(path, \"wb\");\n    if (file == NULL) {\n        return -1;\n    }\n\n    length = strlen(content);\n    if (fwrite(content, 1U, length, file) != length) {\n        fclose(file);\n        return -1;\n    }\n\n    return fclose(file) == 0 ? 0 : -1;\n}",
+                "sourceLanguageId": "c",
+                "specification": "File service library with complete buffered reads and checked writes.",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "c",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-04T00:20:18.004541121Z",
+                "user": "devlin"
+            },
+            "ports": [
+                {
+                    "id": "lib_csv_io_reader",
+                    "name": "reader_service",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "lib_csv_io_writer",
+                    "name": "writer_service",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {
+                "role": "service-library",
+                "provides": "file reading and writing"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:56:31.611188456Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_da35cebe-9481-409a-8adb-aa9c1d730605",
+            "name": "lib_csv_table",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [
+                "link_5552ea52-1237-4873-9fe1-c6d00e1164f5",
+                "link_6891a16a-b6ec-42ba-8262-d5f0de2043da"
+            ],
+            "layout": {
+                "x": 810.0,
+                "y": 455.0,
+                "width": 350.0,
+                "height": 82.0,
+                "closedWidth": 350.0,
+                "closedHeight": 82.0,
+                "openWidth": 350.0,
+                "openHeight": 82.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "#include <stdlib.h>\n#include <string.h>\n\nvoid csv_table_free(CsvUsers *users);\n\nstatic char *duplicate_field(const char *start, size_t length) {\n    char *value = malloc(length + 1U);\n\n    if (value == NULL) {\n        return NULL;\n    }\n\n    memcpy(value, start, length);\n    value[length] = '\\0';\n    return value;\n}\n\nstatic size_t count_columns(const char *line) {\n    size_t count = 1U;\n\n    for (const char *cursor = line; *cursor != '\\0'; ++cursor) {\n        if (*cursor == ',') {\n            ++count;\n        }\n    }\n\n    return count;\n}\n\nstatic char **split_line(const char *line, size_t column_count) {\n    char **columns = calloc(column_count, sizeof(*columns));\n    const char *field_start = line;\n    size_t column = 0U;\n\n    if (columns == NULL) {\n        return NULL;\n    }\n\n    for (const char *cursor = line;; ++cursor) {\n        if (*cursor != ',' && *cursor != '\\0') {\n            continue;\n        }\n\n        if (column >= column_count) {\n            break;\n        }\n\n        columns[column] = duplicate_field(\n            field_start,\n            (size_t)(cursor - field_start)\n        );\n        if (columns[column] == NULL) {\n            for (size_t index = 0U; index < column; ++index) {\n                free(columns[index]);\n            }\n            free(columns);\n            return NULL;\n        }\n\n        ++column;\n        if (*cursor == '\\0') {\n            break;\n        }\n\n        field_start = cursor + 1;\n    }\n\n    return columns;\n}\n\nCsvUsers csv_table_parse(const char *csv_text) {\n    CsvUsers table = {0};\n    char *copy;\n    char *line;\n    size_t capacity = 8U;\n    size_t city_column = (size_t)-1;\n\n    if (csv_text == NULL) {\n        return table;\n    }\n\n    copy = malloc(strlen(csv_text) + 1U);\n    if (copy == NULL) {\n        return table;\n    }\n    strcpy(copy, csv_text);\n\n    table.cells = calloc(capacity, sizeof(*table.cells));\n    if (table.cells == NULL) {\n        free(copy);\n        return (CsvUsers){0};\n    }\n\n    line = strtok(copy, \"\\n\");\n    if (line == NULL) {\n        free(copy);\n        csv_table_free(&table);\n        return (CsvUsers){0};\n    }\n\n    table.column_count = count_columns(line);\n\n    {\n        char **header = split_line(line, table.column_count);\n\n        if (header == NULL) {\n            free(copy);\n            csv_table_free(&table);\n            return (CsvUsers){0};\n        }\n\n        for (size_t column = 0U; column < table.column_count; ++column) {\n            if (strcmp(header[column], \"city\") == 0) {\n                city_column = column;\n            }\n            free(header[column]);\n        }\n        free(header);\n    }\n\n    if (city_column == (size_t)-1) {\n        free(copy);\n        csv_table_free(&table);\n        return (CsvUsers){0};\n    }\n\n    while ((line = strtok(NULL, \"\\n\")) != NULL) {\n        if (table.row_count == capacity) {\n            capacity *= 2U;\n\n            char ***expanded = realloc(\n                table.cells,\n                capacity * sizeof(*table.cells)\n            );\n            if (expanded == NULL) {\n                free(copy);\n                csv_table_free(&table);\n                return (CsvUsers){0};\n            }\n            table.cells = expanded;\n        }\n\n        table.cells[table.row_count] = split_line(line, table.column_count);\n        if (table.cells[table.row_count] == NULL) {\n            free(copy);\n            csv_table_free(&table);\n            return (CsvUsers){0};\n        }\n\n        ++table.row_count;\n    }\n\n    table.city_column = city_column;\n    free(copy);\n    return table;\n}\n\nCityCount *csv_users_group_by_city(\n    const CsvUsers *users,\n    size_t *group_count\n) {\n    CityCount *groups;\n    size_t count = 0U;\n    size_t capacity = 8U;\n\n    if (group_count == NULL) {\n        return NULL;\n    }\n    *group_count = 0U;\n\n    if (users == NULL || users->cells == NULL) {\n        return NULL;\n    }\n\n    groups = calloc(capacity, sizeof(*groups));\n    if (groups == NULL) {\n        return NULL;\n    }\n\n    for (size_t row = 0U; row < users->row_count; ++row) {\n        const char *city = users->cells[row][users->city_column];\n        size_t group = 0U;\n\n        while (group < count && strcmp(groups[group].city, city) != 0) {\n            ++group;\n        }\n\n        if (group == count) {\n            if (count == capacity) {\n                capacity *= 2U;\n\n                CityCount *expanded = realloc(\n                    groups,\n                    capacity * sizeof(*groups)\n                );\n                if (expanded == NULL) {\n                    free(groups);\n                    return NULL;\n                }\n                groups = expanded;\n            }\n\n            groups[count].city = city;\n            groups[count].user_count = 0U;\n            ++count;\n        }\n\n        ++groups[group].user_count;\n    }\n\n    *group_count = count;\n    return groups;\n}\n\nvoid csv_table_free(CsvUsers *users) {\n    if (users == NULL || users->cells == NULL) {\n        return;\n    }\n\n    for (size_t row = 0U; row < users->row_count; ++row) {\n        for (size_t column = 0U; column < users->column_count; ++column) {\n            free(users->cells[row][column]);\n        }\n        free(users->cells[row]);\n    }\n\n    free(users->cells);\n    users->cells = NULL;\n    users->row_count = 0U;\n    users->column_count = 0U;\n    users->city_column = 0U;\n}",
+                "sourceLanguageId": "c",
+                "specification": "Complete CSV table service with owned row storage, city-column detection, aggregation, and cleanup.",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "c-compiler",
+                "fileExtension": "c",
+                "contentType": "text/x-c"
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-04T00:20:18.126627905Z",
+                "user": "devlin"
+            },
+            "ports": [
+                {
+                    "id": "lib_csv_table_reader",
+                    "name": "reader_service",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "lib_csv_table_extractor",
+                    "name": "extractor_service",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {
+                "role": "service-library",
+                "provides": "CSV parsing, table ownership, and city aggregation"
+            },
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "BUSINESS",
+            "statusChanges": [
+                {
+                    "userId": "devlin",
+                    "changedDate": "2026-10-03T23:56:33.926820136Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "link_5552ea52-1237-4873-9fe1-c6d00e1164f5",
+            "name": "csv_table_service",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:58:46.161182063Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_da35cebe-9481-409a-8adb-aa9c1d730605",
+                "sourcePortName": "extractor_service",
+                "targetNodeId": "node_824e0fc9-cd23-48b7-aebc-1d8fe40e222c",
+                "targetPortName": "table_service",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "lib",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_9ce5604a-b505-42cf-90b9-9fe7dbc7283d",
+            "name": "csv_writer_io",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:58:45.939507720Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_457acd07-da56-4cc8-9c96-96cd2d563481",
+                "sourcePortName": "writer_service",
+                "targetNodeId": "node_6cecd43e-ac7b-4287-816c-e91b850e9f1f",
+                "targetPortName": "file_io",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "lib",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_b3b9b6dc-3d8b-4e95-bd1c-1ced611390a2",
+            "name": "csv_reader_io",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:58:45.836037057Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_457acd07-da56-4cc8-9c96-96cd2d563481",
+                "sourcePortName": "reader_service",
+                "targetNodeId": "node_6b578430-97d6-4105-82b2-4995b97f3ffb",
+                "targetPortName": "file_io",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "lib",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_6891a16a-b6ec-42ba-8262-d5f0de2043da",
+            "name": "csv_reader_table",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-03T23:58:46.051284848Z",
+                "user": "devlin"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_da35cebe-9481-409a-8adb-aa9c1d730605",
+                "sourcePortName": "reader_service",
+                "targetNodeId": "node_6b578430-97d6-4105-82b2-4995b97f3ffb",
+                "targetPortName": "table_service",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "lib",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        }
+    ],
+    "metadata": {},
+    "masterRevision": {
+        "name": "",
+        "date": ""
+    },
+    "users": [
+        {
+            "identifier": "devlin",
+            "avatar": "",
+            "avatarData": "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",
+            "source": "local",
+            "userId": "",
+            "emailAddress": "",
+            "username": "",
+            "fullName": "",
+            "role": "",
+            "refreshedAt": "2026-10-04T23:05:57.529811703Z"
+        }
+    ]
+}

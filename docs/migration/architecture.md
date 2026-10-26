@@ -1,0 +1,31 @@
+# Architecture decisions
+
+## ADR 001 — Rust services with a GPUI client
+
+Choose GPUI 0.2.2 (pinned) with gpui-component 0.5.1. Official documentation checked 2026-10-26: https://gpui.rs/ and https://docs.rs/gpui/0.2.2/gpui/. GPUI provides GPU paths/quads/text, retained entities, custom canvas and background tasks. Its pre-1.0 API and Linux system dependencies are accepted constraints. Alternatives checked: eframe (https://docs.rs/eframe/latest/eframe/) offers native/web immediate UI and paint callbacks; iced (https://docs.rs/iced/latest/iced/) offers typed update/view and task/subscription APIs. GPUI matches the requested direction and editor/canvas needs; none eliminates the need for custom graph geometry. Windows and macOS builds remain separate acceptance gates.
+
+`wirecraft-core`: transport/framework-free typed graph, rules, repository operations, compatibility codecs, atomic project storage. Unknown document/node/section fields round-trip. Domain mutations operate on a candidate snapshot and commit atomically only after validation. Stable IDs, topology repair, immutable reads, undo and redo.
+
+`wirecraft-runtime`: application service owns a single document/session, serializes commands, revision checks, HTTP backend, event subscriptions, MCP adapter, LSP/tool supervision. Desktop and MCP call the same command dispatcher. File and subprocess work stays off the UI thread. DTOs are JSON envelopes around typed document data; transport errors do not live in domain entities.
+
+`wirecraft-desktop`: GPUI shell, local HTTP client on a worker, immutable snapshots, canvas and editor state. Pointer motion updates local preview; one backend mutation on release. Render primitives are culled in world coordinates; nodes are indexed by uniform spatial cells; routes are cached per document revision. No per-project raster disk cache. Viewport transforms are tested separately. World geometry is f64, screen geometry f32. Hierarchy navigation gives a focused subgraph. Full obstacle-aware routing and benchmark budgets are separate parity gates.
+
+## ADR 002 — Local lifecycle and contract
+
+Backend binds IPv4 loopback on an OS-selected port by default, avoiding the running old server. Desktop owns its backend process, passes an ephemeral bearer token, waits for readiness, and shuts down only that child. Standalone backend prints one JSON discovery record with endpoint/token; do not publish it. No network bind, implicit reverse proxy or database service. Reject browser Origin requests. HTTP API `/api` receives `{command, arguments, expectedRevision?}`; response `{ok, result?, error?:{code,message}, revision}`. `/events` carries revision/progress events; reconnect reads a full snapshot. Concurrent stale writes return conflict. Save failures retain dirty state. Health and reads never mutate projects.
+
+MCP `/mcp` preserves threadwork.* names and threadwork:// resources where supported, with explicit errors for unsupported desktop-only commands. Tool responses include textual and structured JSON and isError. stdio supports newline JSON-RPC with protocol-only stdout. Stateless HTTP notifications return 202, absent GET event stream returns 405. Unknown methods -32601, malformed requests -32600/-32700, invalid arguments -32602; service errors remain structured. No transport duplicates business mutations.
+
+## ADR 003 — Language/tool adapters
+
+An LSP adapter owns one subprocess and pipes; Content-Length framing, initialize/initialized, server capability reporting, workspace URI, UTF-16 negotiation by default (support negotiated UTF-8/UTF-32), monotonic document versions, didOpen/full-text didChange/didClose, asynchronous diagnostics, stale version rejection, generic requests and $/cancelRequest. Handle configuration/workspace/progress/registration server requests with explicit replies. On missing executable or crash, return structured unavailable/process errors. Explicit restart creates a new generation; old pending requests fail. Shutdown sends shutdown/exit, times out then kills and waits; Drop is a final kill guard. No shell invocation. clangd discovers compile_commands.json through workspace or explicit --compile-commands-dir. clangd diagnostics are editor feedback, external compiler/build execution is a distinct service. C/C++ first; other server executable/args/language IDs are configuration data, not a plugin system.
+
+Build jobs have IDs, cancellation, timeout, bounded output and progress. They execute argv in explicit working directories; process groups on supported Unix platforms must prevent child leaks. Compilation generation parity is distinct from invoking build tools and remains tracked.
+
+## Compatibility
+
+Keep .orch extension, current list/legacy map, field names source/initialization and Base64 payload. Preserve unknown fields. Reject duplicate IDs and cycles rather than silently lose entities. Import Java Preferences from an explicit exported XML into Wirecraft's own config, never edit old preferences or automatically import provider secrets. JVM plugins, TCC and TinyCC native integration are incompatible by design; graph data is retained. All other gaps remain pending, not declared deliberate removals.
+
+## Release procedure
+
+Commit small verified milestones with Conventional Commits; push configured origin. Tag only verified milestone releases with SemVer. Only patch/minor increments are authorized; major changes require the user to set the version explicitly.

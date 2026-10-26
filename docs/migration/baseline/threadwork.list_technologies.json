@@ -1,0 +1,78 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"technologies\":[{\"compilerId\":\"c-compiler\",\"compilerName\":\"C17 Compiler\",\"languageId\":\"c\",\"technologyId\":\"c-native\"},{\"compilerId\":\"generic-flow-design\",\"compilerName\":\"Pebble Template Set Compiler\",\"languageId\":\"any\",\"technologyId\":\"compiler-template-set\"},{\"compilerId\":\"go-compiler\",\"compilerName\":\"Go Compiler\",\"languageId\":\"go\",\"technologyId\":\"go\"},{\"compilerId\":\"multi-tech\",\"compilerName\":\"multi-tech\",\"languageId\":\"any\",\"technologyId\":\"file-export\"},{\"compilerId\":\"multi-tech\",\"compilerName\":\"multi-tech\",\"languageId\":\"any\",\"technologyId\":\"multi-tech\"},{\"compilerId\":\"naive-kotlin\",\"compilerName\":\"Naive Kotlin/JVM Compiler\",\"languageId\":\"kotlin\",\"technologyId\":\"kotlin-jvm\"},{\"compilerId\":\"nodejs-compiler\",\"compilerName\":\"Node.js CommonJS Compiler\",\"languageId\":\"javascript\",\"technologyId\":\"nodejs\"},{\"compilerId\":\"php-compiler\",\"compilerName\":\"PHP Compiler\",\"languageId\":\"php\",\"technologyId\":\"php\"},{\"compilerId\":\"quickjs-compiler\",\"compilerName\":\"QuickJS JavaScript Compiler\",\"languageId\":\"javascript\",\"technologyId\":\"quickjs\"}]}"
+      }
+    ],
+    "structuredContent": {
+      "technologies": [
+        {
+          "compilerId": "c-compiler",
+          "compilerName": "C17 Compiler",
+          "languageId": "c",
+          "technologyId": "c-native"
+        },
+        {
+          "compilerId": "generic-flow-design",
+          "compilerName": "Pebble Template Set Compiler",
+          "languageId": "any",
+          "technologyId": "compiler-template-set"
+        },
+        {
+          "compilerId": "go-compiler",
+          "compilerName": "Go Compiler",
+          "languageId": "go",
+          "technologyId": "go"
+        },
+        {
+          "compilerId": "multi-tech",
+          "compilerName": "multi-tech",
+          "languageId": "any",
+          "technologyId": "file-export"
+        },
+        {
+          "compilerId": "multi-tech",
+          "compilerName": "multi-tech",
+          "languageId": "any",
+          "technologyId": "multi-tech"
+        },
+        {
+          "compilerId": "naive-kotlin",
+          "compilerName": "Naive Kotlin/JVM Compiler",
+          "languageId": "kotlin",
+          "technologyId": "kotlin-jvm"
+        },
+        {
+          "compilerId": "nodejs-compiler",
+          "compilerName": "Node.js CommonJS Compiler",
+          "languageId": "javascript",
+          "technologyId": "nodejs"
+        },
+        {
+          "compilerId": "php-compiler",
+          "compilerName": "PHP Compiler",
+          "languageId": "php",
+          "technologyId": "php"
+        },
+        {
+          "compilerId": "quickjs-compiler",
+          "compilerName": "QuickJS JavaScript Compiler",
+          "languageId": "javascript",
+          "technologyId": "quickjs"
+        }
+      ]
+    },
+    "isError": false,
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    }
+  }
+}

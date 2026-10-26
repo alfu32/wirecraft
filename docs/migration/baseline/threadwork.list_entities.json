@@ -1,0 +1,34 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"entities\":[{\"id\":\"root\",\"name\":\"Untitled Threadwork\",\"kind\":\"Processor\",\"parentId\":\"\",\"fullyQualifiedName\":\"Untitled Threadwork\",\"isComposite\":false,\"status\":\"\",\"technologyId\":\"\"}]}"
+      }
+    ],
+    "structuredContent": {
+      "entities": [
+        {
+          "id": "root",
+          "name": "Untitled Threadwork",
+          "kind": "Processor",
+          "parentId": "",
+          "fullyQualifiedName": "Untitled Threadwork",
+          "isComposite": false,
+          "status": "",
+          "technologyId": ""
+        }
+      ]
+    },
+    "isError": false,
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    }
+  }
+}

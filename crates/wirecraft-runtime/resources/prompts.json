@@ -1,0 +1,14 @@
+{
+  "prompts": [
+    {
+      "name": "threadwork.inspect_design",
+      "title": "Inspect the current design",
+      "description": "Read the current design and summarize its structure, technologies, and validation state."
+    },
+    {
+      "name": "threadwork.edit_entity",
+      "title": "Edit a Threadwork entity",
+      "description": "Inspect an entity before applying a focused model edit."
+    }
+  ]
+}

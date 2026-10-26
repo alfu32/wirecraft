@@ -1,0 +1,29 @@
+{
+  "resources": [
+    {
+      "uri": "threadwork://instructions",
+      "name": "Threadwork instructions",
+      "mimeType": "text/plain"
+    },
+    {
+      "uri": "threadwork://agent-guide",
+      "name": "Threadwork MCP agent guide",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "threadwork://technologies",
+      "name": "Available compiler technologies",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "threadwork://commands",
+      "name": "Desktop command catalog",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "threadwork://design",
+      "name": "Current Threadwork design",
+      "mimeType": "application/json"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"entity\":{\"id\":\"root\",\"name\":\"Untitled Threadwork\",\"kind\":\"Processor\",\"parentId\":null,\"children\":[],\"incomingLinks\":[],\"outgoingLinks\":[],\"layout\":{\"x\":0.0,\"y\":0.0,\"width\":200.0,\"height\":70.0,\"closedWidth\":200.0,\"closedHeight\":70.0,\"openWidth\":200.0,\"openHeight\":70.0,\"isExpanded\":true},\"fileLayoutStrategyId\":\"none\",\"text\":{\"initialization\":\"\",\"initializationLanguageId\":\"\",\"source\":\"\",\"sourceLanguageId\":\"\",\"specification\":\"\",\"specificationLanguageId\":\"markdown\",\"tests\":\"\",\"testsLanguageId\":\"json\",\"aiInstructions\":\"\",\"aiInstructionsLanguageId\":\"markdown\"},\"binaryContent\":null,\"technology\":{\"languageId\":\"\",\"technologyId\":\"\",\"compilerId\":\"\",\"fileExtension\":\"\",\"contentType\":\"\"},\"revision\":null,\"responsible\":null,\"modified\":{\"date\":\"\",\"user\":\"\"},\"ports\":[],\"link\":null,\"typeDefinition\":null,\"diagnostics\":[],\"metadata\":{},\"pluginData\":{},\"nameDetail\":\"\",\"status\":null,\"statusChanges\":[],\"assignee\":null},\"fullyQualifiedName\":\"Untitled Threadwork\",\"projectName\":\"Untitled Threadwork\"}"
+      }
+    ],
+    "structuredContent": {
+      "entity": {
+        "id": "root",
+        "name": "Untitled Threadwork",
+        "kind": "Processor",
+        "parentId": null,
+        "children": [],
+        "incomingLinks": [],
+        "outgoingLinks": [],
+        "layout": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 200.0,
+          "height": 70.0,
+          "closedWidth": 200.0,
+          "closedHeight": 70.0,
+          "openWidth": 200.0,
+          "openHeight": 70.0,
+          "isExpanded": true
+        },
+        "fileLayoutStrategyId": "none",
+        "text": {
+          "initialization": "",
+          "initializationLanguageId": "",
+          "source": "",
+          "sourceLanguageId": "",
+          "specification": "",
+          "specificationLanguageId": "markdown",
+          "tests": "",
+          "testsLanguageId": "json",
+          "aiInstructions": "",
+          "aiInstructionsLanguageId": "markdown"
+        },
+        "binaryContent": null,
+        "technology": {
+          "languageId": "",
+          "technologyId": "",
+          "compilerId": "",
+          "fileExtension": "",
+          "contentType": ""
+        },
+        "revision": null,
+        "responsible": null,
+        "modified": {
+          "date": "",
+          "user": ""
+        },
+        "ports": [],
+        "link": null,
+        "typeDefinition": null,
+        "diagnostics": [],
+        "metadata": {},
+        "pluginData": {},
+        "nameDetail": "",
+        "status": null,
+        "statusChanges": [],
+        "assignee": null
+      },
+      "fullyQualifiedName": "Untitled Threadwork",
+      "projectName": "Untitled Threadwork"
+    },
+    "isError": false,
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    }
+  }
+}

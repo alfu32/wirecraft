@@ -1,0 +1,19 @@
+[package]
+name = "wirecraft-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+wirecraft-core = { path = "../wirecraft-core" }
+wirecraft-runtime = { path = "../wirecraft-runtime" }
+gpui = "=0.2.2"
+gpui-component = "=0.5.1"
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json"] }
+async-channel = "2"
+# GPUI's xattr 0.2 dependency uses ENOATTR removed in libc 0.2.191.
+libc = "=0.2.189"

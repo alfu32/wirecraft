@@ -1,0 +1,29 @@
+[package]
+name = "wirecraft-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "wirecraft"
+path = "src/main.rs"
+
+[dependencies]
+wirecraft-core = { path = "../wirecraft-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+uuid.workspace = true
+axum = "0.8"
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures = "0.3"
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "=0.2.189"

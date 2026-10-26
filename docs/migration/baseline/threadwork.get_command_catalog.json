@@ -1,0 +1,209 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"commands\":[{\"id\":\"ai.copyComponentFiches\",\"title\":\"AI Support: Copy Selected Component Fiches as Markdown\",\"description\":\"\"},{\"id\":\"ai.generateSource\",\"title\":\"AI Support: Generate Source Code for Selected Components\",\"description\":\"\"},{\"id\":\"ai.generateTestData\",\"title\":\"AI Support: Generate Test Data for Selected Components\",\"description\":\"\"},{\"id\":\"ai.tidySpecification\",\"title\":\"AI Support: Tidy and Format Selected Specifications\",\"description\":\"\"},{\"id\":\"app.options\",\"title\":\"Application: Options...\",\"description\":\"\"},{\"id\":\"commands.palette\",\"title\":\"Commands: Open Palette\",\"description\":\"\"},{\"id\":\"compile.compiler\",\"title\":\"Generate: Compiler from Overrides\",\"description\":\"\"},{\"id\":\"compile.project\",\"title\":\"Generate: Project or Selection\",\"description\":\"\"},{\"id\":\"edit.align.bottom\",\"title\":\"Edit: Align Bottom\",\"description\":\"\"},{\"id\":\"edit.align.left\",\"title\":\"Edit: Align Left\",\"description\":\"\"},{\"id\":\"edit.align.right\",\"title\":\"Edit: Align Right\",\"description\":\"\"},{\"id\":\"edit.align.top\",\"title\":\"Edit: Align Top\",\"description\":\"\"},{\"id\":\"edit.copy\",\"title\":\"Edit: Copy\",\"description\":\"\"},{\"id\":\"edit.cut\",\"title\":\"Edit: Cut\",\"description\":\"\"},{\"id\":\"edit.distribute.horizontal\",\"title\":\"Edit: Distribute Evenly Horizontally\",\"description\":\"\"},{\"id\":\"edit.distribute.vertical\",\"title\":\"Edit: Distribute Evenly Vertically\",\"description\":\"\"},{\"id\":\"edit.paste\",\"title\":\"Edit: Paste\",\"description\":\"\"},{\"id\":\"edit.redo\",\"title\":\"Edit: Redo\",\"description\":\"\"},{\"id\":\"edit.redoAlt\",\"title\":\"Edit: Redo\",\"description\":\"\"},{\"id\":\"edit.undo\",\"title\":\"Edit: Undo\",\"description\":\"\"},{\"id\":\"file.new\",\"title\":\"File: New\",\"description\":\"\"},{\"id\":\"file.open\",\"title\":\"File: Open...\",\"description\":\"\"},{\"id\":\"file.printPreview\",\"title\":\"File: Export...\",\"description\":\"\"},{\"id\":\"file.quit\",\"title\":\"File: Quit\",\"description\":\"\"},{\"id\":\"file.save\",\"title\":\"File: Save\",\"description\":\"\"},{\"id\":\"file.saveAs\",\"title\":\"File: Save As...\",\"description\":\"\"},{\"id\":\"file.saveAsArchetype\",\"title\":\"File: Save Model as Archetype...\",\"description\":\"\"},{\"id\":\"graph.deleteSelection\",\"title\":\"Graph: Delete Selection\",\"description\":\"\"},{\"id\":\"graph.mode.link\",\"title\":\"Graph: Link Mode\",\"description\":\"\"},{\"id\":\"graph.mode.node\",\"title\":\"Graph: Node Mode\",\"description\":\"\"},{\"id\":\"graph.mode.select\",\"title\":\"Graph: Select Mode\",\"description\":\"\"},{\"id\":\"graph.mode.type\",\"title\":\"Graph: Type Mode\",\"description\":\"\"},{\"id\":\"graph.zoomExtents\",\"title\":\"Graph: Zoom Extents\",\"description\":\"\"},{\"id\":\"help.about\",\"title\":\"Help: About\",\"description\":\"\"},{\"id\":\"help.mcpAgentGuide\",\"title\":\"Help: MCP Agent Guide...\",\"description\":\"\"},{\"id\":\"mcp.manage\",\"title\":\"MCP: Manage Server...\",\"description\":\"\"},{\"id\":\"sheet.toggle\",\"title\":\"Sheet: Toggle Preview\",\"description\":\"\"}]}"
+      }
+    ],
+    "structuredContent": {
+      "commands": [
+        {
+          "id": "ai.copyComponentFiches",
+          "title": "AI Support: Copy Selected Component Fiches as Markdown",
+          "description": ""
+        },
+        {
+          "id": "ai.generateSource",
+          "title": "AI Support: Generate Source Code for Selected Components",
+          "description": ""
+        },
+        {
+          "id": "ai.generateTestData",
+          "title": "AI Support: Generate Test Data for Selected Components",
+          "description": ""
+        },
+        {
+          "id": "ai.tidySpecification",
+          "title": "AI Support: Tidy and Format Selected Specifications",
+          "description": ""
+        },
+        {
+          "id": "app.options",
+          "title": "Application: Options...",
+          "description": ""
+        },
+        {
+          "id": "commands.palette",
+          "title": "Commands: Open Palette",
+          "description": ""
+        },
+        {
+          "id": "compile.compiler",
+          "title": "Generate: Compiler from Overrides",
+          "description": ""
+        },
+        {
+          "id": "compile.project",
+          "title": "Generate: Project or Selection",
+          "description": ""
+        },
+        {
+          "id": "edit.align.bottom",
+          "title": "Edit: Align Bottom",
+          "description": ""
+        },
+        {
+          "id": "edit.align.left",
+          "title": "Edit: Align Left",
+          "description": ""
+        },
+        {
+          "id": "edit.align.right",
+          "title": "Edit: Align Right",
+          "description": ""
+        },
+        {
+          "id": "edit.align.top",
+          "title": "Edit: Align Top",
+          "description": ""
+        },
+        {
+          "id": "edit.copy",
+          "title": "Edit: Copy",
+          "description": ""
+        },
+        {
+          "id": "edit.cut",
+          "title": "Edit: Cut",
+          "description": ""
+        },
+        {
+          "id": "edit.distribute.horizontal",
+          "title": "Edit: Distribute Evenly Horizontally",
+          "description": ""
+        },
+        {
+          "id": "edit.distribute.vertical",
+          "title": "Edit: Distribute Evenly Vertically",
+          "description": ""
+        },
+        {
+          "id": "edit.paste",
+          "title": "Edit: Paste",
+          "description": ""
+        },
+        {
+          "id": "edit.redo",
+          "title": "Edit: Redo",
+          "description": ""
+        },
+        {
+          "id": "edit.redoAlt",
+          "title": "Edit: Redo",
+          "description": ""
+        },
+        {
+          "id": "edit.undo",
+          "title": "Edit: Undo",
+          "description": ""
+        },
+        {
+          "id": "file.new",
+          "title": "File: New",
+          "description": ""
+        },
+        {
+          "id": "file.open",
+          "title": "File: Open...",
+          "description": ""
+        },
+        {
+          "id": "file.printPreview",
+          "title": "File: Export...",
+          "description": ""
+        },
+        {
+          "id": "file.quit",
+          "title": "File: Quit",
+          "description": ""
+        },
+        {
+          "id": "file.save",
+          "title": "File: Save",
+          "description": ""
+        },
+        {
+          "id": "file.saveAs",
+          "title": "File: Save As...",
+          "description": ""
+        },
+        {
+          "id": "file.saveAsArchetype",
+          "title": "File: Save Model as Archetype...",
+          "description": ""
+        },
+        {
+          "id": "graph.deleteSelection",
+          "title": "Graph: Delete Selection",
+          "description": ""
+        },
+        {
+          "id": "graph.mode.link",
+          "title": "Graph: Link Mode",
+          "description": ""
+        },
+        {
+          "id": "graph.mode.node",
+          "title": "Graph: Node Mode",
+          "description": ""
+        },
+        {
+          "id": "graph.mode.select",
+          "title": "Graph: Select Mode",
+          "description": ""
+        },
+        {
+          "id": "graph.mode.type",
+          "title": "Graph: Type Mode",
+          "description": ""
+        },
+        {
+          "id": "graph.zoomExtents",
+          "title": "Graph: Zoom Extents",
+          "description": ""
+        },
+        {
+          "id": "help.about",
+          "title": "Help: About",
+          "description": ""
+        },
+        {
+          "id": "help.mcpAgentGuide",
+          "title": "Help: MCP Agent Guide...",
+          "description": ""
+        },
+        {
+          "id": "mcp.manage",
+          "title": "MCP: Manage Server...",
+          "description": ""
+        },
+        {
+          "id": "sheet.toggle",
+          "title": "Sheet: Toggle Preview",
+          "description": ""
+        }
+      ]
+    },
+    "isError": false,
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    }
+  }
+}

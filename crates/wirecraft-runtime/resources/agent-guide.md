@@ -1,0 +1,7 @@
+# Wirecraft agent guide
+
+Wirecraft migrates the Threadworks topology IDE. Libraries define reusable capabilities; processing nodes employ them and route a principal result or coherent typed error; Type entities define boundary values; links expose data, error, dependency and recovery topology. These are design defaults, not prohibitions.
+
+Read threadwork.get_design or a bounded fragment before edits. Use stable IDs and repository tools. Validate after structural changes. Mutations synchronize parents, children, ports and link indexes. Technology and file-layout values normally inherit from the parent. Update source, initialization, specification, tests and aiInstructions through update_entity.text. Partial text/layout/technology/link objects merge; metadata and arrays replace. Root cannot be deleted or reparented; data links cannot point to links. Mutations are atomic and undoable.
+
+The MCP names and resource URIs retain threadwork for client compatibility. The backend and desktop share these services. Inspect list_technologies and command catalog: unavailable graph compilers and UI-only commands are not claimed. Changes remain in memory until an explicit file.save through the application API or supported execute_command, with a path already selected. Headless hosts may opt into recovery snapshots. C/C++ intelligence uses a supervised external clangd and build tools; TCC is absent.

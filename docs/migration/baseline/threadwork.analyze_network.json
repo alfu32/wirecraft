@@ -1,0 +1,29 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"entities\":1,\"links\":0,\"types\":0,\"composites\":0,\"ports\":0,\"users\":1,\"projectName\":\"Untitled Threadwork\"}"
+      }
+    ],
+    "structuredContent": {
+      "entities": 1,
+      "links": 0,
+      "types": 0,
+      "composites": 0,
+      "ports": 0,
+      "users": 1,
+      "projectName": "Untitled Threadwork"
+    },
+    "isError": false,
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    }
+  }
+}
