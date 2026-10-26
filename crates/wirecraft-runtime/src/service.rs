@@ -244,6 +244,14 @@ impl Service {
                     Ok(json!({"scope":"document","metadata":self.document.metadata}))
                 };
             }
+            "compile.c17" => {
+                let root = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
+                let project = wirecraft_core::c17::C17::generate(&self.document, root)?;
+                if let Some(output) = a["outputDir"].as_str() {
+                    crate::generation::write(&project, Path::new(output))?;
+                }
+                return Ok(serde_json::to_value(project)?);
+            }
             "generate.files" => {
                 let id = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
                 let project = wirecraft_core::generation::literal_files(&self.document, id)?;
@@ -304,7 +312,7 @@ impl Service {
             "analyze_network" => return Ok(self.document.network_counts()),
             "list_technologies" => {
                 return Ok(
-                    json!({"technologies":[{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"file-export"},{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"multi-tech"}],"languageServers":[{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}],"note":"Graph-to-source compiler migration pending; external build and LSP services are separate."}),
+                    json!({"technologies":[{"compilerId":"c-compiler","compilerName":"C17 topology (data/error flow, types, library declarations)","languageId":"c","technologyId":"c-native"},{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"file-export"},{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"multi-tech"}],"languageServers":[{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}],"note":"C17 source/runnable capabilities and template overrides remain pending; other language graph compilers are pending. External build and LSP services are separate."}),
                 );
             }
             "get_command_catalog" => return Ok(command_catalog()),

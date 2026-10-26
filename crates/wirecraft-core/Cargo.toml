@@ -10,6 +10,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 base64 = "0.22"
+regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]

@@ -777,6 +777,44 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "wirecraft.compile_c17",
+      "description": "Generate a C17 translation unit from processing/composite bodies, typed data/error links and service-library declarations. Source/runnable capabilities and template overrides remain pending.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "outputDir": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "wirecraft.analyze_c17",
+      "description": "Analyze the generated C17 graph with a real clangd and map diagnostics to original node text sections. Uses an independent temporary workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "executable": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     }
   ]
 }

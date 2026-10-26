@@ -14,3 +14,5 @@ pub mod generation;
 pub mod config;
 
 mod process;
+
+mod generated_analysis;

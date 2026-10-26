@@ -36,6 +36,7 @@ pub struct Application {
     pub events: broadcast::Sender<Value>,
     pub jobs: Jobs,
     lsp: Arc<AsyncMutex<Option<LanguageSession>>>,
+    generated: Arc<AsyncMutex<Option<crate::generated_analysis::GeneratedAnalysis>>>,
     lifecycle: Arc<AsyncMutex<()>>,
     pub token: String,
     stop: watch::Sender<bool>,
@@ -53,6 +54,7 @@ impl Application {
             jobs: Jobs::new(events.clone()),
             events,
             lsp: Arc::new(AsyncMutex::new(None)),
+            generated: Arc::new(AsyncMutex::new(None)),
             lifecycle: Arc::new(AsyncMutex::new(())),
             token,
             stop,
@@ -71,6 +73,66 @@ impl Application {
             "system.shutdown" => {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
+            }
+            "editor.analyze_generated" => {
+                let service = self.service.clone();
+                let root = a["nodeId"].as_str().map(str::to_string);
+                let (project, revision) = tokio::task::spawn_blocking(move || {
+                    let s = service
+                        .lock()
+                        .map_err(|_| Error::new("internal", "Project lock poisoned"))?;
+                    Ok::<_, Error>((
+                        wirecraft_core::c17::C17::generate(
+                            &s.document,
+                            root.as_deref().unwrap_or(&s.document.root_node_id),
+                        )?,
+                        s.revision,
+                    ))
+                })
+                .await
+                .map_err(|e| Error::new("internal", e.to_string()))??;
+                let _lifecycle = self.lifecycle.lock().await;
+                let mut generated = self.generated.lock().await;
+                if let Some(session) = generated.as_mut() {
+                    session.update(project).await?;
+                } else {
+                    let args: Vec<String> = serde_json::from_value(
+                        a.get("args")
+                            .cloned()
+                            .unwrap_or(json!(["--background-index=false"])),
+                    )?;
+                    *generated = Some(
+                        crate::generated_analysis::GeneratedAnalysis::start(
+                            project,
+                            a["executable"].as_str().unwrap_or("clangd"),
+                            &args,
+                        )
+                        .await?,
+                    );
+                }
+                let mut result = generated.as_ref().unwrap().diagnostics().await?;
+                if self.revision() != revision {
+                    return Err(Error::new(
+                        "stale_result",
+                        "Model changed during generated-source analysis",
+                    ));
+                }
+                result["revision"] = json!(revision);
+                return Ok(result);
+            }
+            "editor.generated_diagnostics" => {
+                let generated = self.generated.lock().await;
+                let session = generated.as_ref().ok_or_else(|| {
+                    Error::new("unavailable", "Generated-source analysis has not started")
+                })?;
+                return session.diagnostics().await;
+            }
+            "editor.stop_generated" => {
+                let _lifecycle = self.lifecycle.lock().await;
+                if let Some(s) = self.generated.lock().await.take() {
+                    s.shutdown().await;
+                }
+                return Ok(json!({"stopped":true}));
             }
             "lsp.start" => {
                 let _lifecycle = self.lifecycle.lock().await;
@@ -230,6 +292,9 @@ impl Application {
         let _lifecycle = self.lifecycle.lock().await;
         if let Some(session) = self.lsp.lock().await.take() {
             session.shutdown().await;
+        }
+        if let Some(generated) = self.generated.lock().await.take() {
+            generated.shutdown().await;
         }
         self.jobs.shutdown().await;
     }

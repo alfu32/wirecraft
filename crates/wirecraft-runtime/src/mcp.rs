@@ -75,6 +75,8 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                     let command = match name {
                         "wirecraft.open_project" => "file.open",
                         "wirecraft.generate_files" => "generate.files",
+                        "wirecraft.compile_c17" => "compile.c17",
+                        "wirecraft.analyze_c17" => "editor.analyze_generated",
                         "wirecraft.save_archetype" => "archetypes.save",
                         "wirecraft.save_project" => "file.save",
                         "wirecraft.undo" => "edit.undo",

@@ -10,8 +10,52 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let mode = args.next().unwrap_or_else(|| "help".into());
     if mode == "help" || mode == "--help" {
         println!(
-            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
+            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
             env!("CARGO_PKG_VERSION")
+        );
+        return Ok(());
+    }
+    if mode == "desktop" {
+        let name = if cfg!(windows) {
+            "wirecraft-desktop.exe"
+        } else {
+            "wirecraft-desktop"
+        };
+        let executable = std::env::current_exe()?.with_file_name(name);
+        let status = std::process::Command::new(&executable)
+            .args(args)
+            .status()
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Cannot start {}: {e}; build/install the desktop binary too",
+                    executable.display()
+                )
+            })?;
+        if !status.success() {
+            anyhow::bail!("Desktop exited with {status}");
+        }
+        return Ok(());
+    }
+    if mode == "compile" {
+        let source = PathBuf::from(
+            args.next()
+                .ok_or_else(|| anyhow::anyhow!("Missing project path"))?,
+        );
+        let output = PathBuf::from(
+            args.next()
+                .ok_or_else(|| anyhow::anyhow!("Missing generated output directory"))?,
+        );
+        let document = store::load(&source)?;
+        let root = document.root_node_id.clone();
+        let project = if document.effective(&root, "technologyId") == "c-native" {
+            wirecraft_core::c17::C17::generate(&document, &root)?
+        } else {
+            wirecraft_core::generation::literal_files(&document, &root)?
+        };
+        crate::generation::write(&project, &output)?;
+        println!(
+            "{}",
+            json!({"generated":true,"files":project.files.len(),"capability":project.capability,"outputDir":output})
         );
         return Ok(());
     }

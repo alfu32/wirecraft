@@ -132,7 +132,7 @@ async fn real_http_mcp_client_and_shared_revision() {
         .json()
         .await
         .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 34);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 36);
     let created: Value = client
         .post(format!("{url}/mcp"))
         .bearer_auth("temporary-test-token")
@@ -463,7 +463,7 @@ fn stdio_client_initializes_lists_calls_and_stops() {
         .map(|s| serde_json::from_str(s).unwrap())
         .collect();
     assert_eq!(messages.len(), 3);
-    assert_eq!(messages[1]["result"]["tools"].as_array().unwrap().len(), 34);
+    assert_eq!(messages[1]["result"]["tools"].as_array().unwrap().len(), 36);
     assert_eq!(messages[2]["result"]["structuredContent"]["valid"], true);
 }
 

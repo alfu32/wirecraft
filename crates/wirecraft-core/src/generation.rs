@@ -15,6 +15,8 @@ pub struct SourceMap {
     pub generated_start_line: usize,
     pub generated_end_line: usize,
     pub source_start_line: usize,
+    #[serde(default)]
+    pub generated_column_offset: usize,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,6 +100,7 @@ pub fn literal_files(document: &Document, node_id: &str) -> Result<GeneratedProj
                 generated_start_line: 1,
                 generated_end_line: content.lines().count().max(1),
                 source_start_line: 1,
+                generated_column_offset: 0,
             }]
         } else {
             vec![]
@@ -150,5 +153,11 @@ fn segment(name: &str) -> String {
         "file".into()
     } else {
         name.into()
+    }
+}
+
+impl VirtualFile {
+    pub fn source_location(&self, line: usize, column: usize) -> Option<serde_json::Value> {
+        self.source_map.iter().find(|m|line>=m.generated_start_line&&line<=m.generated_end_line).map(|m|serde_json::json!({"nodeId":m.node_id,"section":m.section,"line":m.source_start_line+line-m.generated_start_line,"column":column.saturating_sub(m.generated_column_offset).max(1)}))
     }
 }

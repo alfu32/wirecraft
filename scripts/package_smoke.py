@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
    with urllib.request.urlopen(request,timeout=10) as response:return json.load(response)
   def rpc(method,params=None):return call('/mcp',{'jsonrpc':'2.0','id':1,'method':method,'params':params or {}})
   assert rpc('initialize',{'protocolVersion':'2025-11-25'})['result']['protocolVersion']=='2025-11-25'
-  tools=rpc('tools/list')['result']['tools'];assert len(tools)==34
+  tools=rpc('tools/list')['result']['tools'];assert len(tools)==36
   created=rpc('tools/call',{'name':'threadwork.create_entity','arguments':{'name':'packaged worker'}});assert not created['result']['isError']
   saved=rpc('tools/call',{'name':'wirecraft.save_project','arguments':{}});assert not saved['result']['isError']
   exported=rpc('tools/call',{'name':'wirecraft.export_diagram','arguments':{'path':str(tmp/'diagram.pdf'),'format':'pdf'}});assert not exported['result']['isError']

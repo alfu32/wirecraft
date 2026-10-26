@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
    try:
     value=f()
     if value:return value
-   except (subprocess.CalledProcessError,FileNotFoundError,json.JSONDecodeError):pass
+   except (subprocess.CalledProcessError,FileNotFoundError,json.JSONDecodeError,KeyError):pass
    time.sleep(.1)
   raise TimeoutError('desktop smoke condition timed out')
  window=None
@@ -92,12 +92,18 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   lsp_pid=api('lsp.status')['pid'];assert lsp_pid
   xd('mousemove','--window',window,530,167);xd('click',1)
   wait_for(lambda:any(j['status']=='failed' and 'missing' in j.get('stderr','') for j in api('jobs.list')['jobs']))
+  xd('mousemove','--window',window,930,167);xd('click',1)
+  mapped=wait_for(lambda:next((d for d in api('editor.generated_diagnostics')['diagnostics'] if d.get('source') and d['source']['section']=='source'),None))
+  generated_pid=api('editor.generated_diagnostics')['pid'];assert generated_pid
+  time.sleep(.3)
+  xd('mousemove','--window',window,550,220);xd('click',1)
+  wait_for(lambda:json.loads(state.joinpath('ui.json').read_text()).get('tab')=='Editor')
   subprocess.run(['import','-window',window,str(artifact/'tools.png')],env=env,check=True)
   xd('key','ctrl+q');app.wait(timeout=10)
   until=time.monotonic()+5
-  while any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,lsp_pid]) and time.monotonic()<until:time.sleep(.05)
-  assert not any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,lsp_pid]), 'owned child survived shutdown'
-  print(json.dumps({'desktop':'passed','clangdDiagnostics':True,'externalCompilerDiagnostics':True,'ownedChildrenStopped':True,'editorDraft':True,'draftRestoredAndApplied':True,'nodes':4,'canvasLink':True,'clipboardUndo':True,'recovery':True,'exitCode':app.returncode,'artifacts':str(artifact)}))
+  while any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,lsp_pid,generated_pid]) and time.monotonic()<until:time.sleep(.05)
+  assert not any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,lsp_pid,generated_pid]), 'owned child survived shutdown'
+  print(json.dumps({'desktop':'passed','generatedDiagnosticRevealed':True,'generatedDiagnosticsMapped':True,'clangdDiagnostics':True,'externalCompilerDiagnostics':True,'ownedChildrenStopped':True,'editorDraft':True,'draftRestoredAndApplied':True,'nodes':4,'canvasLink':True,'clipboardUndo':True,'recovery':True,'exitCode':app.returncode,'artifacts':str(artifact)}))
  finally:
   if app.poll() is None:
    try:

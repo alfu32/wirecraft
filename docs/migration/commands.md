@@ -11,7 +11,7 @@ Source command catalog was read from the running 2.6.7 app. Implementations orig
 | `app.options` | Application: Options... | settings.json + explicit XML import; full options UI pending | partial |
 | `commands.palette` | Commands: Open Palette | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
 | `compile.compiler` | Generate: Compiler from Overrides | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
-| `compile.project` | Generate: Project or Selection | literal file-export/multi-tech + source maps + external tools; graph wrappers/templates pending | partial |
+| `compile.project` | Generate: Project or Selection | literal file-export/multi-tech and native C17 topology + mapped diagnostics + external tools; remaining capabilities/templates/languages pending | partial |
 | `edit.align.bottom` | Edit: Align Bottom | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
 | `edit.align.left` | Edit: Align Left | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
 | `edit.align.right` | Edit: Align Right | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |

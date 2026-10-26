@@ -97,6 +97,8 @@ struct Wirecraft {
     output: String,
     tree: Vec<(String, usize)>,
     archetypes: Vec<Value>,
+    generated_diagnostics: Vec<Value>,
+    generated_revision: u64,
 }
 impl Wirecraft {
     fn new(
@@ -171,6 +173,8 @@ impl Wirecraft {
             output: String::new(),
             tree: vec![],
             archetypes: vec![],
+            generated_diagnostics: vec![],
+            generated_revision: 0,
         };
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(update) = rx.recv().await {
@@ -271,11 +275,20 @@ impl Wirecraft {
                 {
                     cx.write_to_clipboard(ClipboardItem::new_string(text.to_string()));
                 }
+                if command == "editor.analyze_generated" {
+                    self.generated_revision = value["revision"].as_u64().unwrap_or(0);
+                    self.generated_diagnostics =
+                        value["diagnostics"].as_array().cloned().unwrap_or_default();
+                    for d in &mut self.generated_diagnostics {
+                        d["positionEncoding"] = value["positionEncoding"].clone();
+                    }
+                }
                 if command.starts_with("lsp.")
                     || command.starts_with("jobs.")
                     || command == "threadwork.analyze_network"
                     || command == "threadwork.validate_design"
                     || command == "analysis.report"
+                    || command == "editor.analyze_generated"
                 {
                     self.output = serde_json::to_string_pretty(&value).unwrap_or_default();
                 }
@@ -289,6 +302,9 @@ impl Wirecraft {
             }
             Update::Snapshot(snapshot) => {
                 self.snapshot = Arc::new(*snapshot);
+                if self.snapshot.revision != self.generated_revision {
+                    self.generated_diagnostics.clear();
+                }
                 if !self.snapshot.document.nodes.contains_key(&self.parent) {
                     self.parent = self.snapshot.document.root_node_id.clone();
                 }
@@ -854,7 +870,7 @@ impl Wirecraft {
         })
         .detach();
     }
-    fn artifact_dialog(&mut self, archetype: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn artifact_dialog(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         if self.has_draft(cx) {
             self.status = "Apply the editor draft before generating or saving an archetype".into();
             cx.notify();
@@ -869,7 +885,7 @@ impl Wirecraft {
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
         let prompt = cx.prompt_for_new_path(
             &directory,
-            Some(if archetype {
+            Some(if kind == "archetype" {
                 "archetype.orch"
             } else {
                 "generated-project"
@@ -878,14 +894,18 @@ impl Wirecraft {
         cx.spawn_in(window, async move |this, cx| {
             if let Ok(Ok(Some(path))) = prompt.await {
                 let _ = this.update_in(cx, |this, _, _| {
-                    if archetype {
+                    if kind == "archetype" {
                         if let Some(id) = this.selected.first() {
                             this.client
                                 .send("archetypes.save", json!({"nodeId":id,"path":path}));
                         }
                     } else {
                         this.client.send(
-                            "generate.files",
+                            if kind == "c17" {
+                                "compile.c17"
+                            } else {
+                                "generate.files"
+                            },
                             json!({"nodeId":this.parent,"outputDir":path}),
                         );
                     }
@@ -914,6 +934,94 @@ impl Wirecraft {
             }
         })
         .detach();
+    }
+    fn reveal_diagnostic(
+        &mut self,
+        diagnostic: &Value,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.has_draft(cx) {
+            self.status = "Apply the editor draft before revealing another diagnostic".into();
+            cx.notify();
+            return;
+        }
+        let source = &diagnostic["source"];
+        let Some(id) = source["nodeId"].as_str() else {
+            return;
+        };
+        if !self.snapshot.document.nodes.contains_key(id) {
+            return;
+        }
+        self.selected = BTreeSet::from([id.into()]);
+        let section = source["section"].as_str().unwrap_or("source");
+        self.section = if [
+            "source",
+            "initialization",
+            "specification",
+            "tests",
+            "aiInstructions",
+        ]
+        .contains(&section)
+        {
+            section.into()
+        } else {
+            "source".into()
+        };
+        self.tab = "Editor".into();
+        self.load_editor(window, cx);
+        if ![
+            "source",
+            "initialization",
+            "specification",
+            "tests",
+            "aiInstructions",
+        ]
+        .contains(&section)
+        {
+            self.properties.update(cx, |editor, cx| {
+                editor.set_cursor_position(lsp_types::Position::new(0, 0), window, cx)
+            });
+            self.status = format!(
+                "{} · {section}:{}:{}",
+                self.snapshot.document.qualified_name(id),
+                source["line"],
+                source["column"]
+            );
+            self.persist_ui(cx);
+            cx.notify();
+            return;
+        }
+        let row = source["line"].as_u64().unwrap_or(1).saturating_sub(1) as usize;
+        let row = row.min(
+            self.editor
+                .read(cx)
+                .value()
+                .split('\n')
+                .count()
+                .saturating_sub(1),
+        );
+        let column = source["column"].as_u64().unwrap_or(1).saturating_sub(1) as usize;
+        let text = self.editor.read(cx).value();
+        let encoding = diagnostic["positionEncoding"].as_str().unwrap_or("utf-16");
+        let character = wirecraft_runtime::lsp::offset(text.as_ref(), row, column, encoding)
+            .ok()
+            .and_then(|offset| {
+                wirecraft_runtime::lsp::position(text.as_ref(), offset, "utf-32").ok()
+            })
+            .and_then(|p| p["character"].as_u64())
+            .unwrap_or(0) as u32;
+        self.editor.update(cx, |editor, cx| {
+            editor.set_cursor_position(lsp_types::Position::new(row as u32, character), window, cx)
+        });
+        self.status = format!(
+            "{} · {section}:{}:{}",
+            self.snapshot.document.qualified_name(id),
+            row + 1,
+            column + 1
+        );
+        self.persist_ui(cx);
+        cx.notify();
     }
     fn analyze(&mut self, cpp: bool, build: bool, cx: &mut Context<Self>) {
         if self.section != "source" {
@@ -1246,21 +1354,25 @@ impl Render for Wirecraft {
               })));
         } else if self.tab == "Export" {
             content=content.child(div().p_4().child("Export the focused graph as a free-size drawing. ISO sheets, rolls and poster tiling remain pending."))
-              .child(div().flex().gap_2().p_3().child(button("generate-files","Generate literal file entities").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog(false,window,cx)))).child(button("save-archetype","Save selected subtree as archetype").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog(true,window,cx)))))
+              .child(div().flex().gap_2().p_3().child(button("generate-c17","Generate C17 topology").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog("c17",window,cx)))).child(button("generate-files","Generate literal file entities").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog("files",window,cx)))).child(button("save-archetype","Save selected subtree as archetype").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog("archetype",window,cx)))))
               .child(div().flex().gap_2().p_3().child(button("export-svg","SVG").on_click(cx.listener(|this,_,window,cx|this.export_dialog("svg",window,cx))))
               .child(button("export-png","PNG").on_click(cx.listener(|this,_,window,cx|this.export_dialog("png",window,cx))))
               .child(button("export-pdf","PDF").on_click(cx.listener(|this,_,window,cx|this.export_dialog("pdf",window,cx))))
               .child(button("copy-fiches","Copy component fiches · Markdown").on_click(cx.listener(|this,_,_,_|this.client.send("export.markdown",json!({"nodeIds":this.selected}))))));
         } else if self.tab == "Tools" {
-            content=content.child(div().p_3().child("Analyze the selected source section as a standalone C/C++ file. Graph-generated translation units are a separate migration milestone."))
+            content=content.child(div().p_3().child("Check a standalone source section or analyze the C17 graph. Graph diagnostics include the original entity, text section and line."))
              .child(div().flex().gap_2().p_3()
               .child(button("clangd-c","clangd · C").on_click(cx.listener(|this,_,_,cx|this.analyze(false,false,cx))))
               .child(button("clangd-cpp","clangd · C++").on_click(cx.listener(|this,_,_,cx|this.analyze(true,false,cx))))
               .child(button("build-c","Compiler check · C").on_click(cx.listener(|this,_,_,cx|this.analyze(false,true,cx))))
               .child(button("diagnostics","Refresh diagnostics").on_click(cx.listener(|this,_,_,_|this.tool("lsp.diagnostics"))))
               .child(button("jobs","Build jobs").on_click(cx.listener(|this,_,_,_|this.tool("jobs.list"))))
-              .child(button("stop-lsp","Stop clangd").on_click(cx.listener(|this,_,_,_|this.tool("lsp.stop")))))
-             .child(div().id("tool-output").flex_1().overflow_y_scroll().p_4().child(self.output.clone()));
+              .child(button("analyze-c17","Analyze C17 graph").on_click(cx.listener(|this,_,_,_|this.tool("editor.analyze_generated")))).child(button("stop-graph","Stop graph analyzer").on_click(cx.listener(|this,_,_,_|this.tool("editor.stop_generated")))).child(button("stop-lsp","Stop standalone").on_click(cx.listener(|this,_,_,_|this.tool("lsp.stop")))))
+             .child(div().id("tool-output").flex_1().overflow_y_scroll().p_4()
+                .children(self.generated_diagnostics.iter().enumerate().filter(|(_,d)|d["source"].is_object()).map(|(i,d)|{
+                    let diagnostic=d.clone();let source=&d["source"];let label=format!("{}:{}:{} · {}",source["nodeId"].as_str().unwrap_or(""),source["line"],source["column"],d["message"].as_str().unwrap_or(""));
+                    div().id(i).p_2().mb_2().bg(rgb(0x3c2831)).cursor_pointer().on_click(cx.listener(move|this,_,window,cx|this.reveal_diagnostic(&diagnostic,window,cx))).child(label)
+                })).child(self.output.clone()));
         } else {
             let config = json!({"mcpServers":{"wirecraft":{"url":format!("{}/mcp",self.endpoint),"headers":{"Authorization":format!("Bearer {}",self.token)}}}});
             content=content.child(div().p_4().child("Local MCP server · owned by this desktop session")).child(div().p_4().child(format!("{}/mcp",self.endpoint))).child(button("copy-mcp","Copy MCP client configuration").on_click(move|_,_,cx|cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string_pretty(&config).unwrap())))).child(div().p_4().child("Clients share this open design. Closing Wirecraft shuts down this server. The previous Threadworks server runs independently."));

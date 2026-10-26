@@ -1,0 +1,656 @@
+/* Threadworks 2.6.7 runtime, migrated from revision 7d392d3.
+ * Wirecraft corrects single-packet transport counts; see migration analysis. */
+#ifdef WIRECRAFT_TRACE
+#define threadwork_trace(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define threadwork_trace(...) ((void)0)
+#endif
+
+/** @brief Common result type returned by Threadwork runtime operations. */
+typedef int threadwork_error_t;
+
+enum {
+    THREADWORK_OK = 0,
+    THREADWORK_ERROR = 1,
+    THREADWORK_QUEUE_OK = THREADWORK_OK,
+    THREADWORK_QUEUE_ERROR = 2,
+    THREADWORK_QUEUE_FULL = 3
+};
+
+/** @brief Execution state for one generated Threadwork application. */
+typedef struct threadwork_runner_t {
+    volatile sig_atomic_t running;
+    volatile sig_atomic_t shutdown_signal;
+    unsigned long long transit;
+    unsigned long long shutdown_previous_transit;
+    unsigned int shutdown_idle_ticks;
+    unsigned int shutdown_remaining_ticks;
+} threadwork_runner_t;
+
+/** @brief Global execution state for the generated application. */
+threadwork_runner_t threadwork_runner;
+
+/* POSIX signal handlers cannot receive a context pointer. */
+static threadwork_runner_t *threadwork_active_signal_runner = NULL;
+
+threadwork_error_t threadwork_runner__shutdown_request(threadwork_runner_t *this);
+
+/** @brief Record SIGINT or SIGTERM and request network shutdown. */
+static void threadwork_shutdown_signal_handler(int signal_number)
+{
+    if (threadwork_active_signal_runner != NULL) {
+        threadwork_active_signal_runner->shutdown_signal = signal_number;
+        threadwork_runner__shutdown_request(&threadwork_runner);
+    }
+}
+
+/** @brief Initialize one application runner. */
+threadwork_error_t threadwork_runner__init(threadwork_runner_t *this)
+{
+    if (this == NULL) {
+        return THREADWORK_ERROR;
+    }
+    this->running = 1;
+    this->shutdown_signal = 0;
+    this->transit = 0ULL;
+    this->shutdown_previous_transit = 0ULL;
+    this->shutdown_idle_ticks = 0U;
+    this->shutdown_remaining_ticks = 0U;
+    return THREADWORK_OK;
+}
+
+/** @brief Release one application runner. */
+threadwork_error_t threadwork_runner__destroy(threadwork_runner_t *this)
+{
+    if (this == NULL) {
+        return THREADWORK_ERROR;
+    }
+    if (threadwork_active_signal_runner == this) {
+        threadwork_active_signal_runner = NULL;
+    }
+    this->running = 0;
+    return THREADWORK_OK;
+}
+
+/** @brief Install SIGINT and SIGTERM handlers for one application runner. */
+threadwork_error_t threadwork_runner__install_shutdown_signal_handlers(threadwork_runner_t *this)
+{
+    if (this == NULL) {
+        return THREADWORK_ERROR;
+    }
+    threadwork_active_signal_runner = this;
+    if (signal(SIGINT, threadwork_shutdown_signal_handler) == SIG_ERR) {
+        threadwork_active_signal_runner = NULL;
+        return THREADWORK_ERROR;
+    }
+    if (signal(SIGTERM, threadwork_shutdown_signal_handler) == SIG_ERR) {
+        threadwork_active_signal_runner = NULL;
+        return THREADWORK_ERROR;
+    }
+    return THREADWORK_OK;
+}
+
+/** @brief Request shutdown; modeled nodes decide whether they continue emitting packets. */
+threadwork_error_t threadwork_runner__shutdown_request(threadwork_runner_t *this)
+{
+    if (this == NULL) {
+        return THREADWORK_ERROR;
+    }
+    this->running = 0;
+    return THREADWORK_OK;
+}
+
+/** @brief Return the last OS shutdown signal received by the runtime, or zero. */
+threadwork_error_t threadwork_runner__get_shutdown_signal(
+    const threadwork_runner_t *this,
+    int *out_signal)
+{
+    if (this == NULL || out_signal == NULL) {
+        return THREADWORK_ERROR;
+    }
+    *out_signal = (int)this->shutdown_signal;
+    return THREADWORK_OK;
+}
+
+/** @brief Report whether generators may still emit packets. */
+threadwork_error_t threadwork_runner__is_running(
+    const threadwork_runner_t *this,
+    int *out_running)
+{
+    if (this == NULL || out_running == NULL) {
+        return THREADWORK_ERROR;
+    }
+    *out_running = this->running != 0 ? 1 : 0;
+    return THREADWORK_OK;
+}
+
+/** @brief Record one packet completed by a modeled data transport. */
+threadwork_error_t threadwork_runner__record_transit(threadwork_runner_t *this)
+{
+    if (this == NULL) {
+        return THREADWORK_ERROR;
+    }
+    this->transit++;
+    return THREADWORK_OK;
+}
+
+/** @brief Start the bounded idle window used to drain residual network traffic. */
+threadwork_error_t threadwork_runner__begin_shutdown_drain(
+    threadwork_runner_t *this,
+    unsigned int idle_ticks)
+{
+    if (this == NULL) {
+        return THREADWORK_ERROR;
+    }
+    threadwork_trace(
+        "[threadwork_runner__begin_shutdown_drain] transit=%llu idle_ticks=%u\n",
+        this->transit,
+        idle_ticks
+    );
+    this->shutdown_previous_transit = this->transit;
+    this->shutdown_idle_ticks = idle_ticks;
+    this->shutdown_remaining_ticks = idle_ticks;
+    return THREADWORK_OK;
+}
+
+/** @brief Report whether transport activity or the idle drain window remains. */
+threadwork_error_t threadwork_runner__has_recent_transit(
+    threadwork_runner_t *this,
+    int *out_recent_transit)
+{
+    if (this == NULL || out_recent_transit == NULL) {
+        return THREADWORK_ERROR;
+    }
+    threadwork_trace(
+        "[threadwork_runner__has_recent_transit] transit=%llu previous=%llu remaining=%u\n",
+        this->transit,
+        this->shutdown_previous_transit,
+        this->shutdown_remaining_ticks
+    );
+    if (this->transit != this->shutdown_previous_transit) {
+        threadwork_trace(
+            "[threadwork_runner__has_recent_transit] transit detected, resetting drain window\n"
+        );
+        this->shutdown_previous_transit = this->transit;
+        this->shutdown_remaining_ticks = this->shutdown_idle_ticks;
+        *out_recent_transit = 1;
+        return THREADWORK_OK;
+    }
+    if (this->shutdown_remaining_ticks == 0U) {
+        threadwork_trace(
+            "[threadwork_runner__has_recent_transit] idle window complete\n"
+        );
+        *out_recent_transit = 0;
+        return THREADWORK_OK;
+    }
+    this->shutdown_remaining_ticks--;
+    threadwork_trace(
+        "[threadwork_runner__has_recent_transit] draining, remaining=%u\n",
+        this->shutdown_remaining_ticks
+    );
+    *out_recent_transit = 1;
+    return THREADWORK_OK;
+}
+
+/** @brief One copied packet stored in a modeled buffer queue. */
+typedef struct threadwork_packet {
+    void *data;
+    size_t size;
+    struct threadwork_packet *next;
+} threadwork_packet;
+
+/** @brief FIFO chain used by endpoint and buffer storage. */
+typedef struct threadwork_queue {
+    threadwork_packet *head;
+    threadwork_packet *tail;
+} threadwork_queue;
+
+/** @brief Generic array value used by generated packet structures. */
+typedef struct ThreadworkArray {
+    void **items;
+    size_t length;
+    size_t capacity;
+} ThreadworkArray;
+
+/** @brief Typed FIFO endpoint; element_size identifies the modeled packet type. */
+typedef struct threadwork_buffer {
+    threadwork_queue queue;
+    size_t element_size;
+    size_t count;
+    size_t capacity;
+} threadwork_buffer;
+
+/** @brief Named runtime endpoint storage. */
+typedef struct threadwork_endpoint {
+    char *name;
+    threadwork_queue queue;
+    struct threadwork_endpoint *next;
+} threadwork_endpoint;
+
+/** @brief Endpoint state shared by generated node functions. */
+typedef struct threadwork_context {
+    threadwork_endpoint *inputs;
+    threadwork_endpoint *outputs;
+} threadwork_context;
+
+/** @brief Name/value pair used to materialize a source capability. */
+typedef struct threadwork_build_parameter {
+    const char *name;
+    const char *value;
+} threadwork_build_parameter;
+
+static char *threadwork_string_copy(const char *value)
+{
+    size_t size;
+    char *copy;
+
+    if (value == NULL) {
+        return NULL;
+    }
+    size = strlen(value) + 1U;
+    copy = (char *)malloc(size);
+    if (copy != NULL) {
+        memcpy(copy, value, size);
+    }
+    return copy;
+}
+
+static char *threadwork_replace_all(const char *source, const char *needle, const char *replacement)
+{
+    const char *cursor;
+    const char *match;
+    char *result;
+    char *output;
+    size_t count = 0U;
+    size_t source_size;
+    size_t needle_size;
+    size_t replacement_size;
+    size_t result_size;
+
+    if (source == NULL || needle == NULL || replacement == NULL || needle[0] == '\0') {
+        return NULL;
+    }
+    source_size = strlen(source);
+    needle_size = strlen(needle);
+    replacement_size = strlen(replacement);
+    cursor = source;
+    while ((match = strstr(cursor, needle)) != NULL) {
+        count++;
+        cursor = match + needle_size;
+    }
+    result_size = replacement_size >= needle_size
+        ? source_size + count * (replacement_size - needle_size)
+        : source_size - count * (needle_size - replacement_size);
+    result = (char *)malloc(result_size + 1U);
+    if (result == NULL) {
+        return NULL;
+    }
+    cursor = source;
+    output = result;
+    while ((match = strstr(cursor, needle)) != NULL) {
+        size_t prefix_size = (size_t)(match - cursor);
+        memcpy(output, cursor, prefix_size);
+        output += prefix_size;
+        memcpy(output, replacement, replacement_size);
+        output += replacement_size;
+        cursor = match + needle_size;
+    }
+    strcpy(output, cursor);
+    return result;
+}
+
+char *threadwork_materialize_source(
+    const char *source,
+    const threadwork_build_parameter *parameters,
+    size_t parameter_count)
+{
+    char *product = threadwork_string_copy(source);
+    size_t index;
+
+    if (product == NULL) {
+        return NULL;
+    }
+    for (index = 0U; index < parameter_count; index++) {
+        char marker[256];
+        char *next;
+        if (parameters[index].name == NULL || parameters[index].value == NULL) {
+            continue;
+        }
+        if (snprintf(marker, sizeof(marker), "%c%c%s%c", '$', '{', parameters[index].name, '}') < 0) {
+            free(product);
+            return NULL;
+        }
+        next = threadwork_replace_all(product, marker, parameters[index].value);
+        free(product);
+        if (next == NULL) {
+            return NULL;
+        }
+        product = next;
+    }
+    return product;
+}
+
+static threadwork_endpoint *threadwork_endpoint_find(
+    threadwork_endpoint *head,
+    const char *name)
+{
+    threadwork_endpoint *current = head;
+
+    while (current != NULL) {
+        if (strcmp(current->name, name) == 0) {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+
+static threadwork_endpoint *threadwork_endpoint_get_or_create(
+    threadwork_endpoint **head,
+    const char *name)
+{
+    threadwork_endpoint *endpoint;
+
+    if (head == NULL || name == NULL) {
+        return NULL;
+    }
+    endpoint = threadwork_endpoint_find(*head, name);
+    if (endpoint != NULL) {
+        return endpoint;
+    }
+    endpoint = (threadwork_endpoint *)calloc(1U, sizeof(*endpoint));
+    if (endpoint == NULL) {
+        return NULL;
+    }
+    endpoint->name = threadwork_string_copy(name);
+    if (endpoint->name == NULL) {
+        free(endpoint);
+        return NULL;
+    }
+    endpoint->next = *head;
+    *head = endpoint;
+    return endpoint;
+}
+
+static void threadwork_packet_destroy(threadwork_packet *packet)
+{
+    if (packet != NULL) {
+        free(packet->data);
+        free(packet);
+    }
+}
+
+/** @brief Move at most one packet from a source buffer to a target buffer. */
+static threadwork_error_t threadwork_buffer_transport(threadwork_buffer *source, threadwork_buffer *target)
+{
+    threadwork_packet *packet;
+
+    if (source == NULL || target == NULL || source->element_size != target->element_size) {
+        return THREADWORK_ERROR;
+    }
+    packet = source->queue.head;
+    if (packet == NULL) {
+        return THREADWORK_QUEUE_OK;
+    }
+    if (target->capacity > 0U && target->count >= target->capacity) {
+        return THREADWORK_QUEUE_FULL;
+    }
+    source->queue.head = packet->next;
+    if (source->queue.head == NULL) {
+        source->queue.tail = NULL;
+    }
+    packet->next = NULL;
+    if (target->queue.tail == NULL) {
+        target->queue.head = packet;
+    } else {
+        target->queue.tail->next = packet;
+    }
+    target->queue.tail = packet;
+    target->count++;
+    source->count--;
+    return THREADWORK_QUEUE_OK;
+}
+
+/** @brief Copy one packet into a typed buffer. */
+threadwork_error_t threadwork_buffer_push(threadwork_buffer *buffer, const void *data, size_t size)
+{
+    threadwork_packet *packet;
+
+    if (buffer == NULL || data == NULL || size != buffer->element_size) {
+        return THREADWORK_ERROR;
+    }
+    if (buffer->capacity > 0U && buffer->count >= buffer->capacity) {
+        return THREADWORK_QUEUE_FULL;
+    }
+    packet = (threadwork_packet *)calloc(1U, sizeof(*packet));
+    if (packet == NULL) {
+        return THREADWORK_ERROR;
+    }
+    packet->data = malloc(size);
+    if (packet->data == NULL) {
+        free(packet);
+        return THREADWORK_ERROR;
+    }
+    memcpy(packet->data, data, size);
+    packet->size = size;
+    if (buffer->queue.tail == NULL) {
+        buffer->queue.head = packet;
+    } else {
+        buffer->queue.tail->next = packet;
+    }
+    buffer->queue.tail = packet;
+    buffer->count++;
+    return THREADWORK_QUEUE_OK;
+}
+
+/** @brief Remove one packet from a typed buffer into caller-owned storage. */
+threadwork_error_t threadwork_buffer_pop(threadwork_buffer *buffer, void *destination, size_t size)
+{
+    threadwork_packet *packet;
+
+    if (buffer == NULL || destination == NULL || size != buffer->element_size) {
+        return THREADWORK_ERROR;
+    }
+    packet = buffer->queue.head;
+    if (packet == NULL || packet->size != size) {
+        return THREADWORK_QUEUE_ERROR;
+    }
+    memcpy(destination, packet->data, size);
+    buffer->queue.head = packet->next;
+    if (buffer->queue.head == NULL) {
+        buffer->queue.tail = NULL;
+    }
+    threadwork_packet_destroy(packet);
+    buffer->count--;
+    return THREADWORK_QUEUE_OK;
+}
+
+/** @brief Generated-node convenience operation for pushing one modeled packet. */
+threadwork_error_t push(void *target, void *package)
+{
+    threadwork_buffer *buffer = (threadwork_buffer *)target;
+
+    if (buffer == NULL) {
+        return THREADWORK_ERROR;
+    }
+    return threadwork_buffer_push(buffer, package, buffer->element_size);
+}
+
+/** @brief Generated-node convenience operation for popping one modeled packet. */
+threadwork_error_t pop(void *target, void *package)
+{
+    threadwork_buffer *buffer = (threadwork_buffer *)target;
+
+    if (buffer == NULL) {
+        return THREADWORK_ERROR;
+    }
+    return threadwork_buffer_pop(buffer, package, buffer->element_size);
+}
+
+/** @brief Count packets currently waiting in a modeled buffer. */
+size_t threadwork_buffer_count(const threadwork_buffer *buffer)
+{
+    if (buffer == NULL) {
+        return 0U;
+    }
+    return buffer->count;
+}
+
+/** @brief Set a queue capacity; zero keeps the queue unbounded. */
+threadwork_error_t threadwork_buffer_set_capacity(threadwork_buffer *buffer, size_t capacity)
+{
+    if (buffer == NULL) {
+        return THREADWORK_ERROR;
+    }
+    if (capacity > 0U && buffer->count > capacity) {
+        return THREADWORK_QUEUE_FULL;
+    }
+    buffer->capacity = capacity;
+    return THREADWORK_QUEUE_OK;
+}
+
+static void threadwork_endpoint_list_destroy(threadwork_endpoint *head)
+{
+    while (head != NULL) {
+        threadwork_endpoint *next_endpoint = head->next;
+        threadwork_packet *packet = head->queue.head;
+        while (packet != NULL) {
+            threadwork_packet *next_packet = packet->next;
+            threadwork_packet_destroy(packet);
+            packet = next_packet;
+        }
+        free(head->name);
+        free(head);
+        head = next_endpoint;
+    }
+}
+
+/** @brief Initialize runtime endpoint state before generated initialization. */
+threadwork_error_t threadwork_context_init(threadwork_context *context)
+{
+    if (context == NULL) {
+        return THREADWORK_ERROR;
+    }
+    context->inputs = NULL;
+    context->outputs = NULL;
+    return THREADWORK_OK;
+}
+
+/** @brief Release runtime endpoint state after the generated network drains. */
+void threadwork_context_destroy(threadwork_context *context)
+{
+    if (context == NULL) {
+        return;
+    }
+    threadwork_endpoint_list_destroy(context->inputs);
+    threadwork_endpoint_list_destroy(context->outputs);
+    context->inputs = NULL;
+    context->outputs = NULL;
+}
+
+/** @brief Write a packet to a named output endpoint. */
+threadwork_error_t threadwork_output_write(
+    threadwork_context *context,
+    const char *endpoint_name,
+    const void *data,
+    size_t size)
+{
+    threadwork_endpoint *endpoint;
+    threadwork_packet *packet;
+
+    if (context == NULL || endpoint_name == NULL || (size > 0U && data == NULL)) {
+        return THREADWORK_ERROR;
+    }
+    endpoint = threadwork_endpoint_get_or_create(&context->outputs, endpoint_name);
+    if (endpoint == NULL) {
+        return THREADWORK_ERROR;
+    }
+    packet = (threadwork_packet *)calloc(1U, sizeof(*packet));
+    if (packet == NULL) {
+        return THREADWORK_ERROR;
+    }
+    if (size > 0U) {
+        packet->data = malloc(size);
+        if (packet->data == NULL) {
+            free(packet);
+            return THREADWORK_ERROR;
+        }
+        memcpy(packet->data, data, size);
+    }
+    packet->size = size;
+    if (endpoint->queue.tail == NULL) {
+        endpoint->queue.head = packet;
+    } else {
+        endpoint->queue.tail->next = packet;
+    }
+    endpoint->queue.tail = packet;
+    return THREADWORK_OK;
+}
+
+/** @brief Read one packet from a named input endpoint. */
+threadwork_error_t threadwork_input_read(
+    threadwork_context *context,
+    const char *endpoint_name,
+    void *destination,
+    size_t capacity,
+    size_t *actual_size)
+{
+    threadwork_endpoint *endpoint;
+    threadwork_packet *packet;
+
+    if (context == NULL || endpoint_name == NULL) {
+        return THREADWORK_ERROR;
+    }
+    endpoint = threadwork_endpoint_find(context->inputs, endpoint_name);
+    if (endpoint == NULL || endpoint->queue.head == NULL) {
+        return THREADWORK_ERROR;
+    }
+    packet = endpoint->queue.head;
+    if (actual_size != NULL) {
+        *actual_size = packet->size;
+    }
+    if (packet->size > capacity || (packet->size > 0U && destination == NULL)) {
+        return THREADWORK_ERROR;
+    }
+    if (packet->size > 0U) {
+        memcpy(destination, packet->data, packet->size);
+    }
+    endpoint->queue.head = packet->next;
+    if (endpoint->queue.head == NULL) {
+        endpoint->queue.tail = NULL;
+    }
+    threadwork_packet_destroy(packet);
+    return THREADWORK_OK;
+}
+
+/** @brief Transfer one packet between named runtime endpoints. */
+threadwork_error_t threadwork_transport(
+    threadwork_context *context,
+    const char *link_reference,
+    const char *source_name,
+    const char *target_name)
+{
+    threadwork_endpoint *source;
+    threadwork_endpoint *target;
+
+    if (context == NULL || link_reference == NULL || source_name == NULL || target_name == NULL) {
+        return THREADWORK_ERROR;
+    }
+    source = threadwork_endpoint_find(context->outputs, source_name);
+    if (source == NULL || source->queue.head == NULL) {
+        return THREADWORK_OK;
+    }
+    target = threadwork_endpoint_get_or_create(&context->inputs, target_name);
+    if (target == NULL) {
+        return THREADWORK_ERROR;
+    }
+    if (target->queue.tail == NULL) {
+        target->queue.head = source->queue.head;
+    } else {
+        target->queue.tail->next = source->queue.head;
+    }
+    target->queue.tail = source->queue.tail;
+    source->queue.head = NULL;
+    source->queue.tail = NULL;
+    return THREADWORK_OK;
+}

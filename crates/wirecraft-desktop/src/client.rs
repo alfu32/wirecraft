@@ -188,8 +188,18 @@ fn worker(
     };
     loop {
         match rx.recv_timeout(Duration::from_millis(300)) {
-            Ok(Message::Execute(request)) => {
+            Ok(Message::Execute(mut request)) => {
                 let command = request.command.clone();
+                if command == "editor.analyze_generated" {
+                    request.arguments["executable"] = json!(
+                        std::env::var("WIRECRAFT_CLANGD").unwrap_or_else(|_| intelligence
+                            .settings
+                            .clangd
+                            .executable
+                            .clone())
+                    );
+                    request.arguments["args"] = json!(intelligence.settings.clangd.args);
+                }
                 if command == "lsp.stop" {
                     intelligence.started = false;
                     intelligence.versions.clear();
