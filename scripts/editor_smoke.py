@@ -75,6 +75,10 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   xd('key','ctrl+space');time.sleep(1);xd('type','--clearmodifiers','x');time.sleep(.5);shot('025-completion-stale-dismissed')
   assert (ui()['draft']['text']).endswith('argslib__get_arx')
   click(620,253);wait(lambda:ui().get('draft') is None)
+  click(600,350);xd('key','ctrl+End');xd('key','Return');xd('type','--clearmodifiers','/* Apply shortcut smoke */');xd('key','ctrl+Return')
+  wait(lambda:document()['nodes'][node]['text']['source'].endswith('/* Apply shortcut smoke */'));wait(lambda:ui().get('draft') is None)
+  command('Undo');wait(lambda:document()['nodes'][node]['text']['source']==next(n['text']['source'] for n in reference['nodes'] if n['id']==node));wait(lambda:ui().get('draft') is None)
+
   click(1270,598);time.sleep(.3);shot('compact-status-dropdown');click(1270,660)
   wait(lambda:(ui().get('draft') or {}).get('properties') and json.loads(ui()['draft']['properties']).get('status')=='BUSINESS')
   click(950,165);wait(lambda:document()['nodes'][node].get('status')!='FUNCTIONAL');wait(lambda:ui().get('draft') is None)
@@ -89,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   until=time.monotonic()+5
   while any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,clangd_pid]) and time.monotonic()<until:time.sleep(.05)
   assert not any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,clangd_pid])
-  print(json.dumps({'editor':'passed','compilerContextInsertion':True,'completionUndo':True,'staleMenuDismissal':True,'statusDropdownAndApply':True,'inlineTablesVisible':True,'minimizeMaximizeRestoreClose':True,'ownedChildrenStopped':True,'artifacts':str(ARTIFACT)}))
+  print(json.dumps({'editor':'passed','compilerContextInsertion':True,'completionUndo':True,'applyShortcut':True,'staleMenuDismissal':True,'statusDropdownAndApply':True,'inlineTablesVisible':True,'minimizeMaximizeRestoreClose':True,'ownedChildrenStopped':True,'artifacts':str(ARTIFACT)}))
 
  finally:
   if app is not None and app.poll() is None:
