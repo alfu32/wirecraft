@@ -188,7 +188,7 @@ pub fn icon(name: &'static str) -> AnyElement {
                 }
             }
             if let Ok(path) = path.build() {
-                window.paint_path(path, rgb(0x9babb9));
+                window.paint_path(path, crate::chrome::color(0x9babb9));
             }
         },
     )
@@ -219,5 +219,38 @@ pub fn for_button(id: &str) -> &'static str {
         "MCP" => "server",
         "apply" => "check",
         _ => "",
+    }
+}
+
+/// Embedded controls use the same stroke vocabulary, including editor search and color picker.
+pub struct Assets;
+impl AssetSource for Assets {
+    fn load(&self, path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {
+        let data = match path {
+            "icons/check.svg" => "M4 12l5 6L21 5",
+            "icons/close.svg" | "icons/window-close.svg" => "M6 6l12 12M6 18L18 6",
+            "icons/chevron-down.svg" => "M5 9l7 7 7-7",
+            "icons/chevron-up.svg" => "M5 15l7-7 7 7",
+            "icons/chevron-left.svg" => "M15 5l-7 7 7 7",
+            "icons/chevron-right.svg" => "M9 5l7 7-7 7",
+            "icons/arrow-down.svg" => "M12 3v18M5 14l7 7 7-7",
+            "icons/arrow-up.svg" => "M12 21V3M5 10l7-7 7 7",
+            "icons/search.svg" => "M15 15l7 7M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
+            "icons/case-sensitive.svg" => "M3 18L8 5l5 13M5 13h6M16 10h5v8h-5v-4h5",
+            "icons/regex.svg" => "M5 15h1v1H5zM15 3v12M9 6l12 6M9 12l12-6",
+            "icons/whole-word.svg" => "M3 7v12h18V7M7 7v7h4V7M15 7v7h3V7",
+            "icons/replace.svg" | "icons/replace-all.svg" => {
+                "M4 5h14l-4-4M20 19H6l4 4M6 10h3v4H6zM15 10h3v4h-3z"
+            }
+            "icons/palette.svg" => {
+                "M12 3a9 9 0 1 0 0 18c3 0 0-5 3-5h3c5 0 4-13-6-13zM7 9h1M12 6h1M17 9h1"
+            }
+            "icons/loader-circle.svg" | "icons/loader.svg" => "M20 12a8 8 0 1 1-8-8",
+            _ => return Ok(None),
+        };
+        Ok(Some(std::borrow::Cow::Owned(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path d=\"{data}\" fill=\"none\" stroke=\"black\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>").into_bytes())))
+    }
+    fn list(&self, _: &str) -> gpui::Result<Vec<SharedString>> {
+        Ok(vec![])
     }
 }

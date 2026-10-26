@@ -96,6 +96,36 @@ impl Application {
         }
         let a = &r.arguments;
         match r.command.as_str() {
+            "printers.list" => return crate::printing::list().await,
+            "print.submit" => return crate::printing::submit(self, a.clone()).await,
+            "ai.submit" => {
+                let provider = self
+                    .settings
+                    .lock()
+                    .map_err(|_| Error::new("internal", "Settings lock poisoned"))?
+                    .0
+                    .inference
+                    .provider
+                    .clone();
+                if provider != "clipboard" {
+                    return Err(Error::new(
+                        "unsupported",
+                        format!(
+                            "{provider} inference is not implemented in the Threadworks baseline or Wirecraft; choose clipboard"
+                        ),
+                    ));
+                }
+                let service = self.service.clone();
+                let arguments = a.clone();
+                return tokio::task::spawn_blocking(move || {
+                    service
+                        .lock()
+                        .map_err(|_| Error::new("internal", "Project lock poisoned"))?
+                        .execute(Request::new("ai.prompt", arguments))
+                })
+                .await
+                .map_err(|e| Error::new("internal", e.to_string()))?;
+            }
             "settings.get" => {
                 return Ok(serde_json::to_value(
                     &self
@@ -402,6 +432,7 @@ fn authorized(app: &Application, headers: &HeaderMap) -> bool {
             .is_some_and(|h| h.strip_prefix("Bearer ") == Some(app.token.as_str()))
 }
 async fn health(State(app): State<Application>) -> Json<Value> {
+    app.log_access("GET /health", 200, 0);
     Json(
         json!({"name":"Wirecraft","version":env!("CARGO_PKG_VERSION"),"status":"ok","revision":app.revision()}),
     )

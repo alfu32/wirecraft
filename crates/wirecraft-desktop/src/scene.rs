@@ -159,6 +159,23 @@ impl Scene {
         if let Ok(path) = grid.build() {
             window.paint_path(path, rgb(self.color(0x202a38)));
         }
+        let mut major = PathBuilder::stroke(px(1.));
+        let step = spacing * 5.;
+        let mut x = (origin[0] / step).floor() * step;
+        while x < origin[0] + width / view.zoom {
+            major.move_to(screen([x, origin[1]]));
+            major.line_to(screen([x, origin[1] + height / view.zoom]));
+            x += step;
+        }
+        let mut y = (origin[1] / step).floor() * step;
+        while y < origin[1] + height / view.zoom {
+            major.move_to(screen([origin[0], y]));
+            major.line_to(screen([origin[0] + width / view.zoom, y]));
+            y += step;
+        }
+        if let Ok(path) = major.build() {
+            window.paint_path(path, rgb(self.color(0x34404d)));
+        }
         let mut ordered = visible
             .iter()
             .filter_map(|id| self.drawing.shapes.get(id).map(|shape| (id, shape)))
@@ -219,7 +236,7 @@ impl Scene {
                             self.label(
                                 label_text,
                                 pos + point(px(6.), px(-13.)),
-                                9.,
+                                (9. * view.zoom as f32).max(5.),
                                 0x70bdb3,
                                 window,
                                 cx,
@@ -231,7 +248,7 @@ impl Scene {
                     self.label(
                         name,
                         screen([p[0] + 4., p[1] - 20.]),
-                        12.,
+                        (10. * view.zoom as f32).max(5.),
                         0x8fabbf,
                         window,
                         cx,
@@ -309,12 +326,28 @@ impl Scene {
                 self.label(
                     &text,
                     rect.origin + point(px(9. * view.zoom as f32), px(y * view.zoom as f32)),
-                    (size * view.zoom as f32).max(7.),
+                    if shape.composite && shape.expanded && size == 14. {
+                        let viewport = window.viewport_size();
+                        let scale = (f64::from(f32::from(viewport.width))
+                            / self.appearance.reference_width)
+                            .min(
+                                f64::from(f32::from(viewport.height))
+                                    / self.appearance.reference_height,
+                            )
+                            .clamp(0.4, 2.);
+                        self.appearance.composite_title_size * scale as f32
+                    } else {
+                        (size * view.zoom as f32).max(7.)
+                    },
                     color,
                     window,
                     cx,
                 );
-                y += 19.;
+                y += if shape.composite && shape.expanded {
+                    (self.appearance.composite_title_size + 3.) / view.zoom as f32
+                } else {
+                    19.
+                };
             }
             for field in &shape.fields {
                 if y + 14. > r.height as f32 {

@@ -56,8 +56,8 @@ impl Render for Ticket {
         div()
             .p_3()
             .rounded_md()
-            .bg(rgb(0x255452))
-            .text_color(rgb(0xe1e9ef))
+            .bg(crate::chrome::color(0x255452))
+            .text_color(crate::chrome::color(0xe1e9ef))
             .child(self.name.clone())
     }
 }
@@ -281,6 +281,27 @@ const COMMANDS: &[Command] = &[
         icon: "copy",
     },
     Command {
+        id: "ai-source",
+        group: "AI Support",
+        label: "Generate Source Code · Copy Prompt",
+        shortcut: "",
+        icon: "spark",
+    },
+    Command {
+        id: "ai-specification",
+        group: "AI Support",
+        label: "Tidy and Format Specifications · Copy Prompt",
+        shortcut: "",
+        icon: "spark",
+    },
+    Command {
+        id: "ai-tests",
+        group: "AI Support",
+        label: "Generate Test Data · Copy Prompt",
+        shortcut: "",
+        icon: "spark",
+    },
+    Command {
         id: "about",
         group: "Help",
         label: "About",
@@ -296,6 +317,57 @@ const COMMANDS: &[Command] = &[
     },
 ];
 impl Wirecraft {
+    pub(super) fn panel_separator(&self, right: bool, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .id(if right {
+                "inspector-divider"
+            } else {
+                "hierarchy-divider"
+            })
+            .w(px(5.))
+            .flex_none()
+            .bg(crate::chrome::color(0x29323d))
+            .cursor_col_resize()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                    this.panel_drag = Some((
+                        right,
+                        f32::from(event.position.x),
+                        if right {
+                            this.inspector_width
+                        } else {
+                            this.sidebar_width
+                        },
+                    ));
+                    cx.stop_propagation();
+                }),
+            )
+            .into_any_element()
+    }
+    pub(super) fn move_panel(
+        &mut self,
+        event: &MouseMoveEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some((right, start, width)) = self.panel_drag {
+            let delta = f32::from(event.position.x) - start;
+            if right {
+                self.inspector_width = (width - delta).clamp(280., 650.);
+            } else {
+                self.sidebar_width = (width + delta).clamp(180., 500.);
+            }
+            cx.notify();
+        }
+    }
+    pub(super) fn end_panel(&mut self, _: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.panel_drag.take().is_some() {
+            self.persist_ui(cx);
+            cx.notify();
+        }
+    }
+
     pub(super) fn merged_properties(&self, cx: &App) -> String {
         let raw = self.properties.read(cx).value().to_string();
         let Ok(mut value) = serde_json::from_str::<Value>(&raw) else {
@@ -320,7 +392,9 @@ impl Wirecraft {
                     json!(text)
                 };
         }
-        if changed {
+        let before = value.clone();
+        let _ = self.tables.merge(&mut value, cx);
+        if changed || value != before {
             serde_json::to_string_pretty(&value).unwrap_or(raw)
         } else {
             raw
@@ -336,6 +410,8 @@ impl Wirecraft {
     }
     pub(super) fn show_export(&mut self, _: &ShowExport, _: &mut Window, cx: &mut Context<Self>) {
         self.tab = "Export".into();
+        self.refresh_preview();
+        self.tool("printers.list");
         self.menu = None;
         cx.notify();
     }
@@ -343,6 +419,17 @@ impl Wirecraft {
         self.tab = "Options".into();
         self.menu = None;
         cx.notify();
+    }
+    pub(super) fn submit_command(&mut self, w: &mut Window, cx: &mut Context<Self>) {
+        let query = self.query.read(cx).value().to_lowercase();
+        if let Some(command) = COMMANDS.iter().find(|c| {
+            format!("{} {}", c.group, c.label)
+                .to_lowercase()
+                .contains(&query)
+        }) {
+            self.command(command.id, w, cx);
+            self.focus.focus(w);
+        }
     }
     fn command(&mut self, id: &str, w: &mut Window, cx: &mut Context<Self>) {
         self.menu = None;
@@ -368,7 +455,20 @@ impl Wirecraft {
             "generate" => self.artifact_dialog("c17", w, cx),
             "files" => self.artifact_dialog("files", w, cx),
             "archetype" => self.artifact_dialog("archetype", w, cx),
-            "mcp" => self.tab = "MCP".into(),
+            "mcp" => {
+                self.tab = "MCP".into();
+                self.tool("mcp.status");
+            }
+            "ai-source" | "ai-specification" | "ai-tests" => {
+                if self.has_draft(cx) {
+                    self.status = "Apply the editor draft before preparing assistance".into();
+                } else {
+                    self.client.send(
+                        "ai.submit",
+                        json!({"task":id.trim_start_matches("ai-"),"nodeIds":self.selected}),
+                    );
+                }
+            }
             "fiches" => self
                 .client
                 .send("export.markdown", json!({"nodeIds":self.selected})),
@@ -402,9 +502,9 @@ impl Wirecraft {
             .items_center()
             .gap_1()
             .px_3()
-            .bg(rgb(0x10161e))
+            .bg(crate::chrome::color(0x10161e))
             .border_b_1()
-            .border_color(rgb(0x29323d));
+            .border_color(crate::chrome::color(0x29323d));
         for label in [
             "File",
             "Edit",
@@ -421,7 +521,7 @@ impl Wirecraft {
                     .py_1()
                     .rounded_sm()
                     .cursor_pointer()
-                    .hover(|s| s.bg(rgb(0x29323d)))
+                    .hover(|s| s.bg(crate::chrome::color(0x29323d)))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.menu = if this.menu.as_deref() == Some(label) {
                             None
@@ -458,8 +558,8 @@ impl Wirecraft {
             .gap_1()
             .rounded_lg()
             .border_1()
-            .border_color(rgb(0x40505c))
-            .bg(rgb(0x1c242e))
+            .border_color(crate::chrome::color(0x40505c))
+            .bg(crate::chrome::color(0x1c242e))
             .shadow_lg();
         panel = panel.child(
             div()
@@ -475,7 +575,49 @@ impl Wirecraft {
                     })),
                 ),
         );
-        if group == "About" || group == "Guide" {
+        if ["Sheet format", "Document format", "Sheet scale"].contains(&group) {
+            let choices: Vec<String> = if group == "Sheet scale" {
+                [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+                    .into_iter()
+                    .map(|n| n.to_string())
+                    .collect()
+            } else {
+                wirecraft_core::sheets::FORMATS
+                    .iter()
+                    .filter(|f| {
+                        group != "Document format" || (**f != "Auto" && !f.contains("roll"))
+                    })
+                    .map(|s| s.to_string())
+                    .collect()
+            };
+            panel = panel.child(div().id("sheet-choices").overflow_y_scroll().children(
+                choices.into_iter().enumerate().map(|(i, choice)| {
+                    let group = group.to_string();
+                    div()
+                        .id(i)
+                        .p_2()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(crate::chrome::color(0x2d3b48)))
+                        .child(choice.clone())
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            match group.as_str() {
+                                "Sheet scale" => {
+                                    this.export_settings.sheet.scale = choice.parse().unwrap_or(1)
+                                }
+                                "Document format" => {
+                                    this.export_settings.document.format = choice.clone()
+                                }
+                                _ => this.export_settings.sheet.format = choice.clone(),
+                            };
+                            this.menu = None;
+                            this.export_page = 0;
+                            this.refresh_preview();
+                            this.persist_ui(cx);
+                            cx.notify();
+                        }))
+                }),
+            ));
+        } else if group == "About" || group == "Guide" {
             panel=panel.child(div().p_4().child(if group=="About" {format!("Wirecraft {}\nRust + GPUI\nMigrated from Threadworks 2.6.7\nSource: 7d392d3a0e30b86445e00e7c03032a5188b26593",env!("CARGO_PKG_VERSION"))}else{"Connect an MCP client using MCP → Copy configuration. The desktop and MCP share one design and undo history. Use threadwork.get_design, get_entity and validate_design to inspect it. Use expectedRevision with HTTP API mutations to prevent stale edits. Files keep the .orch format. Closing this desktop stops its owned backend and language servers. See README.md and docs/migration for the full interface, compiler capabilities and remaining gaps.".into()}));
         } else {
             if group == "Commands" {
@@ -506,7 +648,7 @@ impl Wirecraft {
                                 .p_2()
                                 .rounded_sm()
                                 .cursor_pointer()
-                                .hover(|s| s.bg(rgb(0x2d3b48)))
+                                .hover(|s| s.bg(crate::chrome::color(0x2d3b48)))
                                 .on_click(
                                     cx.listener(move |this, _, w, cx| this.command(id, w, cx)),
                                 )
@@ -516,7 +658,12 @@ impl Wirecraft {
                                 } else {
                                     c.label.into()
                                 }))
-                                .child(div().text_xs().text_color(rgb(0x8a9aab)).child(c.shortcut))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(crate::chrome::color(0x8a9aab))
+                                        .child(c.shortcut),
+                                )
                         }),
                 ),
             );
@@ -551,7 +698,9 @@ impl Wirecraft {
         ] {
             tabs = tabs.child(
                 button(key, title)
-                    .when(self.section == key, |b| b.bg(rgb(0x255452)))
+                    .when(self.section == key, |b| {
+                        b.bg(crate::chrome::color(0x255452))
+                    })
                     .on_click(cx.listener(move |this, _, w, cx| {
                         if this.has_draft(cx) {
                             this.status = "Apply the editor draft before changing section".into();
@@ -605,7 +754,7 @@ impl Wirecraft {
                     .px_3()
                     .pb_2()
                     .text_xs()
-                    .text_color(rgb(0x8fa6b5))
+                    .text_color(crate::chrome::color(0x8fa6b5))
                     .child(format!("Effective language: {language}"))
                     .child(button("reload-entity", "Discard draft / Reload").on_click(
                         cx.listener(|this, _, w, cx| {
@@ -675,7 +824,7 @@ impl Wirecraft {
                                 if s.is_empty() { "None" } else { s },
                             )
                             .text_xs()
-                            .when(status == s, |b| b.bg(rgb(0x255452)))
+                            .when(status == s, |b| b.bg(crate::chrome::color(0x255452)))
                             .on_click(move |_, w, cx| {
                                 input.update(cx, |state, cx| state.set_value(s, w, cx))
                             })
@@ -716,7 +865,7 @@ impl Wirecraft {
                         .id(("transition", i))
                         .text_xs()
                         .p_2()
-                        .bg(rgb(0x202b35))
+                        .bg(crate::chrome::color(0x202b35))
                         .child(format!(
                             "{}  {} → {} · {}",
                             event["changedDate"].as_str().unwrap_or(""),
@@ -727,6 +876,7 @@ impl Wirecraft {
                 );
             }
         }
+        inspector = inspector.child(self.render_tables(cx));
         inspector = inspector.child(
             button(
                 "advanced-properties",
@@ -753,16 +903,22 @@ impl Wirecraft {
             .flex_1()
             .min_h_0()
             .child(editor)
+            .child(self.panel_separator(true, cx))
             .child(
                 div()
-                    .w(px(360.))
+                    .w(px(self.inspector_width))
                     .flex_none()
                     .flex()
                     .flex_col()
                     .border_l_1()
-                    .border_color(rgb(0x29323d))
-                    .bg(rgb(0x191f28))
-                    .child(div().p_3().text_color(rgb(0x70d5c6)).child("Inspector"))
+                    .border_color(crate::chrome::color(0x29323d))
+                    .bg(crate::chrome::color(0x191f28))
+                    .child(
+                        div()
+                            .p_3()
+                            .text_color(crate::chrome::color(0x70d5c6))
+                            .child("Inspector"),
+                    )
                     .child(inspector),
             )
             .into_any_element()
@@ -797,13 +953,18 @@ impl Wirecraft {
                 .flex_col()
                 .rounded_md()
                 .border_1()
-                .border_color(rgb(0x303c49))
-                .bg(rgb(0x171f28))
-                .child(div().p_3().text_color(rgb(0x70d5c6)).child(format!(
-                    "{}  {}",
-                    status.unwrap_or("BACKLOG"),
-                    tickets.len()
-                )))
+                .border_color(crate::chrome::color(0x303c49))
+                .bg(crate::chrome::color(0x171f28))
+                .child(
+                    div()
+                        .p_3()
+                        .text_color(crate::chrome::color(0x70d5c6))
+                        .child(format!(
+                            "{}  {}",
+                            status.unwrap_or("BACKLOG"),
+                            tickets.len()
+                        )),
+                )
                 .on_drop(move |t: &Ticket, _, _| {
                     if !draft {
                         client.send(
@@ -835,13 +996,15 @@ impl Wirecraft {
                         .id(SharedString::from(id.clone()))
                         .p_3()
                         .rounded_md()
-                        .bg(rgb(if n.kind == wirecraft_core::NodeKind::Type {
-                            0x173b3a
-                        } else {
-                            0x252f3c
-                        }))
+                        .bg(crate::chrome::color(
+                            if n.kind == wirecraft_core::NodeKind::Type {
+                                0x173b3a
+                            } else {
+                                0x252f3c
+                            },
+                        ))
                         .border_1()
-                        .border_color(rgb(if self.selected.contains(&id) {
+                        .border_color(crate::chrome::color(if self.selected.contains(&id) {
                             0x70d5c6
                         } else {
                             0x43505f
@@ -886,12 +1049,15 @@ impl Wirecraft {
                                 ),
                         )
                         .child(
-                            div().text_xs().text_color(rgb(0x96a9bb)).child(
-                                n.parent_id
-                                    .as_ref()
-                                    .map(|id| doc.qualified_name(id))
-                                    .unwrap_or_default(),
-                            ),
+                            div()
+                                .text_xs()
+                                .text_color(crate::chrome::color(0x96a9bb))
+                                .child(
+                                    n.parent_id
+                                        .as_ref()
+                                        .map(|id| doc.qualified_name(id))
+                                        .unwrap_or_default(),
+                                ),
                         )
                         .child(div().text_xs().mt_2().child(format!(
                             "Responsible: {}",
@@ -936,7 +1102,9 @@ impl Wirecraft {
                     .p_3()
                     .child(
                         button("kanban", "Kanban board")
-                            .when(!self.management_backlog, |b| b.bg(rgb(0x255452)))
+                            .when(!self.management_backlog, |b| {
+                                b.bg(crate::chrome::color(0x255452))
+                            })
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.management_backlog = false;
                                 cx.notify();
@@ -944,7 +1112,9 @@ impl Wirecraft {
                     )
                     .child(
                         button("backlog", "Backlog")
-                            .when(self.management_backlog, |b| b.bg(rgb(0x255452)))
+                            .when(self.management_backlog, |b| {
+                                b.bg(crate::chrome::color(0x255452))
+                            })
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.management_backlog = true;
                                 cx.notify();
@@ -990,10 +1160,10 @@ impl Wirecraft {
                         .id(SharedString::from(id.clone()))
                         .p_3()
                         .border_b_1()
-                        .border_color(rgb(0x2d3947))
+                        .border_color(crate::chrome::color(0x2d3947))
                         .cursor_pointer()
-                        .when(selected, |b| b.bg(rgb(0x255452)))
-                        .hover(|s| s.bg(rgb(0x293846)))
+                        .when(selected, |b| b.bg(crate::chrome::color(0x255452)))
+                        .hover(|s| s.bg(crate::chrome::color(0x293846)))
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.archetype_selected = Some(id.clone());
                             this.archetype_preview = None;
@@ -1005,11 +1175,16 @@ impl Wirecraft {
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .child(a["name"].as_str().unwrap_or("").to_string()),
                         )
-                        .child(div().text_xs().text_color(rgb(0x9bb0c3)).child(format!(
-                            "{} entities · {}",
-                            a["nodes"],
-                            a["id"].as_str().unwrap_or("")
-                        ))),
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(crate::chrome::color(0x9bb0c3))
+                                .child(format!(
+                                    "{} entities · {}",
+                                    a["nodes"],
+                                    a["id"].as_str().unwrap_or("")
+                                )),
+                        ),
                 );
             }
         }
@@ -1044,7 +1219,7 @@ impl Wirecraft {
                     .flex_none()
                     .flex()
                     .flex_col()
-                    .bg(rgb(0x191f28))
+                    .bg(crate::chrome::color(0x191f28))
                     .child(
                         div()
                             .p_3()
@@ -1092,7 +1267,7 @@ impl Wirecraft {
                     .flex_1()
                     .p_3()
                     .rounded_md()
-                    .bg(rgb(0x1b2631))
+                    .bg(crate::chrome::color(0x1b2631))
                     .child(heading(key))
                     .child(format!(
                         "{} relationships · {cycles} cycles",
@@ -1101,16 +1276,17 @@ impl Wirecraft {
             );
         }
         let graph = self.report["graphs"][&self.analysis_layer].clone();
-        let ids: Vec<_> = self
-            .snapshot
-            .document
-            .nodes
-            .values()
-            .filter(|n| !n.is_link())
-            .map(|n| n.id.clone())
+        let ids: Vec<String> = report["nodeOrder"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|id| id.as_str().map(str::to_string))
+            .filter(|id| self.snapshot.document.nodes.contains_key(id))
             .collect();
         let matrix_ids = Arc::new(ids);
         let ids_for_rows = matrix_ids.clone();
+        let column_start = self.analysis_column.min(matrix_ids.len().saturating_sub(1));
+        let column_end = (column_start + 32).min(matrix_ids.len());
         let cells = uniform_list(
             "matrix-rows",
             matrix_ids.len(),
@@ -1132,7 +1308,12 @@ impl Wirecraft {
                                 )),
                         );
                         let adjacent = graph["adjacency"][&source].as_array();
-                        for (j, target) in ids_for_rows.iter().enumerate() {
+                        for (j, target) in ids_for_rows
+                            .iter()
+                            .enumerate()
+                            .take(column_end)
+                            .skip(column_start)
+                        {
                             let has = adjacent.is_some_and(|a| {
                                 a.iter().any(|id| id.as_str() == Some(target.as_str()))
                             });
@@ -1145,8 +1326,8 @@ impl Wirecraft {
                                     .flex_none()
                                     .text_center()
                                     .border_1()
-                                    .border_color(rgb(0x303f4b))
-                                    .bg(rgb(if has { 0x257e81 } else { 0x19242c }))
+                                    .border_color(crate::chrome::color(0x303f4b))
+                                    .bg(crate::chrome::color(if has { 0x257e81 } else { 0x19242c }))
                                     .cursor_pointer()
                                     .on_click(cx.listener(move |this, _, w, cx| {
                                         if has && !this.has_draft(cx) {
@@ -1173,12 +1354,17 @@ impl Wirecraft {
             }),
         )
         .h(px(260.))
-        .w(px(220. + matrix_ids.len() as f32 * 45.));
+        .w(px(220. + (column_end - column_start) as f32 * 45.));
         let mut header = div()
             .flex()
             .h(px(36.))
             .child(div().w(px(220.)).flex_none().child("Node / target →"));
-        for (i, id) in matrix_ids.iter().enumerate() {
+        for (i, id) in matrix_ids
+            .iter()
+            .enumerate()
+            .take(column_end)
+            .skip(column_start)
+        {
             header = header.child(
                 div()
                     .w(px(45.))
@@ -1193,13 +1379,55 @@ impl Wirecraft {
             );
         }
         let mut findings = div().flex().gap_3().p_3();
-        for category in ["principal", "error", "dependency"] {
+        for category in ["overview", "principal", "error", "dependency"] {
             let mut column = div()
                 .flex_1()
                 .flex()
                 .flex_col()
                 .gap_2()
                 .child(heading(&format!("{category} findings")));
+            for (i, metric) in report["indicators"][category]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .enumerate()
+            {
+                let ids = metric["affectedNodes"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|id| id.as_str().map(str::to_string))
+                    .collect::<BTreeSet<_>>();
+                column = column.child(
+                    div()
+                        .id(("metric", i))
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .p_1()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(crate::chrome::color(0x293846)))
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_xs()
+                                .child(metric["label"].as_str().unwrap_or("").to_string()),
+                        )
+                        .child(metric["value"].to_string())
+                        .on_click(cx.listener(move |this, _, w, cx| {
+                            if !this.has_draft(cx) && !ids.is_empty() {
+                                this.selected = ids.clone();
+                                this.parent = this.snapshot.document.root_node_id.clone();
+                                this.rebuild();
+                                this.tab = "Designer".into();
+                                this.fit(&Fit, w, cx);
+                                this.load_editor(w, cx);
+                                this.persist_ui(cx);
+                                cx.notify();
+                            }
+                        })),
+                );
+            }
             for (i, finding) in report["findings"]
                 .as_array()
                 .into_iter()
@@ -1220,8 +1448,8 @@ impl Wirecraft {
                             .p_3()
                             .rounded_md()
                             .border_1()
-                            .border_color(rgb(0x54604d))
-                            .bg(rgb(0x252b2a))
+                            .border_color(crate::chrome::color(0x54604d))
+                            .bg(crate::chrome::color(0x252b2a))
                             .child(format!(
                                 "{} · {}",
                                 finding["severity"].as_str().unwrap_or(""),
@@ -1251,7 +1479,7 @@ impl Wirecraft {
             {
                 column = column.child(
                     div()
-                        .text_color(rgb(0x92a8b8))
+                        .text_color(crate::chrome::color(0x92a8b8))
                         .child("No findings at the current thresholds."),
                 );
             }
@@ -1278,6 +1506,43 @@ impl Wirecraft {
             )
             .child(metrics)
             .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .px_3()
+                    .items_center()
+                    .child(
+                        button("matrix-prev", "Previous columns").on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.analysis_column = this.analysis_column.saturating_sub(32);
+                                cx.notify();
+                            },
+                        )),
+                    )
+                    .child(format!(
+                        "Columns {}–{} of {} · rows are virtualized",
+                        column_start + 1,
+                        column_end,
+                        matrix_ids.len()
+                    ))
+                    .child(button("matrix-next", "Next columns").on_click(cx.listener(
+                        |this, _, _, cx| {
+                            if this.analysis_column + 32
+                                < this
+                                    .snapshot
+                                    .document
+                                    .nodes
+                                    .values()
+                                    .filter(|n| !n.is_link())
+                                    .count()
+                            {
+                                this.analysis_column += 32;
+                            }
+                            cx.notify();
+                        },
+                    ))),
+            )
+            .child(
                 div().flex().gap_2().px_3().children(
                     [
                         ("principal", "Principal data"),
@@ -1288,7 +1553,9 @@ impl Wirecraft {
                     .into_iter()
                     .map(|(key, label)| {
                         button(key, label)
-                            .when(self.analysis_layer == key, |b| b.bg(rgb(0x255452)))
+                            .when(self.analysis_layer == key, |b| {
+                                b.bg(crate::chrome::color(0x255452))
+                            })
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.analysis_layer = key.into();
                                 cx.notify();
@@ -1330,7 +1597,7 @@ fn heading(text: &str) -> AnyElement {
         .py_2()
         .text_xs()
         .font_weight(FontWeight::SEMIBOLD)
-        .text_color(rgb(0x70d5c6))
+        .text_color(crate::chrome::color(0x70d5c6))
         .child(text.to_uppercase())
         .into_any_element()
 }
@@ -1343,7 +1610,7 @@ fn field_row(label: &str, input: AnyElement) -> AnyElement {
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0xa0b0c0))
+                .text_color(crate::chrome::color(0xa0b0c0))
                 .child(label.to_string()),
         )
         .child(input)
@@ -1357,7 +1624,7 @@ fn read_row(label: &str, value: String) -> AnyElement {
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(0x8496a5))
+                .text_color(crate::chrome::color(0x8496a5))
                 .child(label.to_string()),
         )
         .child(div().text_xs().child(value))

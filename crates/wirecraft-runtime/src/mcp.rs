@@ -59,7 +59,27 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                 .any(|t| t["name"] == name);
             let operation = if known {
                 let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
-                if name == "wirecraft.language_server" || name == "wirecraft.build" {
+                if name == "wirecraft.workbench" {
+                    let operation = arguments["operation"].as_str().unwrap_or("");
+                    let command = match operation {
+                        "preview_archetype" => "archetypes.preview",
+                        "preview_export" => "export.preview",
+                        "export" => "export.write",
+                        "prepare_ai_prompt" => "ai.prompt",
+                        "settings" => "settings.get",
+                        "replace_settings" => "settings.replace",
+                        "mcp_status" => "mcp.status",
+                        "set_mcp_enabled" => "mcp.set_enabled",
+                        "list_printers" => "printers.list",
+                        "print" => "print.submit",
+                        _ => "unsupported.workbench",
+                    };
+                    app.execute(Request::new(
+                        command,
+                        arguments.get("arguments").cloned().unwrap_or(json!({})),
+                    ))
+                    .await
+                } else if name == "wirecraft.language_server" || name == "wirecraft.build" {
                     let prefix = if name == "wirecraft.build" {
                         "jobs"
                     } else {

@@ -815,6 +815,36 @@
         },
         "additionalProperties": false
       }
+    },
+    {
+      "name": "wirecraft.workbench",
+      "description": "Shared workbench services: archetype/export preview, technical sheets and documentation, clipboard task prompts, settings, MCP controls and optional CUPS printing. Printing is a mutating external operation and must be explicitly requested.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "preview_archetype",
+              "preview_export",
+              "export",
+              "prepare_ai_prompt",
+              "settings",
+              "replace_settings",
+              "mcp_status",
+              "set_mcp_enabled",
+              "list_printers",
+              "print"
+            ]
+          },
+          "arguments": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      }
     }
   ]
 }

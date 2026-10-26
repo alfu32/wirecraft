@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   result=subprocess.run(['xdotool',*map(str,args)],env=env,text=True,capture_output=True)
   if result.returncode and args[-1]!='ctrl+q':raise subprocess.CalledProcessError(result.returncode,result.args,result.stdout,result.stderr)
   return result.stdout.strip()
- def caption():return subprocess.check_output(['import','-window',window,'-crop','300x32+620+98','rgba:-'],env=env)
+ def caption():return subprocess.check_output(['import','-window',window,'-crop','300x32+770+132','rgba:-'],env=env)
  def choose_mode(x,y):
   before=caption();until=time.monotonic()+8
   while time.monotonic()<until:
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   time.sleep(1)
   subprocess.run(['import','-window',window,str(artifact/'initial.png')],env=env,check=True)
   # Node mode button then two canvas positions; never addresses Threadworks' display.
-  choose_mode(370,114)
+  choose_mode(395,148)
   xd('mousemove','--window',window,450,300);xd('click',1)
   wait_for(lambda:state.joinpath('recovery.json').exists())
   recovery=lambda:json.loads(state.joinpath('recovery.json').read_text())
@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   subprocess.run(['import','-window',window,str(artifact/'canvas.png')],env=env,check=True)
   # Synthetic clicks are paced across frames; completion is checked in persisted state.
   wait_for(lambda:json.loads(state.joinpath('ui.json').read_text()).get('draft') is None)
-  choose_mode(483,114)
+  choose_mode(570,148)
   xd('mousemove','--window',window,530,350);xd('click',1);time.sleep(.2)
   xd('mousemove','--window',window,800,470);xd('click',1)
   wait_for(lambda:sum(n['kind']=='Link' for n in recovery()['document']['nodes'].values())==1)
@@ -69,7 +69,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   xd('mousemove','--window',window,530,350);xd('click',1)
   subprocess.run(['import','-window',window,str(artifact/'canvas.png')],env=env,check=True)
   # A draft must survive process exit and recovery without being silently applied.
-  xd('mousemove','--window',window,132,70);xd('click',1)
+  xd('mousemove','--window',window,165,102);xd('click',1)
   time.sleep(.3)
   subprocess.run(['import','-window',window,str(artifact/'editor.png')],env=env,check=True)
   xd('mousemove','--window',window,450,280);xd('click',1)
@@ -85,10 +85,10 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   window=wait_for(lambda:xd('search','--onlyvisible','--pid',app.pid).splitlines()[0])
   assert int(xd('getwindowpid',window))==app.pid
   time.sleep(.7);xd('windowfocus','--sync',window)
-  xd('mousemove','--window',window,1320,116);xd('click',1)
+  xd('mousemove','--window',window,950,150);xd('click',1)
   wait_for(lambda:any(n['text']['source']=='int main(void) { return missing; }' for n in recovery()['document']['nodes'].values()))
   # Tool output is visually recorded; real LSP result assertions also run in cargo tests.
-  xd('mousemove','--window',window,650,70);xd('click',1);time.sleep(.2)
+  xd('mousemove','--window',window,781,102);xd('click',1);time.sleep(.2)
   subprocess.run(['import','-window',window,str(artifact/'tools.png')],env=env,check=True)
   # Inspect only the backend child launched by this owned desktop.
   backend_pid=int(subprocess.check_output(['pgrep','-P',str(app.pid)],text=True).splitlines()[0])
@@ -103,16 +103,16 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   def api(command):
    request=urllib.request.Request(f'http://127.0.0.1:{port}/api',json.dumps({'command':command,'arguments':{}}).encode(),{'Content-Type':'application/json','Authorization':f'Bearer {token}'})
    with urllib.request.urlopen(request,timeout=5) as response:return json.load(response)['result']
-  xd('mousemove','--window',window,300,167);xd('click',1)
+  xd('mousemove','--window',window,300,199);xd('click',1)
   diagnostics=wait_for(lambda:next((d for d in api('lsp.diagnostics').values() if any('missing' in e.get('message','') for e in d.get('diagnostics',[]))),None))
   lsp_pid=api('lsp.status')['pid'];assert lsp_pid
-  xd('mousemove','--window',window,530,167);xd('click',1)
+  xd('mousemove','--window',window,530,199);xd('click',1)
   wait_for(lambda:any(j['status']=='failed' and 'missing' in j.get('stderr','') for j in api('jobs.list')['jobs']))
-  xd('mousemove','--window',window,930,167);xd('click',1)
+  xd('mousemove','--window',window,930,199);xd('click',1)
   mapped=wait_for(lambda:next((d for d in api('editor.generated_diagnostics')['diagnostics'] if d.get('source') and d['source']['section']=='source'),None))
   generated_pid=api('editor.generated_diagnostics')['pid'];assert generated_pid
   time.sleep(.3)
-  xd('mousemove','--window',window,550,220);xd('click',1)
+  xd('mousemove','--window',window,550,252);xd('click',1)
   wait_for(lambda:json.loads(state.joinpath('ui.json').read_text()).get('tab')=='Editor')
   subprocess.run(['import','-window',window,str(artifact/'tools.png')],env=env,check=True)
   xd('key','ctrl+q');app.wait(timeout=10)

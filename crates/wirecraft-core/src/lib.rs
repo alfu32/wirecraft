@@ -10,3 +10,9 @@ pub mod fragment;
 pub mod generation;
 
 pub mod drawing;
+
+pub mod sheets;
+
+pub mod documentation;
+
+pub mod assistance;

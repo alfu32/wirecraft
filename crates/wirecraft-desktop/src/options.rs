@@ -1,5 +1,6 @@
 //! Editable settings are staged until Save; persistence is an application service.
 use super::*;
+use gpui_component::Colorize;
 use wirecraft_runtime::config::Settings;
 pub struct OptionsEditor {
     pub saved: Settings,
@@ -11,6 +12,7 @@ pub struct OptionField {
     pub label: String,
     pub input: Entity<InputState>,
     numeric: bool,
+    picker: Option<Entity<gpui_component::color_picker::ColorPickerState>>,
 }
 impl OptionsEditor {
     pub fn new(saved: Settings, w: &mut Window, cx: &mut Context<Wirecraft>) -> Self {
@@ -80,7 +82,37 @@ impl OptionsEditor {
                     s.set_value(text, w, cx);
                     s
                 });
+                let picker = if path.starts_with("/appearance/colors/") {
+                    let text = input.read(cx).value();
+                    let color = Hsla::parse_hex(&text).unwrap_or_default();
+                    let picker = cx.new(|cx| {
+                        gpui_component::color_picker::ColorPickerState::new(w, cx)
+                            .default_value(color)
+                    });
+                    let field = input.clone();
+                    cx.subscribe_in(
+                        &picker,
+                        w,
+                        move |_,
+                              _,
+                              event: &gpui_component::color_picker::ColorPickerEvent,
+                              w,
+                              cx| {
+                            let gpui_component::color_picker::ColorPickerEvent::Change(color) =
+                                event;
+                            if let Some(color) = color {
+                                field.update(cx, |s, cx| s.set_value(color.to_hex(), w, cx));
+                            }
+                            cx.notify();
+                        },
+                    )
+                    .detach();
+                    Some(picker)
+                } else {
+                    None
+                };
                 OptionField {
+                    picker,
                     path,
                     label,
                     input,
@@ -108,6 +140,18 @@ impl OptionsEditor {
                 .pointer_mut(&f.path)
                 .ok_or_else(|| format!("Missing option {}", f.path))? = val;
         }
+        if value["appearance"]["theme"].as_str() != Some(self.saved.appearance.theme.as_str())
+            && value["appearance"]["colors"]
+                == serde_json::to_value(&self.saved.appearance.colors).unwrap()
+        {
+            value["appearance"]["colors"] =
+                serde_json::to_value(if value["appearance"]["theme"] == "light" {
+                    wirecraft_runtime::config::Appearance::light_colors()
+                } else {
+                    wirecraft_runtime::config::Appearance::default().colors
+                })
+                .unwrap();
+        }
         let settings: Settings =
             serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
         settings.validate().map_err(|e| e.to_string())?;
@@ -118,6 +162,7 @@ impl Wirecraft {
     pub(super) fn apply_settings(&mut self, value: Value, w: &mut Window, cx: &mut Context<Self>) {
         if let Ok(settings) = serde_json::from_value::<Settings>(value) {
             self.options = OptionsEditor::new(settings.clone(), w, cx);
+            crate::chrome::set_light(settings.appearance.theme == "light");
             Theme::change(
                 if settings.appearance.theme == "light" {
                     ThemeMode::Light
@@ -165,7 +210,9 @@ impl Wirecraft {
         for label in ["General", "Flow Designer colors", "Inference Providers"] {
             tabs = tabs.child(
                 button(label, label)
-                    .when(self.options.tab == label, |b| b.bg(rgb(0x255452)))
+                    .when(self.options.tab == label, |b| {
+                        b.bg(crate::chrome::color(0x255452))
+                    })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.options.tab = label;
                         cx.notify();
@@ -196,11 +243,14 @@ impl Wirecraft {
                     .items_center()
                     .gap_4()
                     .child(div().w(px(310.)).flex_none().child(f.label.clone()))
-                    .child(div().w(px(380.)).child(Input::new(&f.input))),
+                    .child(div().w(px(380.)).child(Input::new(&f.input)))
+                    .when_some(f.picker.as_ref(), |b, picker| {
+                        b.child(gpui_component::color_picker::ColorPicker::new(picker))
+                    }),
             );
         }
         if self.options.tab == "Inference Providers" {
-            form=form.child(div().p_3().max_w(px(720.)).text_color(rgb(0x92a8b8)).child("Clipboard is the default. Network providers run only when an AI command is invoked. Store the token in an environment variable and enter its name here; Wirecraft does not import Threadworks credentials. Browser authorization was unimplemented in the reference application."));
+            form=form.child(div().p_3().max_w(px(720.)).text_color(crate::chrome::color(0x92a8b8)).child("Clipboard is the implemented provider: AI actions copy a complete task prompt and component dossier. Claude, Codex, ChatGPT and Ollama inference and browser authorization are unimplemented in the reference application. Their configuration is retained for future adapters; choosing one currently returns an explicit unsupported error. Tokens are referenced by environment-variable name; old credentials are never imported."));
         }
         div()
             .flex()
@@ -251,7 +301,7 @@ impl Wirecraft {
             .min_h_0()
             .overflow_y_scroll()
             .p_3()
-            .bg(rgb(0x10161e));
+            .bg(crate::chrome::color(0x10161e));
         for (i, row) in self.mcp_status["log"]
             .as_array()
             .into_iter()
@@ -273,10 +323,11 @@ impl Wirecraft {
                     )),
             );
         }
-        div().flex().flex_col().flex_1().min_h_0().p_4().gap_3().child(div().text_lg().text_color(rgb(0x70d5c6)).child(if self.mcp_status["enabled"]==false{"MCP SERVER: OFF"}else{"MCP SERVER: ON"}))
+        div().flex().flex_col().flex_1().min_h_0().p_4().gap_3().child(div().text_lg().text_color(crate::chrome::color(0x70d5c6)).child(if self.mcp_status["enabled"]==false{"MCP SERVER: OFF"}else{"MCP SERVER: ON"}))
             .child(div().child(format!("MCP endpoint: {}/mcp",self.endpoint))).child(div().child(format!("Health endpoint: {}/health",self.endpoint)))
-            .child(div().flex().gap_2().child(button("start-mcp","Start").on_click(cx.listener(|this,_,_,_|this.client.send("mcp.set_enabled",json!({"enabled":true}))))).child(button("stop-mcp","Stop").on_click(cx.listener(|this,_,_,_|this.client.send("mcp.set_enabled",json!({"enabled":false}))))).child(button("health-mcp","Check health / Refresh log").on_click(cx.listener(|this,_,_,_|{this.tool("system.health");this.tool("mcp.status");}))).child(button("copy-mcp","Copy client configuration").on_click(move|_,_,cx|cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string_pretty(&config).unwrap())))))
-            .child(div().text_color(rgb(0x91a5b7)).child("HTTP access log · latest 256 requests · bodies and credentials are never logged")).child(log)
+            .child(div().flex().gap_2().child(button("start-mcp","Start").on_click(cx.listener(|this,_,_,_|this.client.send("mcp.set_enabled",json!({"enabled":true}))))).child(button("stop-mcp","Stop").on_click(cx.listener(|this,_,_,_|this.client.send("mcp.set_enabled",json!({"enabled":false}))))).child(button("restart-mcp","Restart MCP").on_click(cx.listener(|this,_,_,_|{this.client.send("mcp.set_enabled",json!({"enabled":false}));this.client.send("mcp.set_enabled",json!({"enabled":true}));})))
+                .child(button("health-mcp","Check health / Refresh log").on_click(cx.listener(|this,_,_,_|{this.tool("system.health");this.tool("mcp.status");}))).child(button("copy-mcp","Copy client configuration").on_click(move|_,_,cx|cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string_pretty(&config).unwrap())))))
+            .child(div().text_color(crate::chrome::color(0x91a5b7)).child("HTTP access log · latest 256 requests · bodies and credentials are never logged")).child(log)
             .child(div().text_xs().child("Stop disables MCP requests while the desktop remains connected to its backend. Closing this desktop stops its owned backend and tools. The original Threadworks server runs independently.")).into_any_element()
     }
 }

@@ -7524,6 +7524,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
+ "base64 0.22.1",
  "gpui",
  "gpui-component",
  "libc",
@@ -7547,6 +7548,7 @@ dependencies = [
  "base64 0.22.1",
  "futures",
  "libc",
+ "pdf-writer",
  "quick-xml",
  "reqwest",
  "resvg",

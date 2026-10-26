@@ -73,6 +73,34 @@ impl Default for Appearance {
     }
 }
 impl Appearance {
+    pub fn light_colors() -> BTreeMap<String, String> {
+        let mut colors = Self::default().colors;
+        for (key, value) in [
+            ("canvasBackground", "#F7F9FB"),
+            ("gridMinor", "#E1E7ED"),
+            ("gridMajor", "#C9D4DF"),
+            ("nodeFill", "#FFFFFF"),
+            ("nodeStroke", "#334E68"),
+            ("typeFill", "#E3F4EF"),
+            ("typeStroke", "#178C7C"),
+            ("typeText", "#168B59"),
+            ("libraryFill", "#F1F2FF"),
+            ("libraryStroke", "#626BD5"),
+            ("errorFill", "#FFF2F2"),
+            ("errorStroke", "#BD5555"),
+            ("testFill", "#EFFAF2"),
+            ("testStroke", "#3D995A"),
+            ("textPrimary", "#243B53"),
+            ("textSecondary", "#526B7C"),
+            ("textMuted", "#6C8292"),
+            ("selection", "#188C80"),
+            ("linkDefault", "#334E68"),
+            ("linkDependency", "#A77A2C"),
+        ] {
+            colors.insert(key.into(), value.into());
+        }
+        colors
+    }
     pub fn color(&self, key: &str, fallback: u32) -> u32 {
         self.colors
             .get(key)

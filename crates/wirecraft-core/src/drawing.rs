@@ -95,6 +95,7 @@ impl Drawing {
                         f["typeId"]
                             .as_str()
                             .or_else(|| f["typeName"].as_str())
+                            .map(|id| d.nodes.get(id).map(|n| n.name.as_str()).unwrap_or(id))
                             .unwrap_or("?")
                     )
                 })

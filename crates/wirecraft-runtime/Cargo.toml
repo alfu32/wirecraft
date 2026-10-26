@@ -25,6 +25,7 @@ tempfile = "3"
 base64 = "0.22"
 resvg = "0.45.1"
 svg2pdf = "0.13.0"
+pdf-writer = "0.12.1"
 
 [dev-dependencies]
 tempfile = "3"

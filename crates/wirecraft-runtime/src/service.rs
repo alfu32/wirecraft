@@ -281,6 +281,14 @@ impl Service {
                     wirecraft_core::fragment::Fragment::copy(&self.document, &ids)?,
                 )?);
             }
+            "ai.prompt" => {
+                let ids: Vec<String> = serde_json::from_value(a["nodeIds"].clone())?;
+                return wirecraft_core::assistance::prompt(
+                    &self.document,
+                    &ids,
+                    required(a, "task")?,
+                );
+            }
             "analysis.report" => return Ok(wirecraft_core::analysis::report(&self.document)),
             "archetypes.list" => return Ok(crate::archetypes::list()),
             "archetypes.preview" => {
@@ -299,6 +307,63 @@ impl Service {
                     store::atomic_write(Path::new(path), markdown.as_bytes())?;
                 }
                 return Ok(json!({"markdown":markdown}));
+            }
+            "export.preview" | "export.write" => {
+                let parent = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
+                let documentation = a["kind"] == "documentation";
+                let format = a["format"].as_str().unwrap_or("pdf");
+                if r.command == "export.write"
+                    && documentation
+                    && ["html", "markdown"].contains(&format)
+                {
+                    let text = if format == "html" {
+                        wirecraft_core::documentation::html(&self.document, parent)?
+                    } else {
+                        wirecraft_core::documentation::markdown_document(&self.document, parent)?
+                    };
+                    store::atomic_write(Path::new(required(a, "path")?), text.as_bytes())?;
+                    return Ok(json!({"exported":true,"format":format,"path":a["path"]}));
+                }
+                if r.command == "export.write" && format == "mermaid" {
+                    let text = wirecraft_core::export::mermaid(&self.document, parent)?;
+                    store::atomic_write(Path::new(required(a, "path")?), text.as_bytes())?;
+                    return Ok(json!({"exported":true,"path":a["path"]}));
+                }
+                let (pages, summary) = if documentation {
+                    let options =
+                        serde_json::from_value(a.get("options").cloned().unwrap_or(json!({})))?;
+                    (
+                        wirecraft_core::documentation::pages(&self.document, parent, &options)?,
+                        json!({"kind":"documentation"}),
+                    )
+                } else {
+                    let options =
+                        serde_json::from_value(a.get("options").cloned().unwrap_or(json!({})))?;
+                    let plan = wirecraft_core::sheets::plan(&self.document, parent, &options)?;
+                    let summary = json!({"format":plan.format,"widthMm":plan.width_mm,"heightMm":plan.height_mm,"rows":plan.rows,"columns":plan.columns});
+                    (plan.pages, summary)
+                };
+                if r.command == "export.write" {
+                    crate::export::pages_with_mode(
+                        &pages,
+                        Path::new(required(a, "path")?),
+                        format,
+                        a["rasterized"].as_bool().unwrap_or(false),
+                    )?;
+                    return Ok(
+                        json!({"exported":true,"path":a["path"],"pages":pages.len(),"summary":summary}),
+                    );
+                }
+                let page = a["page"].as_u64().unwrap_or(0) as usize;
+                let svg = pages
+                    .get(page)
+                    .ok_or_else(|| Error::new("invalid_input", "Preview page out of range"))?;
+                use base64::Engine;
+                let png = base64::engine::general_purpose::STANDARD
+                    .encode(crate::export::thumbnail(svg)?);
+                return Ok(
+                    json!({"pngBase64":png,"svg":svg,"page":page,"pages":pages.len(),"summary":summary,"generation":a["generation"],"revision":self.revision}),
+                );
             }
             "export.diagram" => {
                 let parent = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);

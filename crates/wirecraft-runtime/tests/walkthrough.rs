@@ -168,3 +168,130 @@ async fn settings_are_validated_persisted_and_mcp_can_stop_without_stopping_ui()
         .unwrap();
     server.await.unwrap();
 }
+
+#[test]
+fn technical_sheets_and_documentation_export_real_paginated_content() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut service = Service::new(Document::new("Walkthrough Report"), None);
+    service.execute(Request::new("threadwork.create_entity",json!({"name":"Far Worker","attributes":{"layout":{"x":2500.,"y":300.},"text":{"source":"int value = 42;","specification":"Returns a value & preserves <constraints>."}}}))).unwrap();
+    let options = json!({"format":"A4","scale":1,"split":true,"overlapMm":5.});
+    let preview = service
+        .execute(Request::new(
+            "export.preview",
+            json!({"options":options,"generation":17}),
+        ))
+        .unwrap();
+    assert!(preview["pages"].as_u64().unwrap() > 1);
+    assert_eq!(preview["generation"], 17);
+    use base64::Engine;
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(preview["pngBase64"].as_str().unwrap())
+        .unwrap();
+    assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert!(u32::from_be_bytes(png[16..20].try_into().unwrap()) <= 1200);
+    assert!(u32::from_be_bytes(png[20..24].try_into().unwrap()) <= 1200);
+    assert!(preview["svg"].as_str().unwrap().contains("210mm"));
+    let path = temp.path().join("poster.pdf");
+    let result = service
+        .execute(Request::new(
+            "export.write",
+            json!({"options":options,"format":"pdf","path":path}),
+        ))
+        .unwrap();
+    assert_eq!(result["pages"], preview["pages"]);
+    assert!(std::fs::read(&path).unwrap().starts_with(b"%PDF"));
+    if let Ok(info) = std::process::Command::new("pdfinfo").arg(&path).output() {
+        assert!(info.status.success());
+        let text = String::from_utf8_lossy(&info.stdout);
+        let count = text
+            .lines()
+            .find(|l| l.starts_with("Pages:"))
+            .unwrap()
+            .split_whitespace()
+            .last()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
+        assert_eq!(count, preview["pages"].as_u64().unwrap());
+        assert!(text.contains("595.276"), "{text}");
+    }
+    let svg_path = temp.path().join("poster.svg");
+    assert!(
+        service
+            .execute(Request::new(
+                "export.write",
+                json!({"options":options,"format":"svg","path":svg_path})
+            ))
+            .is_err()
+    );
+    assert!(!svg_path.exists());
+    for format in ["html", "markdown", "pdf"] {
+        let path = temp.path().join(format!("docs.{format}"));
+        service.execute(Request::new("export.write",json!({"kind":"documentation","options":{"format":"A4"},"format":format,"path":path}))).unwrap();
+        if format != "pdf" {
+            let text = std::fs::read_to_string(&path).unwrap();
+            assert!(text.contains("Far Worker"));
+            if format == "html" {
+                assert!(text.contains("&amp; preserves &lt;constraints&gt;"));
+            }
+        }
+    }
+    let preview = service
+        .execute(Request::new(
+            "export.preview",
+            json!({"kind":"documentation","options":{}}),
+        ))
+        .unwrap();
+    assert!(
+        preview["svg"]
+            .as_str()
+            .unwrap()
+            .contains("Functional and Technical Specification")
+    );
+}
+
+#[test]
+fn clipboard_assistance_contains_task_types_authored_text_and_compiler_contract() {
+    let mut d = Document::new("Assistance");
+    let id = d
+        .create("root", "Worker", wirecraft_core::NodeKind::Processor)
+        .unwrap();
+    d.patch(&id,&json!({"text":{"specification":"Preserve six backticks: ``````","source":"int actual = 7;","testsLanguageId":"json"},"technology":{"languageId":"c","technologyId":"c-native"}})).unwrap();
+    for task in ["source", "specification", "tests"] {
+        let result =
+            wirecraft_core::assistance::prompt(&d, std::slice::from_ref(&id), task).unwrap();
+        let text = result["prompt"].as_str().unwrap();
+        assert!(text.contains("int actual = 7;"));
+        assert!(text.contains("```````markdown"));
+        assert_eq!(result["section"], task);
+        if task == "source" {
+            assert!(text.contains("threadwork_buffer_count"));
+        }
+    }
+    assert!(wirecraft_core::assistance::prompt(&d, &[], "source").is_err());
+}
+
+#[test]
+fn raster_pdf_embeds_an_image_and_vector_pdf_keeps_searchable_text() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut s = Service::new(Document::new("SearchableTitle"), None);
+    let vector = temp.path().join("vector.pdf");
+    let raster = temp.path().join("raster.pdf");
+    for (path, rasterized) in [(&vector, false), (&raster, true)] {
+        s.execute(Request::new("export.write",json!({"options":{"format":"A4","scale":2},"format":"pdf","path":path,"rasterized":rasterized}))).unwrap();
+    }
+    let bytes = std::fs::read(&raster).unwrap();
+    assert!(
+        bytes
+            .windows(b"/Subtype /Image".len())
+            .any(|w| w == b"/Subtype /Image")
+    );
+    if let Ok(output) = std::process::Command::new("pdftotext")
+        .arg(&vector)
+        .arg("-")
+        .output()
+    {
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stdout).contains("SearchableTitle"));
+    }
+}
