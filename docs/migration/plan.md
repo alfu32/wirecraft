@@ -9,3 +9,7 @@
 7. Configuration migration/install/package: explicit config import, Linux package and CI, available-platform smoke. Acceptance: install into temporary prefix, launch both modes and connect MCP. Cross-platform claims only after platform builds.
 
 Keep each stage runnable. This is a large migration; incomplete features remain in parity.md and the exact next step in status.md. Reorder services before desktop polish when that makes behavior independently testable.
+
+## Milestone checkpoint
+
+0.1.0: runnable domain/backend/GPUI vertical slice, compatibility and live MCP baseline. 0.2.0: archetypes, fragments/layout, reports, exports, explicit settings import and verified Linux installation. 0.3.0: typed C17 graph-to-source/native execution and generated clangd diagnostics with editor navigation. These milestones have observable integration and owned-desktop checks recorded in status.md; they do not imply full parity. Next dependencies are C source capabilities/template overrides, remaining language compilers and editor/tool interactions, then full sheets/project/identity/AI/platform fidelity. The headless services were built before UI polish to enable real contract and process verification throughout.

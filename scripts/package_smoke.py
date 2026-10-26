@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Install an owned archive into a temporary prefix and exercise real binary contracts."""
-import json,os,pathlib,select,subprocess,sys,tempfile,urllib.request,uuid
+import json,os,pathlib,select,subprocess,sys,tempfile,time,urllib.request,uuid
 root=pathlib.Path(__file__).resolve().parent.parent
 archive=pathlib.Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
@@ -29,11 +29,28 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
   saved=rpc('tools/call',{'name':'wirecraft.save_project','arguments':{}});assert not saved['result']['isError']
   exported=rpc('tools/call',{'name':'wirecraft.export_diagram','arguments':{'path':str(tmp/'diagram.pdf'),'format':'pdf'}});assert not exported['result']['isError']
   assert (tmp/'diagram.pdf').read_bytes().startswith(b'%PDF')
+  node_id=created['result']['structuredContent']['entity']['id']
+  edited=rpc('tools/call',{'name':'threadwork.update_entity','arguments':{'nodeId':node_id,'patch':{'text':{'source':'threadwork_runner__shutdown_request(&threadwork_runner);'}}}});assert not edited['result']['isError']
+  generated_dir=tmp/'generated-c17'
+  compiled=rpc('tools/call',{'name':'wirecraft.compile_c17','arguments':{'outputDir':str(generated_dir)}});assert not compiled['result']['isError']
+  translation=generated_dir/compiled['result']['structuredContent']['files'][0]['path'];executable=tmp/'generated-network'
+  def build(executable,args):
+   started=rpc('tools/call',{'name':'wirecraft.build','arguments':{'operation':'start','arguments':{'executable':str(executable),'args':list(map(str,args)),'cwd':str(tmp),'timeoutSeconds':5}}});assert not started['result']['isError']
+   job_id=started['result']['structuredContent']['id'];until=time.monotonic()+10
+   while time.monotonic()<until:
+    polled=rpc('tools/call',{'name':'wirecraft.build','arguments':{'operation':'get','arguments':{'id':job_id}}});assert not polled['result']['isError']
+    state=polled['result']['structuredContent']
+    if state['status']!='running':assert state['status']=='succeeded',state;return
+    time.sleep(.02)
+   raise TimeoutError('packaged compiler job')
+  build('clang',['-std=c17',translation,'-o',executable]);build(executable,[])
+  analyzed=rpc('tools/call',{'name':'wirecraft.analyze_c17','arguments':{}});assert not analyzed['result']['isError']
+  assert all(d['severity']!=1 for d in analyzed['result']['structuredContent']['diagnostics'])
   call('/api',{'command':'system.shutdown','arguments':{}});app.wait(timeout=10);assert app.returncode==0
   assert json.loads(subprocess.check_output([str(backend),'validate',str(project)],text=True))['nodes']==2
   if '--desktop' in sys.argv[2:]:
    env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
    subprocess.run([sys.executable,str(root/'scripts/desktop_smoke.py')],env=env,check=True)
-  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'installedDesktop':'--desktop' in sys.argv[2:]}))
+  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'nativeC17Graph':True,'generatedClangd':True,'installedDesktop':'--desktop' in sys.argv[2:]}))
  finally:
   if app.poll() is None:app.terminate();app.wait(timeout=10)

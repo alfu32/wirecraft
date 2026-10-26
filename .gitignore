@@ -3,3 +3,4 @@
 *.tmp
 .wirecraft-session.json
 .idea/
+__pycache__/
