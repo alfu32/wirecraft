@@ -30,3 +30,9 @@ Each slice must remain runnable. Test meaningful mutations and failure cases thr
 
 - Reference indexing complete: 20 images visually inspected, renamed in capture order, exact bytes preserved with SHA-256. Source application remains untouched.
 - Implementation slices pending in this branch after v0.3.0.
+
+### Workbench slice
+
+Implemented menus and searchable command palette, native stroke icons, structured general/management/language/link inspector with explicit Apply and advanced JSON, six-lane Kanban/backlog with drag/drop and transactional status changes, read-only archetype preview plus explicit insertion, and virtual-row adjacency matrices with endpoint/findings navigation. Core report now separates structural relationship union from containment. Source column status names and null backlog behavior were checked in ProjectManagementPanel.kt.
+
+Checks: workspace tests passed (38 integration tests); strict clippy passed after collapsing a nested preview conditional; GPUI built and an owned temporary-state window launched/captured/closed successfully (`target/walkthrough-smoke/initial.png`). Full interactive board/editor regression remains the next acceptance gate. Options, sheet/detail fidelity and provider actions are still pending.

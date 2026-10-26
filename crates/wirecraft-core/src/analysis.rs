@@ -190,7 +190,7 @@ impl Graph {
         cycles
     }
     fn summary(&self) -> Value {
-        json!({"edges":self.out.values().map(BTreeSet::len).sum::<usize>(),"links":self.links,"cycles":self.cycles(),"degrees":self.out.iter().map(|(id,row)|json!({"nodeId":id,"fanOut":row.len(),"fanIn":self.incoming[id].len()})).collect::<Vec<_>>()})
+        json!({"edges":self.out.values().map(BTreeSet::len).sum::<usize>(),"links":self.links,"adjacency":self.out,"cycles":self.cycles(),"degrees":self.out.iter().map(|(id,row)|json!({"nodeId":id,"fanOut":row.len(),"fanIn":self.incoming[id].len()})).collect::<Vec<_>>()})
     }
 }
 pub fn report(d: &Document) -> Value {
@@ -204,9 +204,11 @@ pub fn report(d: &Document) -> Value {
     let mut error = Graph::new(&ids);
     let mut dependency = Graph::new(&ids);
     let mut structural = Graph::new(&ids);
+    let mut containment = Graph::new(&ids);
     let mut findings = vec![];
     for n in d.nodes.values() {
         if let Some(l) = &n.link {
+            structural.add(&n.id, &l.source_node_id, &l.target_node_id);
             match relation(d, n) {
                 Some(Relation::Principal) => {
                     principal.add(&n.id, &l.source_node_id, &l.target_node_id)
@@ -216,7 +218,7 @@ pub fn report(d: &Document) -> Value {
                 _ => {}
             }
         } else if let Some(parent) = &n.parent_id {
-            structural.add(&n.id, parent, &n.id);
+            containment.add(&n.id, parent, &n.id);
         }
     }
     for (kind, graph) in [("principal", &principal), ("dependency", &dependency)] {
@@ -272,5 +274,5 @@ pub fn report(d: &Document) -> Value {
         }
         components.push(component);
     }
-    json!({"counts":d.network_counts(),"graphs":{"principal":principal.summary(),"error":error.summary(),"dependency":dependency.summary(),"structural":structural.summary()},"isolatedNodes":isolated,"connectedComponents":components,"classifications":d.nodes.values().map(|n|json!({"nodeId":n.id,"stereotype":stereotype(d,n),"relation":relation(d,n)})).collect::<Vec<_>>(),"findings":findings,"limitations":["Layout optimization and actionable navigation are not yet ported.","Threshold defaults are currently fixed at fan-out 8."]})
+    json!({"counts":d.network_counts(),"graphs":{"principal":principal.summary(),"error":error.summary(),"dependency":dependency.summary(),"structural":structural.summary(),"containment":containment.summary()},"isolatedNodes":isolated,"connectedComponents":components,"classifications":d.nodes.values().map(|n|json!({"nodeId":n.id,"stereotype":stereotype(d,n),"relation":relation(d,n)})).collect::<Vec<_>>(),"findings":findings,"limitations":["Layout optimization is not yet ported.","Threshold defaults are currently fixed at fan-out 8."]})
 }

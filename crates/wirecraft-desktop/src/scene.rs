@@ -66,6 +66,39 @@ impl Scene {
         }
         s
     }
+    pub fn fitted(&self, size: [f64; 2]) -> Viewport {
+        if self.nodes.is_empty() {
+            return Viewport::default();
+        }
+        let min_x = self
+            .nodes
+            .values()
+            .map(|n| n.2.x)
+            .fold(f64::INFINITY, f64::min);
+        let min_y = self
+            .nodes
+            .values()
+            .map(|n| n.2.y)
+            .fold(f64::INFINITY, f64::min);
+        let max_x = self
+            .nodes
+            .values()
+            .map(|n| n.2.x + n.2.width)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let max_y = self
+            .nodes
+            .values()
+            .map(|n| n.2.y + n.2.height)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let zoom = ((size[0] - 80.) / (max_x - min_x).max(1.))
+            .min((size[1] - 80.) / (max_y - min_y).max(1.))
+            .clamp(0.05, 2.);
+        Viewport {
+            x: 40. - min_x * zoom,
+            y: 40. - min_y * zoom,
+            zoom,
+        }
+    }
     pub fn paint(
         &self,
         bounds: Bounds<Pixels>,

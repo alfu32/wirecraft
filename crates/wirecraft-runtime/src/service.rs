@@ -283,6 +283,11 @@ impl Service {
             }
             "analysis.report" => return Ok(wirecraft_core::analysis::report(&self.document)),
             "archetypes.list" => return Ok(crate::archetypes::list()),
+            "archetypes.preview" => {
+                return Ok(
+                    json!({"id":required(a,"id")?, "document":crate::archetypes::load(required(a,"id")?)?}),
+                );
+            }
             "export.markdown" => {
                 let ids: Vec<String> = if let Some(ids) = a.get("nodeIds") {
                     serde_json::from_value(ids.clone())?

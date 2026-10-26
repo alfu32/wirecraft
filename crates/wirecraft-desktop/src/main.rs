@@ -1,5 +1,7 @@
 mod client;
+mod icons;
 mod scene;
+mod workbench;
 use client::{Client, Message, Update};
 use gpui::{prelude::*, *};
 use gpui_component::{
@@ -33,7 +35,10 @@ actions!(
         Quit,
         CopyEntities,
         CutEntities,
-        PasteEntities
+        PasteEntities,
+        CommandPalette,
+        ShowExport,
+        ShowOptions
     ]
 );
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -99,6 +104,16 @@ struct Wirecraft {
     archetypes: Vec<Value>,
     generated_diagnostics: Vec<Value>,
     generated_revision: u64,
+    inspector: Vec<workbench::FormField>,
+    advanced: bool,
+    editor_committed: bool,
+    menu: Option<String>,
+    query: Entity<InputState>,
+    report: Value,
+    analysis_layer: String,
+    management_backlog: bool,
+    archetype_selected: Option<String>,
+    archetype_preview: Option<Arc<scene::Scene>>,
 }
 impl Wirecraft {
     fn new(
@@ -127,6 +142,10 @@ impl Wirecraft {
             can_undo: false,
             can_redo: false,
         });
+        let inspector = workbench::make_fields(window, cx);
+        let query = cx.new(|cx| InputState::new(window, cx).placeholder("Search commands…"));
+        cx.subscribe(&query, |_, _, _: &InputEvent, cx| cx.notify())
+            .detach();
         let focus = cx.focus_handle();
         focus.focus(window);
         let this = Self {
@@ -175,6 +194,16 @@ impl Wirecraft {
             archetypes: vec![],
             generated_diagnostics: vec![],
             generated_revision: 0,
+            inspector,
+            advanced: false,
+            editor_committed: false,
+            menu: None,
+            query,
+            report: Value::Null,
+            analysis_layer: "principal".into(),
+            management_backlog: false,
+            archetype_selected: None,
+            archetype_preview: None,
         };
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(update) = rx.recv().await {
@@ -187,7 +216,10 @@ impl Wirecraft {
             }
         })
         .detach();
-        for input in [&this.name, &this.editor, &this.properties] {
+        for input in [&this.name, &this.editor, &this.properties]
+            .into_iter()
+            .chain(this.inspector.iter().map(|f| &f.input))
+        {
             cx.subscribe(input, |this, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
                     this.persist_ui(cx);
@@ -267,6 +299,23 @@ impl Wirecraft {
                         .collect();
                     self.editor_entity = None;
                 }
+                if command == "archetypes.preview"
+                    && value["id"].as_str() == self.archetype_selected.as_deref()
+                    && let Ok(document) =
+                        serde_json::from_value::<Document>(value["document"].clone())
+                {
+                    self.archetype_preview = Some(Arc::new(scene::Scene::new(
+                        &document,
+                        &document.root_node_id,
+                    )));
+                }
+                if command == "analysis.report" {
+                    self.report = value.clone();
+                }
+                if ["threadwork.update_entity", "file.commit_and_save"].contains(&command.as_str())
+                {
+                    self.editor_committed = true;
+                }
                 if command == "archetypes.list" {
                     self.archetypes = value["archetypes"].as_array().cloned().unwrap_or_default();
                 }
@@ -340,7 +389,11 @@ impl Wirecraft {
                     }
                 }
                 let clean = !self.has_draft(cx);
-                if clean || self.editor_entity.as_ref() != self.selected.first() {
+                if clean
+                    || self.editor_committed
+                    || self.editor_entity.as_ref() != self.selected.first()
+                {
+                    self.editor_committed = false;
                     self.load_editor(window, cx);
                 } else {
                     self.status =
@@ -375,7 +428,7 @@ impl Wirecraft {
                     section: self.section.clone(),
                     name: self.name.read(cx).value().to_string(),
                     text: self.editor.read(cx).value().to_string(),
-                    properties: self.properties.read(cx).value().to_string(),
+                    properties: self.merged_properties(cx),
                     base_name: self.base_name.clone(),
                     base_text: self.base_text.clone(),
                     base_properties: self.base_properties.clone(),
@@ -413,6 +466,24 @@ impl Wirecraft {
                 props.as_object_mut().unwrap().remove(k);
             }
             self.base_properties = serde_json::to_string_pretty(&props).unwrap();
+            let all = serde_json::to_value(n).unwrap();
+            for field in &mut self.inspector {
+                let value = all
+                    .pointer(field.path)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                field.baseline = value.clone();
+                field
+                    .input
+                    .update(cx, |state, cx| state.set_value(value, window, cx));
+            }
+            let language = self
+                .snapshot
+                .document
+                .effective_text_language(&n.id, &self.section);
+            self.editor
+                .update(cx, |state, cx| state.set_highlighter(language, cx));
             self.edit_revision = self.snapshot.revision;
             self.name.update(cx, |state, cx| {
                 state.set_value(self.base_name.clone(), window, cx)
@@ -431,14 +502,12 @@ impl Wirecraft {
         };
         let name = self.name.read(cx).value().to_string();
         let text = self.editor.read(cx).value().to_string();
-        let properties = self.properties.read(cx).value().to_string();
+        let properties = self.merged_properties(cx);
         let mut patch = json!({});
         if name != self.base_name {
             patch["name"] = json!(name);
         }
-        if text != self.base_text {
-            patch["text"] = json!({self.section.clone():text});
-        }
+
         if properties != self.base_properties {
             match serde_json::from_str::<Value>(&properties) {
                 Ok(Value::Object(o)) => patch.as_object_mut().unwrap().extend(o),
@@ -448,6 +517,9 @@ impl Wirecraft {
                     return;
                 }
             }
+        }
+        if text != self.base_text {
+            patch["text"][&self.section] = json!(text);
         }
         if patch.as_object().unwrap().is_empty() {
             return;
@@ -464,7 +536,7 @@ impl Wirecraft {
     fn has_draft(&self, cx: &App) -> bool {
         self.name.read(cx).value().as_ref() != self.base_name
             || self.editor.read(cx).value().as_ref() != self.base_text
-            || self.properties.read(cx).value().as_ref() != self.base_properties
+            || self.merged_properties(cx) != self.base_properties
     }
     fn select(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         if self.has_draft(cx) {
@@ -517,7 +589,7 @@ impl Wirecraft {
             let mut patch = json!({});
             let name = self.name.read(cx).value().to_string();
             let text = self.editor.read(cx).value().to_string();
-            let properties = self.properties.read(cx).value().to_string();
+            let properties = self.merged_properties(cx);
             if name != self.base_name {
                 patch["name"] = json!(name);
             }
@@ -528,6 +600,9 @@ impl Wirecraft {
                 let p: Value = serde_json::from_str(&properties).map_err(|e| e.to_string())?;
                 let o = p.as_object().ok_or("Properties must be an object")?;
                 patch.as_object_mut().unwrap().extend(o.clone());
+            }
+            if text != self.base_text {
+                patch["text"][&self.section] = json!(text);
             }
             a["nodeId"] = json!(id);
             a["patch"] = patch;
@@ -608,6 +683,7 @@ impl Wirecraft {
         }
     }
     fn select_mode(&mut self, _: &SelectMode, _: &mut Window, cx: &mut Context<Self>) {
+        self.menu = None;
         self.mode = Mode::Select;
         self.link_source = None;
         cx.notify();
@@ -1050,9 +1126,15 @@ fn button(id: &'static str, label: impl Into<SharedString>) -> Stateful<Div> {
         .px_3()
         .py_1()
         .rounded_sm()
-        .bg(rgb(0x233347))
-        .hover(|s| s.bg(rgb(0x354a61)))
+        .bg(rgb(0x242c36))
+        .hover(|s| s.bg(rgb(0x34414d)))
         .cursor_pointer()
+        .flex()
+        .items_center()
+        .gap_2()
+        .when(!icons::for_button(id).is_empty(), |b| {
+            b.child(icons::icon(icons::for_button(id)))
+        })
         .child(label.into())
 }
 impl Render for Wirecraft {
@@ -1068,7 +1150,7 @@ impl Render for Wirecraft {
             .gap_2()
             .px_3()
             .py_2()
-            .bg(rgb(0x111d2b))
+            .bg(rgb(0x171d25))
             .child(div().text_lg().text_color(rgb(0x75d4d6)).child("Wirecraft"))
             .child(div().flex_1().child(title))
             .child(
@@ -1108,9 +1190,12 @@ impl Render for Wirecraft {
         ] {
             tabs = tabs.child(
                 button(tab, tab)
-                    .when(self.tab == tab, |b| b.bg(rgb(0x3c536c)))
+                    .when(self.tab == tab, |b| b.bg(rgb(0x255452)))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.tab = tab.into();
+                        if tab == "Analysis" {
+                            this.tool("analysis.report");
+                        }
                         if tab == "Archetypes" {
                             this.tool("archetypes.list");
                         }
@@ -1133,7 +1218,7 @@ impl Render for Wirecraft {
                             .pl(px(10. + depth as f32 * 14.))
                             .pr_2()
                             .overflow_hidden()
-                            .when(this.selected.contains(&id), |b| b.bg(rgb(0x2a4057)))
+                            .when(this.selected.contains(&id), |b| b.bg(rgb(0x253f45)))
                             .cursor_pointer()
                             .on_click(_cx.listener(move |this, _, window, cx| {
                                 this.select(id.clone(), window, cx)
@@ -1149,7 +1234,7 @@ impl Render for Wirecraft {
             .flex_none()
             .flex()
             .flex_col()
-            .bg(rgb(0x111b28))
+            .bg(rgb(0x191f28))
             .child(
                 div()
                     .p_3()
@@ -1220,7 +1305,7 @@ impl Render for Wirecraft {
                         .flex_1()
                         .min_h_0()
                         .overflow_hidden()
-                        .bg(rgb(0x0d1520))
+                        .bg(rgb(0x10161e))
                         .on_mouse_down(MouseButton::Left, cx.listener(Self::down))
                         .on_mouse_down(MouseButton::Middle, cx.listener(Self::down))
                         .on_mouse_down(MouseButton::Right, cx.listener(Self::down))
@@ -1243,115 +1328,14 @@ impl Render for Wirecraft {
                             .size_full(),
                         ),
                 );
-        } else if self.tab == "Editor" || self.tab == "Project Management" {
-            let mut sections = div().flex().gap_2().p_2();
-            for (key, title) in [
-                ("source", "Source"),
-                ("initialization", "Initialization"),
-                ("specification", "Specification"),
-                ("tests", "Tests"),
-                ("aiInstructions", "Usage"),
-            ] {
-                sections = sections.child(
-                    button(key, title)
-                        .when(self.section == key, |b| b.bg(rgb(0x3c536c)))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            if this.has_draft(cx) {
-                                this.status =
-                                    "Apply the editor draft before changing section".into();
-                            } else {
-                                this.section = key.into();
-                                this.load_editor(window, cx);
-                                this.persist_ui(cx);
-                            }
-                            cx.notify();
-                        })),
-                );
-            }
-            content = content
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .p_2()
-                        .child(div().flex_1().child(Input::new(&self.name)))
-                        .child(
-                            button("apply", "Apply · Ctrl Enter")
-                                .on_click(cx.listener(|this, _, w, cx| this.apply(&Apply, w, cx))),
-                        ),
-                )
-                .child(
-                    button("reload-entity", "Reload entity · discard draft").on_click(cx.listener(
-                        |this, _, window, cx| {
-                            this.load_editor(window, cx);
-                            this.persist_ui(cx);
-                            cx.notify();
-                        },
-                    )),
-                )
-                .child(sections)
-                .child(
-                    div()
-                        .flex()
-                        .flex_1()
-                        .min_h_0()
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .child(Input::new(&self.editor).h_full()),
-                        )
-                        .child(
-                            div()
-                                .w(px(350.))
-                                .flex_none()
-                                .flex()
-                                .flex_col()
-                                .child(div().p_2().child("Entity properties · JSON"))
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_h_0()
-                                        .child(Input::new(&self.properties).h_full()),
-                                ),
-                        ),
-                );
+        } else if self.tab == "Editor" {
+            content = content.child(self.render_editor(cx));
+        } else if self.tab == "Project Management" {
+            content = content.child(self.render_management(cx));
         } else if self.tab == "Analysis" {
-            content = content
-                .child(
-                    div()
-                        .flex()
-                        .gap_2()
-                        .p_3()
-                        .child(button("validate", "Validate design").on_click(
-                            cx.listener(|this, _, _, _| this.tool("threadwork.validate_design")),
-                        ))
-                        .child(
-                            button("report-full", "Graph report").on_click(
-                                cx.listener(|this, _, _, _| this.tool("analysis.report")),
-                            ),
-                        )
-                        .child(button("counts", "Network counts").on_click(
-                            cx.listener(|this, _, _, _| this.tool("threadwork.analyze_network")),
-                        )),
-                )
-                .child(
-                    div()
-                        .id("report")
-                        .flex_1()
-                        .overflow_y_scroll()
-                        .p_4()
-                        .child(self.output.clone()),
-                );
+            content = content.child(self.render_analysis(cx));
         } else if self.tab == "Archetypes" {
-            let parent = self.parent.clone();
-            content=content.child(div().flex().gap_2().p_3().child(button("refresh-archetypes","Refresh catalog").on_click(cx.listener(|this,_,_,_|this.tool("archetypes.list")))).child(button("import-archetype","Import .orch file").on_click(cx.listener(|this,_,window,cx|this.import_dialog(window,cx)))))
-              .child(div().p_3().child("Import a reusable workflow into the focused composite. Every imported entity gets a fresh ID; originals are retained."))
-              .child(div().id("archetype-list").flex_1().overflow_y_scroll().children(self.archetypes.iter().enumerate().map(|(i,a)|{
-                let id=a["id"].as_str().unwrap_or("").to_string();let label=format!("{} · {}",a["name"].as_str().unwrap_or(&id),id);let parent=parent.clone();
-                div().id(i).p_3().border_b_1().border_color(rgb(0x233347)).cursor_pointer().hover(|s|s.bg(rgb(0x233347))).on_click(cx.listener(move|this,_,_,_|this.client.send("archetypes.import",json!({"id":id,"parentId":parent})))).child(label)
-              })));
+            content = content.child(self.render_archetypes(cx));
         } else if self.tab == "Export" {
             content=content.child(div().p_4().child("Export the focused graph as a free-size drawing. ISO sheets, rolls and poster tiling remain pending."))
               .child(div().flex().gap_2().p_3().child(button("generate-c17","Generate C17 topology").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog("c17",window,cx)))).child(button("generate-files","Generate literal file entities").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog("files",window,cx)))).child(button("save-archetype","Save selected subtree as archetype").on_click(cx.listener(|this,_,window,cx|this.artifact_dialog("archetype",window,cx)))))
@@ -1377,7 +1361,7 @@ impl Render for Wirecraft {
             let config = json!({"mcpServers":{"wirecraft":{"url":format!("{}/mcp",self.endpoint),"headers":{"Authorization":format!("Bearer {}",self.token)}}}});
             content=content.child(div().p_4().child("Local MCP server · owned by this desktop session")).child(div().p_4().child(format!("{}/mcp",self.endpoint))).child(button("copy-mcp","Copy MCP client configuration").on_click(move|_,_,cx|cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string_pretty(&config).unwrap())))).child(div().p_4().child("Clients share this open design. Closing Wirecraft shuts down this server. The previous Threadworks server runs independently."));
         }
-        div().key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(|_:&Quit,_,cx|cx.quit()).size_full().flex().flex_col().bg(rgb(0x0d1520)).text_color(rgb(0xe1e9ef)).text_sm().child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().child(sidebar).child(content)).child(div().px_3().py_2().bg(rgb(0x111d2b)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.)))
+        div().key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(rgb(0x10161e)).text_color(rgb(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar)).child(content)).child(div().px_3().py_2().bg(rgb(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_menu(cx))
     }
 }
 fn main() -> anyhow::Result<()> {
@@ -1426,6 +1410,9 @@ fn main() -> anyhow::Result<()> {
         gpui_component::init(cx);
         Theme::change(ThemeMode::Dark, None, cx);
         cx.bind_keys([
+            KeyBinding::new("ctrl-shift-p", CommandPalette, Some("Wirecraft")),
+            KeyBinding::new("ctrl-p", ShowExport, Some("Wirecraft")),
+            KeyBinding::new("ctrl-comma", ShowOptions, Some("Wirecraft")),
             KeyBinding::new("ctrl-o", Open, Some("Wirecraft")),
             KeyBinding::new("ctrl-c", CopyEntities, Some("Wirecraft")),
             KeyBinding::new("ctrl-x", CutEntities, Some("Wirecraft")),
