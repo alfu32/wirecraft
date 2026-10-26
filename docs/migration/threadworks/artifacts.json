@@ -1,0 +1,14 @@
+[
+  {
+    "file": "example-c.orch",
+    "sha256": "9b8500a1641dae221d5cb03e1df86d7a5af579348546aba667bd295f4bcd911f",
+    "bytes": 4757906,
+    "notes": "User-supplied working ticker: 30 entities, C processing/library/type graph with file-export text and embedded binaries; original bytes retained. External clang finds a trailing unfinished pu token in gen_uuid. Preserve this diagnostic on the original; any execution fixture correction must be explicit and isolated."
+  },
+  {
+    "file": "ticker-print.pdf",
+    "sha256": "bbb30c1915b1dc1cbcb05affa40d51bfd70f3888d501dd116dc5d5452f77192e",
+    "bytes": 262605,
+    "notes": "34-page reference plan/specification PDF. User describes the drawing renderer as vector/PostScript. pdfimages -list identifies one 2058x840 JPEG on page 1; other pages have searchable specification text. Wirecraft vector output must be checked for paths/text rather than assumed from PDF extension."
+  }
+]

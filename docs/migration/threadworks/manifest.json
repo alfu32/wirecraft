@@ -196,5 +196,32 @@
     "sha256": "b8f46f2a975db38a76dc2570f0b4b650a0d58a041ba0a4a7731218c8b67246db",
     "feature": "Node-context channel and library completion",
     "observed": "Ctrl-Space list includes push/pop, typed channel/port identifiers (awaitResponseLoop, request, response), injected base_lib_socket_accept__fclose/fopen/fprintf aliases with signatures, and the link item type Any."
+  },
+  {
+    "sequence": 23,
+    "original": "Screenshot From 2026-10-26 20-05-33.png",
+    "file": "023-editor-c-body-syntax-highlighting.png",
+    "captured": "2026-10-26 20-05-33",
+    "sha256": "057dae2ec606c7929ab8ca9437fdf79f77db65f8d071e8c1ab379d8676c71bd8",
+    "feature": "C function-body syntax highlighting",
+    "observed": "read_time Declaration shows a generated C function header above editable body, language-specific tokens, Packet fields, tm__strftime dependency and push(ip_time, &packet)."
+  },
+  {
+    "sequence": 24,
+    "original": "Screenshot From 2026-10-26 20-12-42.png",
+    "file": "024-designer-typed-flow-and-library-dependencies.png",
+    "captured": "2026-10-26 20-12-42",
+    "sha256": "7a5e365d4317f12af77bae57447166e2efdcc4dbe509c5e9e52e508ea68726da",
+    "feature": "Typed flow and library dependency drawing",
+    "observed": "Ticker canvas shows named Packet dataflow, directional port glyphs, service-library dependency callouts, type fields and type usage."
+  },
+  {
+    "sequence": 25,
+    "original": "Screenshot From 2026-10-26 20-13-54.png",
+    "file": "025-editor-injected-library-and-payload-completions.png",
+    "captured": "2026-10-26 20-13-54",
+    "sha256": "865a5abe47f82e277f095d9145d703b89be6d3d75b0060e15e3395f8ed329838",
+    "feature": "Injected library and payload completion",
+    "observed": "write_append_file Ctrl-Space lists argslib__* functions with signatures, typed ip_word input, Packet fields and pop/count helper suggestions inside the generated node function."
   }
 ]

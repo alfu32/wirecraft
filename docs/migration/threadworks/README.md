@@ -26,7 +26,12 @@ Chronological capture order on 2026-10-26 (Europe/Brussels). Original image byte
 | [020](020-options-inference.png) | Inference provider options | Active provider, Claude/Codex/ChatGPT/local Ollama/clipboard tabs, endpoint/model/API token; browser authorization explicitly marked not implemented. |
 | [021](021-editor-c-runtime-completions.png) | C runtime identifier completion | Ctrl-Space in the C node function body lists compiler runtime types, constants and functions with declaration/signature details. |
 | [022](022-editor-node-context-completions.png) | Node-context channel and library completion | The same list includes typed channel/port identifiers, push/pop helpers, injected `base_lib_socket_accept__*` library aliases and link item types. |
+| [23](023-editor-c-body-syntax-highlighting.png) | C function-body syntax highlighting | read_time Declaration shows a generated C function header above editable body, language-specific tokens, Packet fields, tm__strftime dependency and push(ip_time, &packet). |
+| [24](024-designer-typed-flow-and-library-dependencies.png) | Typed flow and library dependency drawing | Ticker canvas shows named Packet dataflow, directional port glyphs, service-library dependency callouts, type fields and type usage. |
+| [25](025-editor-injected-library-and-payload-completions.png) | Injected library and payload completion | write_append_file Ctrl-Space lists argslib__* functions with signatures, typed ip_word input, Packet fields and pop/count helper suggestions inside the generated node function. |
 
 Ctrl-Space context (photos 021–022): the edited declaration is a processing node’s function body inside a compiler-generated C wrapper. Suggestions must reflect the effective project compiler/runtime, that node’s connected channels/ports and injected libraries, with usable names and type/signature details. These captures document Threadworks behavior; equivalent inline Wirecraft completion is still pending.
 
 Implementation and verification tracking: [walkthrough parity](../walkthrough.md).
+
+Additional evidence: [working C ticker project](example-c.orch) and [reference plan/specification PDF](ticker-print.pdf); hashes and inspection notes are recorded in [artifacts.json](artifacts.json). Treat the project as an immutable reference; generation/execution checks use temporary copies and external clang, never its legacy TCC launcher.
