@@ -41,9 +41,10 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   xd('key','Escape');xd('mousemove','--window',window,480,320);xd('mousedown',1);xd('mousemove','--window',window,530,350);xd('mouseup',1)
   time.sleep(.4)
   subprocess.run(['import','-window',window,str(artifact/'canvas.png')],env=env,check=True)
-  # Create a directed link through the canvas, then copy/paste/undo an entity.
-  xd('mousemove','--window',window,483,114);xd('click',1)
-  xd('mousemove','--window',window,530,350);xd('click',1)
+  # Synthetic clicks are paced across frames; completion is checked in persisted state.
+  wait_for(lambda:json.loads(state.joinpath('ui.json').read_text()).get('draft') is None)
+  xd('mousemove','--window',window,483,114);xd('click',1);time.sleep(.2)
+  xd('mousemove','--window',window,530,350);xd('click',1);time.sleep(.2)
   xd('mousemove','--window',window,800,470);xd('click',1)
   wait_for(lambda:sum(n['kind']=='Link' for n in recovery()['document']['nodes'].values())==1)
   xd('key','Escape');xd('mousemove','--window',window,530,350);xd('click',1)
@@ -106,8 +107,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   print(json.dumps({'desktop':'passed','generatedDiagnosticRevealed':True,'generatedDiagnosticsMapped':True,'clangdDiagnostics':True,'externalCompilerDiagnostics':True,'ownedChildrenStopped':True,'editorDraft':True,'draftRestoredAndApplied':True,'nodes':4,'canvasLink':True,'clipboardUndo':True,'recovery':True,'exitCode':app.returncode,'artifacts':str(artifact)}))
  finally:
   if app.poll() is None:
-   try:
-    if window is None:raise RuntimeError('No owned window')
-    xd('key','--window',window,'ctrl+q');app.wait(timeout=8)
-   except Exception:app.terminate();app.wait(timeout=5)
+   if window is not None:
+    subprocess.run(['import','-window',window,str(artifact/'failure.png')],env=env,capture_output=True)
+   app.terminate();app.wait(timeout=10)
   log.close()
