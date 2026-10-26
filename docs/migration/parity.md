@@ -1,6 +1,6 @@
 # Feature parity matrix
 
-Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. Source paths below are relative to `../threadworks`; `...` abbreviates Kotlin package roots. Verified means the listed scope was checked, not that every edge case or platform matches. Photo numbers link through [the chronological index](threadworks/README.md); exact assertions are in [walkthrough.md](walkthrough.md).
+Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. The [canvas interaction contract](canvas-interactions.md) records the corrected gestures and tests. Source paths below are relative to `../threadworks`; `...` abbreviates Kotlin package roots. Verified means the listed scope was checked, not that every edge case or platform matches. Photo numbers link through [the chronological index](threadworks/README.md); exact assertions are in [walkthrough.md](walkthrough.md).
 
 | Feature and workflow | Source implementation | Reference evidence | Rust component | Verification | Status and remaining gap |
 |---|---|---|---|---|---|

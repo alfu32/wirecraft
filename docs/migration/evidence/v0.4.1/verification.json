@@ -1,0 +1,101 @@
+{
+  "verifiedAt": "2026-10-26T21:52:14.011025+00:00",
+  "codeCommit": "959ab38f3d8f18c25bf05e9722f8025ec9173060",
+  "tests": {
+    "total": 61,
+    "coreIntegration": 18,
+    "runtimeIntegration": 37,
+    "desktopGeometryUnit": 6,
+    "result": "passed"
+  },
+  "formatting": "passed",
+  "strictClippy": "passed",
+  "optimizedPackageSmoke": {
+    "package": "passed",
+    "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.4.1-linux-x86_64.tar.gz",
+    "installedBackend": true,
+    "mcpTools": 37,
+    "pdfExport": true,
+    "workbenchMcp": true,
+    "nativeC17Graph": true,
+    "generatedClangd": true,
+    "installedDesktop": true,
+    "installedWalkthrough": true,
+    "installedEditor": true,
+    "installedCanvas": true
+  },
+  "nativeSuites": [
+    {
+      "desktop": "passed",
+      "generatedDiagnosticRevealed": true,
+      "generatedDiagnosticsMapped": true,
+      "clangdDiagnostics": true,
+      "externalCompilerDiagnostics": true,
+      "ownedChildrenStopped": true,
+      "editorDraft": true,
+      "draftRestoredAndApplied": true,
+      "nodes": 4,
+      "canvasLink": true,
+      "clipboardUndo": true,
+      "recovery": true,
+      "exitCode": 0,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/desktop-smoke"
+    },
+    {
+      "walkthrough": "passed",
+      "kanbanDrag": true,
+      "backlog": true,
+      "inspectorPreservedSource": true,
+      "panePersistence": true,
+      "lightThemeAndIndentPersistence": true,
+      "archetypePreviewAndInsert": true,
+      "realPlanPreview": true,
+      "mcpIndependentControls": true,
+      "compositeCollapseMoveResize": true,
+      "typeUsageCalloutSelection": true,
+      "typeAndMetadataEdits": true,
+      "invalidTableDraftRecovery": true,
+      "matrixEndpointNavigation": true,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/walkthrough-smoke"
+    },
+    {
+      "editor": "passed",
+      "compilerContextInsertion": true,
+      "completionUndo": true,
+      "applyShortcut": true,
+      "staleMenuDismissal": true,
+      "statusDropdownAndApply": true,
+      "inlineTablesVisible": true,
+      "minimizeMaximizeRestoreClose": true,
+      "ownedChildrenStopped": true,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/editor-smoke"
+    },
+    {
+      "canvas": "passed",
+      "wheelZoomAnchored": true,
+      "middleDragPan": true,
+      "directionalWindows": true,
+      "addRemoveReplace": true,
+      "treeSelectionAndReparent": true,
+      "selectionContoursAndBounds": true,
+      "groupDragSingleUndo": true,
+      "descendantsMoveOnce": true,
+      "releaseOutsideCanvas": true,
+      "debouncedPreviewWithoutMutation": true,
+      "cycleRejected": true,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
+    }
+  ],
+  "binarySha256": {
+    "wirecraft": "9c5a1d99dc681b9c700b8546fea26ebf937321194a788c2cd225ce280833d3b3",
+    "wirecraft-desktop": "80dd7d4b90ba4bd6218dbba867e5c951318557caf29d3aa137f802ccbe8f3a9d"
+  },
+  "remoteCi": {
+    "initialInteractionCommit": "0602a179b2a99da4202126eb98ab5280c0b38dbb",
+    "initialResult": "success",
+    "initialUrl": "https://github.com/alfu32/wirecraft/actions/runs/40406995006",
+    "finalCodeResult": "in_progress",
+    "finalCodeUrl": "https://github.com/alfu32/wirecraft/actions/runs/40407388067"
+  },
+  "platform": "Linux x86_64; X11/XWayland/Vulkan; other platforms unverified"
+}
