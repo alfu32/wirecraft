@@ -1,0 +1,182 @@
+[
+  {
+    "sequence": 1,
+    "original": "Screenshot From 2026-10-26 14-30-47.png",
+    "file": "001-designer-overview.png",
+    "captured": "2026-10-26 14-30-47",
+    "sha256": "72359ac7b95b45973ae2321c2995d6465146cbd07fbe64fd41a4ca5380541d80",
+    "feature": "Designer canvas and expanded hierarchy",
+    "observed": "Composite workers, types, libraries, named typed ports, directed routes, validation markers; grid and status bar."
+  },
+  {
+    "sequence": 2,
+    "original": "Screenshot From 2026-10-26 14-30-59.png",
+    "file": "002-editor-inspector.png",
+    "captured": "2026-10-26 14-30-59",
+    "sha256": "b24fd2ccb7449597e1623fd8853144d94a54592e57fb012689a3e980442898a9",
+    "feature": "Editor and inspector",
+    "observed": "Selected-entity list above hierarchy; declaration/specification/usage/tests/instantiation tabs; section language; general/effective/management/tracking/metadata inspector."
+  },
+  {
+    "sequence": 3,
+    "original": "Screenshot From 2026-10-26 14-31-49.png",
+    "file": "003-project-kanban.png",
+    "captured": "2026-10-26 14-31-49",
+    "sha256": "20b1f058ff336a096441f42ed0ecd5ec6243ab6630475ea6a5c0bfccce75ea8b",
+    "feature": "Project management Kanban",
+    "observed": "Six status columns, counts, entity cards, paths, responsibility/assignee and remove-from-board control; backlog tab."
+  },
+  {
+    "sequence": 4,
+    "original": "Screenshot From 2026-10-26 14-32-03.png",
+    "file": "004-archetype-preview.png",
+    "captured": "2026-10-26 14-32-03",
+    "sha256": "f8f1f31075773e6fea701108a0632884491e5729eccf50beda6145b5ec71beb1",
+    "feature": "Archetype browser",
+    "observed": "Language-grouped catalog, descriptions, read-only canvas preview and explicit Insert Archetype into Design."
+  },
+  {
+    "sequence": 5,
+    "original": "Screenshot From 2026-10-26 14-32-16.png",
+    "file": "005-network-analysis.png",
+    "captured": "2026-10-26 14-32-16",
+    "sha256": "5db3030f2ee5c66ad0d43f7efa2d7134a96982926ae2304b3b57ac818020ba26",
+    "feature": "Network analysis",
+    "observed": "Principal/error/dependency/union matrices; selectable relationship cells; overview and qualitative findings with affected-entity selection."
+  },
+  {
+    "sequence": 6,
+    "original": "Screenshot From 2026-10-26 14-32-31.png",
+    "file": "006-file-menu.png",
+    "captured": "2026-10-26 14-32-31",
+    "sha256": "0581802131bb5acfd3154cee53be3f50b340cf104cec98cff4cf506ee2c6f8fb",
+    "feature": "File menu",
+    "observed": "New/Open/Save/Save As/archetype/export/options/quit and shortcuts."
+  },
+  {
+    "sequence": 7,
+    "original": "Screenshot From 2026-10-26 14-32-34.png",
+    "file": "007-edit-menu.png",
+    "captured": "2026-10-26 14-32-34",
+    "sha256": "8533b313189d48231f21c0b544428994a1bd13db63a383052c368f55e9148682",
+    "feature": "Edit menu",
+    "observed": "Undo/redo, cut/copy/paste, align and distribute submenu."
+  },
+  {
+    "sequence": 8,
+    "original": "Screenshot From 2026-10-26 14-32-38.png",
+    "file": "008-graph-menu.png",
+    "captured": "2026-10-26 14-32-38",
+    "sha256": "d01e361316aa389bf7751446a1df31469ab8ab1e9e237f0744c6c1ce3072bcbe",
+    "feature": "Graph menu",
+    "observed": "Zoom extents, select/node/link modes, deletion and command palette."
+  },
+  {
+    "sequence": 9,
+    "original": "Screenshot From 2026-10-26 14-32-42.png",
+    "file": "009-generate-menu.png",
+    "captured": "2026-10-26 14-32-42",
+    "sha256": "016c155ce7094130cb60f11d7c872a8e6a5a283eeb779c1f132285eead1eeac4",
+    "feature": "Generate menu",
+    "observed": "Generate project/selection and generate compiler from model overrides."
+  },
+  {
+    "sequence": 10,
+    "original": "Screenshot From 2026-10-26 14-33-06.png",
+    "file": "010-mcp-management.png",
+    "captured": "2026-10-26 14-33-06",
+    "sha256": "d37f885515319663e0fff2e6d6ae7774c595e5d869689dca0db31a178bdb2780",
+    "feature": "MCP management",
+    "observed": "Endpoint and health endpoint; start/restart/stop/health; HTTP access log. Sheet tool is visibly active behind this dialog, not evidence it opens MCP."
+  },
+  {
+    "sequence": 11,
+    "original": "Screenshot From 2026-10-26 14-33-17.png",
+    "file": "011-ai-support-menu.png",
+    "captured": "2026-10-26 14-33-17",
+    "sha256": "e1345ae57a411333053ec32b7a6f2a3e38a9b8425ba69d60cfb4607b735d98ac",
+    "feature": "AI support menu",
+    "observed": "Copy fiches, generate source, tidy specifications, generate test data. These entries appear disabled in this capture; source behavior must establish availability."
+  },
+  {
+    "sequence": 12,
+    "original": "Screenshot From 2026-10-26 14-33-23.png",
+    "file": "012-help-menu.png",
+    "captured": "2026-10-26 14-33-23",
+    "sha256": "18ba25ed932e7ef6dc32fbbb029e1763d60c82b7d67a27574c9e09ce38bfc65e",
+    "feature": "Help menu",
+    "observed": "About and MCP Agent Guide."
+  },
+  {
+    "sequence": 13,
+    "original": "Screenshot From 2026-10-26 14-33-36.png",
+    "file": "013-export-plan.png",
+    "captured": "2026-10-26 14-33-36",
+    "sha256": "c57959137a5a2bcb59cded711e40e171e26f64ac908d8b01e3efd1fefdc47340",
+    "feature": "Plan export",
+    "observed": "Printer list, plan preview, format/scale/split/overlap; rasterized/searchable PDF; PDF/SVG/PNG/Mermaid; PDF All and persisted printer settings."
+  },
+  {
+    "sequence": 14,
+    "original": "Screenshot From 2026-10-26 14-33-42.png",
+    "file": "014-export-documentation.png",
+    "captured": "2026-10-26 14-33-42",
+    "sha256": "fc4e761eb548b6adfbef1a07b603d24203c59ab654dd538eea595d17cb7a075f",
+    "feature": "Documentation export",
+    "observed": "Documentation preview, page format/header/footer/margins, PDF/HTML/Markdown."
+  },
+  {
+    "sequence": 15,
+    "original": "Screenshot From 2026-10-26 14-35-02.png",
+    "file": "015-canvas-box-selection.png",
+    "captured": "2026-10-26 14-35-02",
+    "sha256": "6411c717fce632084178a95d6d1e62dad113f40695dade322e3496701e2aa963",
+    "feature": "Box selection",
+    "observed": "Translucent selection rectangle over several types, partial-overlap selection and current canvas viewport."
+  },
+  {
+    "sequence": 16,
+    "original": "Screenshot From 2026-10-26 14-35-36.png",
+    "file": "016-command-palette-align.png",
+    "captured": "2026-10-26 14-35-36",
+    "sha256": "2eececac6e074a1baaeca567c876828f3270e69781899732cbe2d5d3a600a46e",
+    "feature": "Command palette and alignment",
+    "observed": "Full categorized command list with shortcuts and archetype submenu; Align Left chosen for multi-selection."
+  },
+  {
+    "sequence": 17,
+    "original": "Screenshot From 2026-10-26 14-35-54.png",
+    "file": "017-canvas-aligned-result.png",
+    "captured": "2026-10-26 14-35-54",
+    "sha256": "5fc9d8c33698bfa35fa9ae13b3633d71feb388f89c11e42d00f7021bf7193c07",
+    "feature": "Aligned canvas result",
+    "observed": "Type nodes share a left edge after command; rest of graph retained."
+  },
+  {
+    "sequence": 18,
+    "original": "Screenshot From 2026-10-26 14-36-46.png",
+    "file": "018-options-general.png",
+    "captured": "2026-10-26 14-36-46",
+    "sha256": "2e8f462b7c0caa4c059c73089d6ee3a3d3752ad4f103d5741af13cac1ed9f7d6",
+    "feature": "General options",
+    "observed": "Theme, designer/editor fonts, composite title target and reference viewport, indent spaces, mouse-wheel rows."
+  },
+  {
+    "sequence": 19,
+    "original": "Screenshot From 2026-10-26 14-36-51.png",
+    "file": "019-options-colors.png",
+    "captured": "2026-10-26 14-36-51",
+    "sha256": "ca3fdb203c78d5ad2bc88c04b74d781b3bcbbed7fbc23b8191e0a7b05e43daf2",
+    "feature": "Designer color options",
+    "observed": "Editable semantic canvas/grid/node/type/compiler/library/error/test and link colors with color pickers."
+  },
+  {
+    "sequence": 20,
+    "original": "Screenshot From 2026-10-26 14-36-58.png",
+    "file": "020-options-inference.png",
+    "captured": "2026-10-26 14-36-58",
+    "sha256": "6d31add49a97c0b42be53e7a909d00dcedf78076dd7cde4a8d7971a75e1d4d27",
+    "feature": "Inference provider options",
+    "observed": "Active provider, Claude/Codex/ChatGPT/local Ollama/clipboard tabs, endpoint/model/API token; browser authorization explicitly marked not implemented."
+  }
+]

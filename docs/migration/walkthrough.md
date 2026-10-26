@@ -1,0 +1,32 @@
+# Screenshot-driven migration
+
+Reference: [20 chronological photos](threadworks/README.md), original names and hashes in [manifest](threadworks/manifest.json). Local Kotlin source remains authoritative for behavior. Images 011 and 020 explicitly show disabled AI actions / unimplemented browser authorization; do not turn these into fabricated successes.
+
+| Photos | Workflow | Source evidence (under app-desktop/src/main/kotlin/com/threadwork/app) | Implementation target | Acceptance / current gap |
+|---|---|---|---|---|
+| 001,015–017 | Designer, hierarchy, composite display, multi-selection and alignment | ui/ThreadworkDesktopApp.kt canvas/registerCommands | desktop scene and shared geometry/services | Existing select/drag/link/cull; expand composite/ports, improve selection, expose all align commands |
+| 002 | Selected list, section editor and structured inspector | ui/ThreadworkDesktopApp.kt inspector/editor | desktop editor + typed form patches | Replace JSON-first inspector with editable fields, inherited values, status/history and advanced JSON escape hatch |
+| 003 | Kanban and backlog | ui/ProjectManagementPanel.kt | desktop management using update_entity | Six real status columns; move/unassign and backlog; changes persist and undo |
+| 004 | Grouped archetypes and preview | ui/WorkflowArchetypesPanel.kt | archetypes services + read-only scene | Select to preview; explicit insert; selection must not mutate design |
+| 005 | Matrices and report actions | ui/NetworkAnalysisPanel.kt | core analysis + desktop report | Four sparse relation matrices, actual indicators/findings, navigate affected entities |
+| 006–009,012,016 | Menus, palette, shortcuts and guide | ui/ThreadworkDesktopApp.kt registerCommands | shared desktop action dispatcher | Recognizable menus; command search; real existing commands; unsupported compilation overrides explicitly tracked |
+| 010 | MCP management | ui/McpServerDialog.kt | runtime MCP controls/log + desktop | Authenticated endpoint, health, bounded access log and independent MCP enable/disable (do not kill UI backend) |
+| 011,020 | AI/provider configuration | ai/AiSupport.kt | runtime prompt/provider adapter + desktop | Clipboard prompts without credentials; network provider calls explicit; no fake authorization |
+| 013,014 | Technical sheet and documentation export | ui/PreprintDialog.kt, SheetLayout.kt | core sheet geometry/docs; runtime exports; desktop preview | Format/scale/title/parts, PDF/SVG/PNG/Mermaid; HTML/Markdown docs; ISO/poster and native printers tracked separately |
+| 018,019 | General and semantic appearance options | ui/ThreadworkAppearance.kt, ThreadworkDesignerSettings.kt, editor/ThreadworkEditorSettings.kt | persisted settings + desktop options | Save/cancel real settings, apply fonts/indent/grid/colors/wheel, restore across restart |
+
+## Dependency order
+
+1. Preserve and index walkthrough (hashes, chronological names, feature evidence).
+2. Cohesive vector icon language and shell; real menus/palette and structured inspector; preserve draft/revision safety.
+3. Management board/backlog, analysis matrices/actions, archetype preview/explicit insert.
+4. Canvas composite/ports/resize/selection fidelity; semantic appearance settings.
+5. Sheet/documentation preview/export, MCP management and prompt/provider workflow.
+6. Full checks, isolated desktop workflow evidence, updated parity/status, minor release and push.
+
+Each slice must remain runnable. Test meaningful mutations and failure cases through the same services used by UI/MCP. Never label an unverified or pending workflow complete.
+
+## Progress
+
+- Reference indexing complete: 20 images visually inspected, renamed in capture order, exact bytes preserved with SHA-256. Source application remains untouched.
+- Implementation slices pending in this branch after v0.3.0.
