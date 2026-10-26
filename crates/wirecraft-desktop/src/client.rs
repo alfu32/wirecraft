@@ -14,6 +14,7 @@ pub struct Client {
 }
 pub enum Message {
     Execute(Request),
+    Commit(Request),
     SaveUi(Value),
     Analyze {
         node_id: String,
@@ -25,9 +26,20 @@ pub enum Message {
 }
 pub enum Update {
     Snapshot(Box<Snapshot>),
-    Result { command: String, value: Value },
-    Error(String),
-    Connected { endpoint: String, token: String },
+    Result {
+        command: String,
+        value: Value,
+        revision: Option<u64>,
+        commit: bool,
+    },
+    Error {
+        message: String,
+        commit: bool,
+    },
+    Connected {
+        endpoint: String,
+        token: String,
+    },
 }
 impl Client {
     pub fn start(
@@ -45,7 +57,10 @@ impl Client {
             .name("wirecraft-client".into())
             .spawn(move || {
                 if let Err(e) = worker(receiver, updates.clone(), state_dir, project, settings) {
-                    let _ = updates.send_blocking(Update::Error(e.to_string()));
+                    let _ = updates.send_blocking(Update::Error {
+                        message: e.to_string(),
+                        commit: false,
+                    });
                 }
             })
             .expect("client worker");
@@ -65,6 +80,9 @@ struct OwnedBackend {
 }
 impl OwnedBackend {
     fn call(&self, request: &Request) -> anyhow::Result<Value> {
+        self.call_with_revision(request).map(|(value, _)| value)
+    }
+    fn call_with_revision(&self, request: &Request) -> anyhow::Result<(Value, u64)> {
         let value: Value = self
             .client
             .post(format!("{}/api", self.endpoint))
@@ -82,7 +100,12 @@ impl OwnedBackend {
                     .unwrap_or("Backend request failed")
             );
         }
-        Ok(value["result"].clone())
+        Ok((
+            value["result"].clone(),
+            value["revision"]
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("API response omitted revision"))?,
+        ))
     }
 }
 impl Drop for OwnedBackend {
@@ -190,7 +213,12 @@ fn worker(
     };
     loop {
         match rx.recv_timeout(Duration::from_millis(300)) {
-            Ok(Message::Execute(mut request)) => {
+            Ok(message @ (Message::Execute(_) | Message::Commit(_))) => {
+                let (mut request, commit) = match message {
+                    Message::Execute(r) => (r, false),
+                    Message::Commit(r) => (r, true),
+                    _ => unreachable!(),
+                };
                 let command = request.command.clone();
                 if command == "editor.analyze_generated" {
                     request.arguments["executable"] = json!(
@@ -206,16 +234,24 @@ fn worker(
                     intelligence.started = false;
                     intelligence.versions.clear();
                 }
-                match backend.call(&request) {
-                    Ok(value) => {
+                match backend.call_with_revision(&request) {
+                    Ok((value, response_revision)) => {
                         if command == "settings.replace" {
                             intelligence.settings = serde_json::from_value(value.clone())?;
                         }
-                        updates.send_blocking(Update::Result { command, value })?;
+                        updates.send_blocking(Update::Result {
+                            command,
+                            value,
+                            revision: Some(response_revision),
+                            commit,
+                        })?;
                         revision = None;
                     }
                     Err(e) => {
-                        updates.send_blocking(Update::Error(e.to_string()))?;
+                        updates.send_blocking(Update::Error {
+                            message: e.to_string(),
+                            commit,
+                        })?;
                     }
                 }
             }
@@ -233,10 +269,15 @@ fn worker(
                             "lsp.diagnostics".into()
                         },
                         value,
+                        revision: None,
+                        commit: false,
                     })?;
                 }
                 Err(e) => {
-                    updates.send_blocking(Update::Error(e.to_string()))?;
+                    updates.send_blocking(Update::Error {
+                        message: e.to_string(),
+                        commit: false,
+                    })?;
                 }
             },
             Ok(Message::SaveUi(value)) => {
@@ -244,7 +285,10 @@ fn worker(
                     &state_dir.join("ui.json"),
                     serde_json::to_string_pretty(&value)?.as_bytes(),
                 ) {
-                    updates.send_blocking(Update::Error(format!("Session state: {e}")))?;
+                    updates.send_blocking(Update::Error {
+                        message: format!("Session state: {e}"),
+                        commit: false,
+                    })?;
                 }
             }
             Ok(Message::Shutdown) | Err(mpsc::RecvTimeoutError::Disconnected) => break,

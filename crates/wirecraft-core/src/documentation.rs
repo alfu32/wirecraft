@@ -137,14 +137,18 @@ pub fn pages(d: &Document, parent: &str, options: &Options) -> Result<Vec<String
             write!(out,"<text x=\"{}\" y=\"{}\" font-family=\"DejaVu Sans\" font-size=\"3.5\">{} · Functional and Technical Specification</text>",options.left_mm,options.top_mm,escape(d.project_name())).unwrap();
         }
         for (i, line) in lines.iter().enumerate() {
-            write!(
-                out,
-                "<text x=\"{}\" y=\"{}\" xml:space=\"preserve\">{}</text>",
-                options.left_mm,
-                options.top_mm + 8. + i as f64 * 4.5,
-                escape(line)
-            )
-            .unwrap();
+            let (text, size, weight, family) = if let Some(s) = line.strip_prefix("# ") {
+                (s, 4.2, "600", "DejaVu Sans")
+            } else if let Some(s) = line.strip_prefix("## ") {
+                (s, 3.8, "600", "DejaVu Sans")
+            } else if let Some(s) = line.strip_prefix("### ") {
+                (s, 3.3, "600", "DejaVu Sans")
+            } else {
+                (line.as_str(), 2.7, "400", "DejaVu Sans Mono")
+            };
+            if !line.starts_with("```") {
+                write!(out,"<text x=\"{}\" y=\"{}\" font-size=\"{size}\" font-weight=\"{weight}\" font-family=\"{family}\" xml:space=\"preserve\">{}</text>",options.left_mm,options.top_mm+8.+i as f64*4.5,escape(text)).unwrap();
+            }
         }
         if options.footer {
             write!(

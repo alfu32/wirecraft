@@ -1,43 +1,29 @@
-# Command-by-command parity
+# Command parity
 
-Source command catalog was read from the running 2.6.7 app. Implementations originate in `app-desktop/.../ui/ThreadworkDesktopApp.kt` (`registerCommands`, `registerAiCommands`). This table distinguishes desktop UI availability from the smaller enabled MCP execute_command catalog; MCP additionally exposes equivalent model/workflow tools.
+Source command catalog was captured from the running 2.6.7 application; implementations are in `app-desktop/.../ui/ThreadworkDesktopApp.kt` (`registerCommands`, `registerAiCommands`). The desktop dispatcher is broader than the headless `execute_command` catalog. Headless clients use the corresponding named MCP tools or shared API commands; UI-only commands return an explicit limitation.
 
-| Source ID | Source title | Wirecraft behavior | Status |
-|---|---|---|---|
-| `ai.copyComponentFiches` | AI Support: Copy Selected Component Fiches as Markdown | Export → Copy component fiches (Markdown); richer dossier/compiler context pending | partial |
-| `ai.generateSource` | AI Support: Generate Source Code for Selected Components | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
-| `ai.generateTestData` | AI Support: Generate Test Data for Selected Components | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
-| `ai.tidySpecification` | AI Support: Tidy and Format Selected Specifications | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
-| `app.options` | Application: Options... | settings.json + explicit XML import; full options UI pending | partial |
-| `commands.palette` | Commands: Open Palette | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
-| `compile.compiler` | Generate: Compiler from Overrides | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
-| `compile.project` | Generate: Project or Selection | literal file-export/multi-tech and native C17 topology + mapped diagnostics + external tools; remaining capabilities/templates/languages pending | partial |
-| `edit.align.bottom` | Edit: Align Bottom | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
-| `edit.align.left` | Edit: Align Left | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
-| `edit.align.right` | Edit: Align Right | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
-| `edit.align.top` | Edit: Align Top | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
-| `edit.copy` | Edit: Copy | entities.copy; typed fragment clipboard | implemented |
-| `edit.cut` | Edit: Cut | entities.cut; atomic fragment + delete | implemented |
-| `edit.distribute.horizontal` | Edit: Distribute Evenly Horizontally | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
-| `edit.distribute.vertical` | Edit: Distribute Evenly Vertically | entities.align service supports all four edges and both distribution axes; Designer exposes left/horizontal controls | partial UI |
-| `edit.paste` | Edit: Paste | entities.paste; ID/type/link remapping | implemented |
-| `edit.redo` | Edit: Redo | edit.redo | implemented |
-| `edit.redoAlt` | Edit: Redo | Ctrl-Shift-Z → edit.redo | implemented |
-| `edit.undo` | Edit: Undo | edit.undo; state identity restores dirty baseline | implemented |
-| `file.new` | File: New | Desktop New + file.new; unsaved-change guard | implemented |
-| `file.open` | File: Open... | Desktop Open + file.open | implemented |
-| `file.printPreview` | File: Export... | SVG/PNG/vector PDF free-size focused graph; ISO/roll/poster sheets pending | partial |
-| `file.quit` | File: Quit | Ctrl-Q; owned backend/LSP/jobs shutdown | implemented |
-| `file.save` | File: Save | Desktop Save + file.commit_and_save / file.save | implemented |
-| `file.saveAs` | File: Save As... | Desktop Save as + file.commit_and_save | implemented |
-| `file.saveAsArchetype` | File: Save Model as Archetype... | Export → Save selected subtree + archetypes.save | implemented |
-| `graph.deleteSelection` | Graph: Delete Selection | Delete; repository cascade | implemented |
-| `graph.mode.link` | Graph: Link Mode | Designer Link | implemented |
-| `graph.mode.node` | Graph: Node Mode | Designer Node | implemented |
-| `graph.mode.select` | Graph: Select Mode | Designer Select / Escape | implemented |
-| `graph.mode.type` | Graph: Type Mode | Designer Type | implemented |
-| `graph.zoomExtents` | Graph: Zoom Extents | Designer Fit | implemented |
-| `help.about` | Help: About | CLI help/version string; dedicated About dialog pending | partial |
-| `help.mcpAgentGuide` | Help: MCP Agent Guide... | threadwork://agent-guide resource; dedicated guide dialog pending | partial |
-| `mcp.manage` | MCP: Manage Server... | owned authenticated backend + MCP connection config; old management/log dialog parity pending | partial |
-| `sheet.toggle` | Sheet: Toggle Preview | Retained in migration scope; no successful placeholder or enabled MCP command | pending |
+| Source IDs | Wirecraft behavior | Status |
+|---|---|---|
+| `ai.copyComponentFiches` | AI Support: Copy Selected Component Fiches; shared `export.markdown` | Working Markdown dossiers |
+| `ai.generateSource`, `ai.generateTestData`, `ai.tidySpecification` | AI Support copies the corresponding task prompt with dossiers and available compiler context; configured network providers report unsupported | Source clipboard behavior migrated; source network implementations were stubs |
+| `app.options` | Staged General/Designer Colors/Inference options, Save/Cancel/defaults; settings.json and explicit XML import | Working supported preferences |
+| `commands.palette` | Ctrl-Shift-P, categorized search, Up/Down/Enter/Escape | Working |
+| `compile.compiler` | Compiler from model overrides | Pending; no successful placeholder |
+| `compile.project` | Generate C17 topology or literal files; shared API/MCP, real external compilation | Partial: other graph compilers and remaining C/templates pending |
+| `edit.align.bottom/left/right/top` | Edit menu and palette; shared `entities.align` | All four operations connected |
+| `edit.distribute.horizontal/vertical` | Edit menu and palette; shared `entities.align` | Both axes connected |
+| `edit.copy/cut/paste` | Menu/shortcuts and ID-safe graph fragments | Working |
+| `edit.redo`, `edit.redoAlt`, `edit.undo` | Menu, Ctrl-Y/Shift-Z/Z; shared undo history | Working |
+| `file.new/open/save/saveAs` | Native path workflows, shared services, unsaved-change/revision guards | Working |
+| `file.printPreview` | Export Plan/Documentation with real preview, ISO/roll/tiling/PDF All and explicit CUPS printing | Working listed scope; exact legacy print fidelity unverified |
+| `file.quit` | Ctrl-Q; owned backend/LSP/jobs shutdown | Working |
+| `file.saveAsArchetype` | Save subtree with stable file format and fresh IDs on import | Working |
+| `graph.deleteSelection` | Delete/menu, shared cascade | Working |
+| `graph.mode.link/node/select/type` | Toolbar/menu/palette, Escape selects | Working |
+| `graph.zoomExtents` | Fit / palette | Working |
+| `help.about` | About dialog with version and baseline | Working |
+| `help.mcpAgentGuide` | Scrollable/copyable guide identical to MCP resource | Working |
+| `mcp.manage` | Dedicated view, config, independent Start/Stop/Restart/health/access log | Working; loopback bearer authentication added |
+| `sheet.toggle` | Sheet toolbar/palette toggles unified Export preview | Deliberate UI redesign; editable on-canvas paper overlay remains pending |
+
+The model, file, generation, report, language-server and job services remain accessible headlessly even when their desktop presentation differs. Do not interpret this table as full compiler or platform parity.

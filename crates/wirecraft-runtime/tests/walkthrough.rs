@@ -282,6 +282,16 @@ fn raster_pdf_embeds_an_image_and_vector_pdf_keeps_searchable_text() {
     }
     let bytes = std::fs::read(&raster).unwrap();
     assert!(
+        bytes.len() < 500_000,
+        "Blank A4 report should compress: {}",
+        bytes.len()
+    );
+    assert!(
+        bytes
+            .windows(b"/FlateDecode".len())
+            .any(|w| w == b"/FlateDecode")
+    );
+    assert!(
         bytes
             .windows(b"/Subtype /Image".len())
             .any(|w| w == b"/Subtype /Image")
@@ -294,4 +304,105 @@ fn raster_pdf_embeds_an_image_and_vector_pdf_keeps_searchable_text() {
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("SearchableTitle"));
     }
+}
+
+#[test]
+fn legacy_appearance_and_font_preferences_activate_without_importing_credentials() {
+    let xml = r##"<preferences><root><node name="com"><node name="threadwork"><node name="app"><node name="appearance"><map><entry key="theme" value="Light"/><entry key="light.canvasbackground" value="#FAFCFD"/><entry key="scroll.rows.per.wheel.tick" value="5"/></map></node><node name="fonts"><map><entry key="codeFont" value="monaspace-neon-regular"/></map></node><node name="designer"><map><entry key="compositeTitleTargetScreenPx" value="22"/></map></node><node name="ai"><map><entry key="claude.token" value="never-import-this"/></map></node></node></node></node></root></preferences>"##;
+    let settings = wirecraft_runtime::config::import_preferences(xml).unwrap();
+    assert_eq!(settings.appearance.theme, "light");
+    assert_eq!(settings.appearance.colors["canvasBackground"], "#FAFCFD");
+    assert_eq!(settings.appearance.wheel_rows, 5.);
+    assert_eq!(settings.appearance.composite_title_size, 22.);
+    assert_eq!(settings.appearance.editor_font, "Monaspace Neon");
+    assert!(
+        !serde_json::to_string(&settings)
+            .unwrap()
+            .contains("never-import-this")
+    );
+}
+#[test]
+fn combined_pdf_includes_plan_and_documentation_and_auto_never_silently_crops() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut s = Service::new(Document::new("CombinedPlan"), None);
+    let path = temp.path().join("all.pdf");
+    let result=s.execute(Request::new("export.write",json!({"kind":"all","sheetOptions":{"format":"A4","scale":2},"documentOptions":{"format":"A4"},"format":"pdf","path":path}))).unwrap();
+    assert_eq!(result["summary"]["planPages"], 1);
+    assert!(result["summary"]["documentationPages"].as_u64().unwrap() > 0);
+    assert_eq!(
+        result["pages"].as_u64().unwrap(),
+        1 + result["summary"]["documentationPages"].as_u64().unwrap()
+    );
+    s.execute(Request::new(
+        "threadwork.create_entity",
+        json!({"name":"Outside","attributes":{"layout":{"x":100_000.}}}),
+    ))
+    .unwrap();
+    let path = temp.path().join("auto.svg");
+    assert!(
+        s.execute(Request::new(
+            "export.write",
+            json!({"format":"svg","path":path})
+        ))
+        .is_err()
+    );
+    assert!(!path.exists());
+    let preview = s
+        .execute(Request::new(
+            "export.preview",
+            json!({"options":{"format":"A4","scale":1}}),
+        ))
+        .unwrap();
+    assert_eq!(preview["summary"]["clipped"], true);
+    assert!(
+        preview["svg"]
+            .as_str()
+            .unwrap()
+            .contains("Drawing exceeds this fixed sheet")
+    );
+}
+
+#[test]
+fn project_revision_updates_transactionally_and_node_edits_capture_it() {
+    let mut s = Service::new(Document::new("Revisions"), None);
+    let before = s.document.nodes["root"].modified.clone();
+    s.execute(Request::new(
+        "threadwork.update_entity",
+        json!({"nodeId":"root","patch":{"masterRevision":{"name":"R1","date":"2026-10-26"}}}),
+    ))
+    .unwrap();
+    assert_eq!(s.document.master_revision["name"], "R1");
+    assert_eq!(s.document.nodes["root"].modified, before);
+    assert!(s.document.nodes["root"].revision.is_none());
+    let node = s
+        .execute(Request::new(
+            "threadwork.create_entity",
+            json!({"name":"Worker"}),
+        ))
+        .unwrap();
+    let id = node["entity"]["id"].as_str().unwrap();
+    assert_eq!(node["effectiveRevision"]["name"], "R1");
+    s.execute(Request::new(
+        "threadwork.update_entity",
+        json!({"nodeId":"root","patch":{"masterRevision":{"name":"R2"}}}),
+    ))
+    .unwrap();
+    assert_eq!(s.document.effective_revision(id).unwrap()["name"], "R1");
+    s.execute(Request::new(
+        "threadwork.update_entity",
+        json!({"nodeId":id,"patch":{"text":{"source":"int version = 2;"}}}),
+    ))
+    .unwrap();
+    assert_eq!(s.document.effective_revision(id).unwrap()["name"], "R2");
+    s.execute(Request::new("edit.undo", json!({}))).unwrap();
+    assert_eq!(s.document.effective_revision(id).unwrap()["name"], "R1");
+    let before = serde_json::to_value(&s.document).unwrap();
+    assert!(
+        s.execute(Request::new(
+            "threadwork.update_entity",
+            json!({"nodeId":"root","patch":{"masterRevision":{"name":17}}})
+        ))
+        .is_err()
+    );
+    assert_eq!(serde_json::to_value(&s.document).unwrap(), before);
 }

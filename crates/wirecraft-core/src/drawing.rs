@@ -27,8 +27,20 @@ pub struct Edge {
     pub target_label: String,
     pub points: Vec<[f64; 2]>,
     pub relation: Option<Relation>,
+    pub color_key: &'static str,
+    pub dashed: bool,
+    pub source: String,
+    pub target: String,
+}
+#[derive(Clone)]
+pub struct Annotation {
+    pub owner: String,
+    pub target: String,
+    pub label: String,
+    pub rect: Rect,
 }
 pub struct Drawing {
+    pub annotations: BTreeMap<String, Annotation>,
     pub shapes: BTreeMap<String, Shape>,
     pub edges: BTreeMap<String, Edge>,
 }
@@ -154,9 +166,11 @@ impl Drawing {
             }
         }
         let mut index = SceneIndex::default();
-        for (id, s) in &shapes {
-            if !s.composite || !s.expanded {
-                index.insert(id.clone(), s.rect);
+        if !projected.is_empty() {
+            for (id, s) in &shapes {
+                if !s.composite || !s.expanded {
+                    index.insert(id.clone(), s.rect);
+                }
             }
         }
         let mut edges = BTreeMap::new();
@@ -231,9 +245,81 @@ impl Drawing {
                     target_label: l.target_port_name.clone(),
                     points,
                     relation: relation(d, n),
+                    color_key: match relation(d, n) {
+                        Some(Relation::Error) => "linkError",
+                        Some(Relation::Dependency) => {
+                            if ["usage", "use", "import", "library"]
+                                .contains(&l.transport_kind.as_str())
+                            {
+                                "linkLibrary"
+                            } else {
+                                "linkDependency"
+                            }
+                        }
+                        Some(Relation::TypeUsage) => "typeText",
+                        Some(Relation::Source) => "linkSource",
+                        Some(Relation::Runnable) => "linkRunnable",
+                        _ => "linkDefault",
+                    },
+                    dashed: dst.rect.x < src.rect.x
+                        || matches!(
+                            relation(d, n),
+                            Some(Relation::Dependency | Relation::Source | Relation::Runnable)
+                        ),
+                    source: a.clone(),
+                    target: b.clone(),
                 },
             );
         }
-        Self { shapes, edges }
+        let mut references: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+        for n in d.nodes.values() {
+            if let Some(link) = &n.link
+                && !link.type_definition_id.is_empty()
+            {
+                references
+                    .entry(link.type_definition_id.clone())
+                    .or_default()
+                    .push((n.id.clone(), n.name.clone()));
+            }
+            if let Some(definition) = &n.type_definition {
+                for field in definition["fields"].as_array().into_iter().flatten() {
+                    if let Some(type_id) = field["typeId"].as_str()
+                        && d.nodes.contains_key(type_id)
+                    {
+                        references.entry(type_id.into()).or_default().push((
+                            n.id.clone(),
+                            format!("{}:{}", n.name, field["name"].as_str().unwrap_or("")),
+                        ));
+                    }
+                }
+            }
+        }
+        let mut annotations = BTreeMap::new();
+        for (type_id, usages) in references {
+            if let Some(shape) = shapes.get(&type_id) {
+                for (i, (target, label)) in usages.into_iter().enumerate() {
+                    let rect = Rect {
+                        x: shape.rect.x + shape.rect.width + 22.,
+                        y: shape.rect.y + 8. + i as f64 * 24.,
+                        width: (label.chars().count() as f64 * 7. + 16.).clamp(80., 320.),
+                        height: 18.,
+                    };
+                    annotations.insert(
+                        format!("type-usage:{type_id}:{i}"),
+                        Annotation {
+                            owner: type_id.clone(),
+                            target,
+                            label,
+                            rect,
+                        },
+                    );
+                }
+            }
+        }
+        Self {
+            shapes,
+            edges,
+            annotations,
+        }
     }
 }

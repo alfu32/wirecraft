@@ -77,7 +77,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
         settings.save(&output)?;
         println!(
             "{}",
-            json!({"imported":true,"retainedPreferences":settings.legacy_preferences.len(),"activeSettings":["editorIndentSpaces"],"deferred":"Appearance and panel geometry are archived for later UI parity; identity and AI credentials were not imported."})
+            json!({"imported":true,"retainedPreferences":settings.legacy_preferences.len(),"activeSettings":["editorIndentSpaces","appearance","fonts","designer"],"deferred":"Panel geometry is archived; identity and AI credentials were not imported. Unavailable system font families use the platform fallback."})
         );
         return Ok(());
     }

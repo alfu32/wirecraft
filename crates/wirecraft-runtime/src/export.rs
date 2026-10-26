@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{io::Write, path::Path};
 use wirecraft_core::{Document, Error, Result, store};
 pub fn diagram(document: &Document, parent: &str, path: &Path, format: &str) -> Result<()> {
     let svg = wirecraft_core::export::svg(document, parent)?;
@@ -100,7 +100,7 @@ pub fn pages_with_mode(
     if format != "pdf" {
         return Err(Error::new("invalid_input", "Expected svg, png or pdf"));
     }
-    use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref};
+    use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref};
     let mut pdf = Pdf::new();
     let mut alloc = Ref::new(1);
     let catalog = alloc.bump();
@@ -112,33 +112,47 @@ pub fn pages_with_mode(
         .count(pages.len() as i32);
     let mut options = svg2pdf::usvg::Options::default();
     options.fontdb_mut().load_system_fonts();
+    let mut raster_pixels = 0_u64;
     for (svg, page_ref) in pages.iter().zip(refs) {
         let tree = svg2pdf::usvg::Tree::from_str(svg, &options)
             .map_err(|e| Error::new("export", e.to_string()))?;
         let (image_ref, chunk) = if rasterized {
             let size = tree.size().to_int_size();
-            if u64::from(size.width()) * u64::from(size.height()) > 40_000_000 {
+            let pixels = u64::from(size.width()) * u64::from(size.height());
+            raster_pixels += pixels;
+            if pixels > 40_000_000 || raster_pixels > 160_000_000 {
                 return Err(Error::new(
                     "export",
-                    "Raster PDF page exceeds 40 megapixels",
+                    "Raster PDF exceeds 40 megapixels per page or 160 megapixels total; use vector PDF",
                 ));
             }
             let mut pixmap = resvg::tiny_skia::Pixmap::new(size.width(), size.height())
                 .ok_or_else(|| Error::new("export", "Cannot allocate raster page"))?;
+            pixmap.fill(resvg::tiny_skia::Color::WHITE);
             resvg::render(
                 &tree,
                 resvg::tiny_skia::Transform::identity(),
                 &mut pixmap.as_mut(),
             );
-            let rgb = pixmap
-                .data()
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .flat_map(|p| [p[0], p[1], p[2]])
-                .collect::<Vec<_>>();
+            let mut encoder =
+                flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+            for row in pixmap.data().chunks_exact(size.width() as usize * 4) {
+                let rgb = row
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .flat_map(|p| [p[0], p[1], p[2]])
+                    .collect::<Vec<_>>();
+                encoder
+                    .write_all(&rgb)
+                    .map_err(|e| Error::new("export", e.to_string()))?;
+            }
+            let rgb = encoder
+                .finish()
+                .map_err(|e| Error::new("export", e.to_string()))?;
             let image_ref = alloc.bump();
             let mut image = pdf.image_xobject(image_ref, &rgb);
+            image.filter(Filter::FlateDecode);
             image
                 .width(size.width() as i32)
                 .height(size.height() as i32)

@@ -4,18 +4,18 @@ pub struct MetadataRow {
     key: Entity<InputState>,
     value: Entity<InputState>,
 }
-pub struct TypeRow {
+pub(super) struct TypeRow {
     name: Entity<InputState>,
-    type_id: Entity<InputState>,
+    pub(super) type_id: Entity<InputState>,
     collection: Entity<InputState>,
-    key_type: Entity<InputState>,
+    pub(super) key_type: Entity<InputState>,
     reference: bool,
     original: Value,
 }
 #[derive(Default)]
 pub struct Tables {
     metadata: Vec<MetadataRow>,
-    types: Vec<TypeRow>,
+    pub(super) types: Vec<TypeRow>,
     baseline_metadata: Value,
     baseline_types: Value,
     is_type: bool,
@@ -211,60 +211,77 @@ impl Wirecraft {
                     .child("TYPE FIELDS"),
             );
             for (i, row) in self.tables.types.iter().enumerate() {
-                form = form.child(
-                    div()
-                        .id(("type-field", i))
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .p_2()
-                        .bg(crate::chrome::color(0x202b35))
-                        .rounded_md()
-                        .child(
-                            div()
-                                .text_xs()
-                                .child("Name / Type ID (primitive or entity)"),
-                        )
-                        .child(Input::new(&row.name))
-                        .child(Input::new(&row.type_id))
-                        .child(
-                            div()
-                                .text_xs()
-                                .child("Collection (array / list / map) / Key type ID"),
-                        )
-                        .child(Input::new(&row.collection))
-                        .child(Input::new(&row.key_type))
-                        .child(
-                            div()
-                                .flex()
-                                .gap_2()
-                                .child(
-                                    button(
-                                        "field-reference",
-                                        if row.reference {
-                                            "☑ Reference"
-                                        } else {
-                                            "☐ Reference"
-                                        },
-                                    )
-                                    .on_click(cx.listener(
-                                        move |this, _, _, cx| {
-                                            this.tables.types[i].reference =
-                                                !this.tables.types[i].reference;
-                                            this.persist_ui(cx);
-                                            cx.notify();
-                                        },
-                                    )),
-                                )
-                                .child(button("remove-field", "Remove field").on_click(
+                form =
+                    form.child(
+                        div()
+                            .id(("type-field", i))
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .p_2()
+                            .bg(crate::chrome::color(0x202b35))
+                            .rounded_md()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .child("Name / Type ID (primitive or entity)"),
+                            )
+                            .child(Input::new(&row.name))
+                            .child(Input::new(&row.type_id))
+                            .child(button("choose-field-type", "Choose type…").on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.type_choice = Some((i, false));
+                                    this.menu = Some("Type reference".into());
+                                    cx.notify();
+                                }),
+                            ))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .child("Collection (array / list / map) / Key type ID"),
+                            )
+                            .child(Input::new(&row.collection))
+                            .child(Input::new(&row.key_type))
+                            .when(row.collection.read(cx).value().as_ref() == "map", |b| {
+                                b.child(button("choose-key-type", "Choose key type…").on_click(
                                     cx.listener(move |this, _, _, cx| {
-                                        this.tables.types.remove(i);
-                                        this.persist_ui(cx);
+                                        this.type_choice = Some((i, true));
+                                        this.menu = Some("Type reference".into());
                                         cx.notify();
                                     }),
-                                )),
-                        ),
-                );
+                                ))
+                            })
+                            .child(
+                                div()
+                                    .flex()
+                                    .gap_2()
+                                    .child(
+                                        button(
+                                            "field-reference",
+                                            if row.reference {
+                                                "☑ Reference"
+                                            } else {
+                                                "☐ Reference"
+                                            },
+                                        )
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| {
+                                                this.tables.types[i].reference =
+                                                    !this.tables.types[i].reference;
+                                                this.persist_ui(cx);
+                                                cx.notify();
+                                            }),
+                                        ),
+                                    )
+                                    .child(button("remove-field", "Remove field").on_click(
+                                        cx.listener(move |this, _, _, cx| {
+                                            this.tables.types.remove(i);
+                                            this.persist_ui(cx);
+                                            cx.notify();
+                                        }),
+                                    )),
+                            ),
+                    );
             }
             form = form.child(button("add-type-field", "Add field").on_click(cx.listener(
                 |this, _, w, cx| {

@@ -74,6 +74,12 @@ pub(crate) fn escape(s: &str) -> String {
 }
 /// Portable visible diagram. Composite visibility matches the desktop projection.
 pub fn svg(d: &Document, parent: &str) -> Result<String> {
+    svg_impl(d, parent, true)
+}
+pub fn drawing_svg(d: &Document, parent: &str) -> Result<String> {
+    svg_impl(d, parent, false)
+}
+fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
     d.node(parent)?;
     let drawing = crate::drawing::Drawing::new(d, parent);
     let left = drawing.shapes.values().map(|s| s.rect.x).fold(0., f64::min) - 40.;
@@ -81,18 +87,26 @@ pub fn svg(d: &Document, parent: &str) -> Result<String> {
     let right = drawing
         .shapes
         .values()
-        .map(|s| s.rect.x + s.rect.width)
+        .map(|s| s.rect)
+        .chain(drawing.annotations.values().map(|a| a.rect))
+        .map(|r| r.x + r.width)
         .fold(400., f64::max)
         + 40.;
     let bottom = drawing
         .shapes
         .values()
-        .map(|s| s.rect.y + s.rect.height)
+        .map(|s| s.rect)
+        .chain(drawing.annotations.values().map(|a| a.rect))
+        .map(|r| r.y + r.height)
         .fold(200., f64::max)
         + 40.;
     let width = (right - left).max(600.);
     let table_y = bottom + 20.;
-    let height = table_y - top + (drawing.shapes.len() as f64 + 2.) * 24. + 70.;
+    let height = if include_parts {
+        table_y - top + (drawing.shapes.len() as f64 + 2.) * 24. + 70.
+    } else {
+        bottom - top + 20.
+    };
     let mut out = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"{left} {top} {width} {height}\"><title>{}</title><defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\"><path d=\"M0 0L10 5L0 10z\" fill=\"#334e68\"/></marker></defs><rect x=\"{left}\" y=\"{top}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/><g font-family=\"DejaVu Sans\" fill=\"#102a43\"><text x=\"{}\" y=\"{}\" font-size=\"22\">{}</text>",
         escape(d.project_name()),
@@ -108,6 +122,7 @@ pub fn svg(d: &Document, parent: &str) -> Result<String> {
         let (fill, stroke) = match s.role.as_str() {
             "Type" => ("#e0f2f1", "#00897b"),
             "ServiceLibrary" => ("#f1f2ff", "#626bd5"),
+            "CompilerTemplate" => ("#fff4dc", "#aa6a00"),
             "ErrorHandler" => ("#fff2f2", "#bd5555"),
             _ => ("#f4f7fa", "#334e68"),
         };
@@ -139,7 +154,7 @@ pub fn svg(d: &Document, parent: &str) -> Result<String> {
             Some(crate::analysis::Relation::TypeUsage) => "#00897b",
             _ => "#334e68",
         };
-        write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" marker-end=\"url(#arrow)\"/>").unwrap();
+        write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" {} marker-end=\"url(#arrow)\"/>",if edge.dashed{"stroke-dasharray=\"8 5\""}else{""}).unwrap();
         for (p, text) in [
             (edge.points.first(), &edge.source_label),
             (edge.points.last(), &edge.target_label),
@@ -149,25 +164,32 @@ pub fn svg(d: &Document, parent: &str) -> Result<String> {
             }
         }
     }
-    write!(out,"<path d=\"M{} {table_y}H{}\" stroke=\"#334e68\"/><text x=\"{}\" y=\"{}\" font-size=\"12\">Parts · Name / Role / Responsible / Revision</text>",left+20.,right-20.,left+20.,table_y+20.).unwrap();
-    for (i, (id, s)) in shapes.iter().enumerate() {
-        let n = d.node(id)?;
-        write!(
-            out,
-            "<text x=\"{}\" y=\"{}\" font-size=\"11\">{} · {} · {} · {}</text>",
-            left + 20.,
-            table_y + 44. + i as f64 * 24.,
-            escape(&n.name),
-            escape(&s.role),
-            escape(&d.effective(id, "responsible")),
-            escape(
-                n.revision
-                    .as_ref()
-                    .and_then(|r| r["name"].as_str())
-                    .unwrap_or("")
+    for annotation in drawing.annotations.values() {
+        let r = annotation.rect;
+        let owner = drawing.shapes[&annotation.owner].rect;
+        write!(out,"<path d=\"M{} {}H{}\" stroke=\"#00897b\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"#e0f2f1\" stroke=\"#00897b\"/><text x=\"{}\" y=\"{}\" font-size=\"9\" fill=\"#00897b\">{}</text>",owner.x+owner.width,r.y+r.height/2.,r.x,r.x,r.y,r.width,r.height,r.x+4.,r.y+12.,escape(&annotation.label)).unwrap();
+    }
+    if include_parts {
+        write!(out,"<path d=\"M{} {table_y}H{}\" stroke=\"#334e68\"/><text x=\"{}\" y=\"{}\" font-size=\"12\">Parts · Name / Role / Responsible / Revision</text>",left+20.,right-20.,left+20.,table_y+20.).unwrap();
+        for (i, (id, s)) in shapes.iter().enumerate() {
+            let n = d.node(id)?;
+            write!(
+                out,
+                "<text x=\"{}\" y=\"{}\" font-size=\"11\">{} · {} · {} · {}</text>",
+                left + 20.,
+                table_y + 44. + i as f64 * 24.,
+                escape(&n.name),
+                escape(&s.role),
+                escape(&d.effective(id, "responsible")),
+                escape(
+                    n.revision
+                        .as_ref()
+                        .and_then(|r| r["name"].as_str())
+                        .unwrap_or("")
+                )
             )
-        )
-        .unwrap();
+            .unwrap();
+        }
     }
     out.push_str("</g></svg>\n");
     Ok(out)

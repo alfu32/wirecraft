@@ -15,6 +15,7 @@ install -m755 "target/$build_dir/wirecraft" "target/$build_dir/wirecraft-desktop
 install -m644 packaging/wirecraft.desktop "$stage/$package/share/applications/"
 install -m644 assets/wirecraft.svg "$stage/$package/share/icons/hicolor/scalable/apps/"
 install -m644 packaging/wirecraft-mime.xml "$stage/$package/share/mime/packages/"
+install -m644 assets/fonts/OFL.txt "$stage/$package/share/doc/wirecraft/Monaspace-OFL.txt"
 install -m644 README.md "$stage/$package/share/doc/wirecraft/"
 cp -R docs/migration "$stage/$package/share/doc/wirecraft/"
 install -m755 scripts/install-linux.sh "$stage/$package/install.sh"

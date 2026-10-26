@@ -434,6 +434,11 @@ impl Document {
             none()
         }
     }
+    pub fn effective_revision(&self, id: &str) -> Option<&Value> {
+        self.ancestors(id)
+            .into_iter()
+            .find_map(|id| self.nodes.get(&id).and_then(|n| n.revision.as_ref()))
+    }
     pub fn effective_text_language(&self, id: &str, section: &str) -> String {
         let key = match section {
             "source" => "sourceLanguageId",
@@ -861,6 +866,7 @@ impl Document {
         }
         let id = Uuid::new_v4().to_string();
         let mut n = Node::new(id.clone(), name.into(), kind, Some(parent.into()));
+        n.revision = Some(self.master_revision.clone());
         n.status = Some("BUSINESS".into());
         n.status_changes.push(json!({"userId":"local","changedDate":timestamp(),"initStatus":null,"endStatus":"BUSINESS"}));
         n.modified = json!({"date":timestamp(),"user":"local"});
@@ -879,6 +885,8 @@ impl Document {
         let p = self.common_parent(&link.source_node_id, &link.target_node_id);
         let mut n = Node::new(id.clone(), name.into(), NodeKind::Link, Some(p.clone()));
         n.link = Some(link);
+        n.revision = Some(self.master_revision.clone());
+        n.modified = json!({"date":timestamp(),"user":"local"});
         self.nodes.insert(id.clone(), n);
         self.nodes.get_mut(&p).unwrap().children.push(id.clone());
         self.sync_links()?;
@@ -944,8 +952,44 @@ impl Document {
                 ));
             }
         }
+        if obj.is_empty() {
+            return Ok(());
+        }
+        let master = if id == self.root_node_id {
+            obj.get("masterRevision")
+                .map(|revision| {
+                    let o = revision.as_object().ok_or_else(|| {
+                        Error::new("invalid_input", "masterRevision must be an object")
+                    })?;
+                    let mut value = self.master_revision.clone();
+                    for key in ["name", "date"] {
+                        if let Some(v) = o.get(key) {
+                            if !v.is_string() {
+                                return Err(Error::new(
+                                    "invalid_input",
+                                    "Revision name/date must be strings",
+                                ));
+                            }
+                            value[key] = v.clone();
+                        }
+                    }
+                    Ok::<_, Error>(value)
+                })
+                .transpose()?
+        } else {
+            None
+        };
+        if obj.len() == 1
+            && let Some(revision) = &master
+        {
+            self.master_revision = revision.clone();
+            return Ok(());
+        }
         let mut value = serde_json::to_value(&current)?;
         for (k, v) in obj {
+            if id == self.root_node_id && k == "masterRevision" {
+                continue;
+            }
             // Text/layout/technology/link patch objects merge; metadata and collections replace.
             if ["text", "layout", "technology", "link"].contains(&k.as_str()) && v.is_object() {
                 if value[k].is_null() {
@@ -996,9 +1040,20 @@ impl Document {
             n.status_changes.push(json!({"userId":"local","changedDate":timestamp(),"initStatus":current.status,"endStatus":n.status}));
         }
         n.modified = json!({"date":timestamp(),"user":"local"});
+        if !obj.contains_key("revision") {
+            n.revision = Some(
+                master
+                    .clone()
+                    .unwrap_or_else(|| self.master_revision.clone()),
+            );
+        }
         self.nodes.insert(id.into(), n);
         self.name = self.project_name().into();
-        self.sync_links()
+        self.sync_links()?;
+        if let Some(master) = master {
+            self.master_revision = master;
+        }
+        Ok(())
     }
     pub fn network_counts(&self) -> Value {
         json!({"entities":self.nodes.values().filter(|n|!n.is_link()).count(),"links":self.nodes.values().filter(|n|n.is_link()).count(),"types":self.nodes.values().filter(|n|n.kind==NodeKind::Type).count(),"composites":self.nodes.values().filter(|n|n.is_composite()&&!n.is_link()).count(),"ports":self.nodes.values().map(|n|n.ports.len()).sum::<usize>(),"users":self.users.len(),"projectName":self.project_name()})

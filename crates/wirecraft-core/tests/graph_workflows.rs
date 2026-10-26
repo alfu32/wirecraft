@@ -184,3 +184,157 @@ fn composite_projection_keeps_absolute_children_and_collapses_boundary_links() {
     assert!(focused.shapes.contains_key(&child));
     assert!(!focused.shapes.contains_key(&peer));
 }
+
+#[test]
+fn type_usage_callouts_reference_entities_and_are_exported() {
+    let mut d = Document::new("Types");
+    let packet = d.create("root", "Packet", NodeKind::Type).unwrap();
+    let envelope = d.create("root", "Envelope", NodeKind::Type).unwrap();
+    let a = d.create("root", "producer", NodeKind::Processor).unwrap();
+    let b = d.create("root", "consumer", NodeKind::Processor).unwrap();
+    d.patch(&envelope,&json!({"typeDefinition":{"fields":[{"name":"payload","typeId":packet}],"qualifier":"object"}})).unwrap();
+    let link = d
+        .create_link(
+            "messages",
+            Link {
+                source_node_id: a,
+                target_node_id: b,
+                type_definition_id: packet.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let drawing = wirecraft_core::drawing::Drawing::new(&d, "root");
+    let usages = drawing
+        .annotations
+        .values()
+        .filter(|a| a.owner == packet)
+        .collect::<Vec<_>>();
+    assert_eq!(usages.len(), 2);
+    assert!(
+        usages
+            .iter()
+            .any(|a| a.target == link && a.label == "messages")
+    );
+    assert!(
+        usages
+            .iter()
+            .any(|a| a.target == envelope && a.label == "Envelope:payload")
+    );
+    let svg = export::svg(&d, "root").unwrap();
+    assert!(svg.contains("Envelope:payload"));
+    assert!(svg.contains("messages"));
+}
+
+#[test]
+fn dependency_matrix_reverses_capability_direction_and_ignores_source_capabilities() {
+    let mut d = Document::new("Layers");
+    let lib = d.create("root", "shared_lib", NodeKind::Processor).unwrap();
+    let worker = d.create("root", "worker", NodeKind::Processor).unwrap();
+    d.create_link(
+        "library",
+        Link {
+            source_node_id: lib.clone(),
+            target_node_id: worker.clone(),
+            interaction_kind: "lib".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    d.create_link(
+        "source",
+        Link {
+            source_node_id: lib.clone(),
+            target_node_id: worker.clone(),
+            interaction_kind: "src".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let r = analysis::report(&d);
+    assert_eq!(
+        r["graphs"]["dependency"]["adjacency"][&worker],
+        json!([lib])
+    );
+    assert_eq!(r["graphs"]["structural"]["edges"], 1);
+    assert_eq!(r["graphs"]["principal"]["edges"], 0);
+    assert!(
+        r["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["title"] == "Select library candidates")
+    );
+}
+
+#[test]
+fn routed_link_index_culls_empty_interiors_and_matches_segment_bounds() {
+    use wirecraft_core::viewport::{Rect, RouteIndex};
+    let names = (0..200)
+        .map(|i| format!("route-{i:03}"))
+        .collect::<Vec<_>>();
+    let routes = names
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            (
+                id.clone(),
+                vec![
+                    [i as f64 * 100., -50.],
+                    [i as f64 * 100. + 300., -50.],
+                    [i as f64 * 100. + 300., 250.],
+                ],
+            )
+        })
+        .collect::<Vec<_>>();
+    let index = RouteIndex::new(routes.iter().map(|(id, p)| (id.as_str(), p.as_slice())));
+    for i in 0..300 {
+        let query = Rect {
+            x: i as f64 * 73. - 100.,
+            y: (i % 9) as f64 * 47. - 90.,
+            width: 80.,
+            height: 60.,
+        };
+        let actual = index
+            .query(query)
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>();
+        let expected = routes
+            .iter()
+            .filter(|(_, p)| {
+                p.windows(2).any(|pair| {
+                    Rect {
+                        x: pair[0][0].min(pair[1][0]) - 6.,
+                        y: pair[0][1].min(pair[1][1]) - 24.,
+                        width: (pair[0][0] - pair[1][0]).abs() + 12.,
+                        height: (pair[0][1] - pair[1][1]).abs() + 48.,
+                    }
+                    .intersects(query)
+                })
+            })
+            .map(|(id, _)| id.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(actual, expected);
+    }
+    let points = [[0., 0.], [1_000_000., 0.], [1_000_000., 1_000_000.]];
+    let index = RouteIndex::new(std::iter::once(("perimeter", points.as_slice())));
+    assert!(
+        index
+            .query(Rect {
+                x: 499_000.,
+                y: 499_000.,
+                width: 2000.,
+                height: 2000.
+            })
+            .is_empty()
+    );
+    assert_eq!(
+        index.query(Rect {
+            x: 999_995.,
+            y: -10.,
+            width: 20.,
+            height: 40.
+        }),
+        vec!["perimeter"]
+    );
+}

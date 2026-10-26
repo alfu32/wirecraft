@@ -2,6 +2,25 @@
 use super::*;
 use std::collections::BTreeMap;
 
+pub(super) fn property_changes(
+    current: &str,
+    baseline: &str,
+) -> Result<serde_json::Map<String, Value>, String> {
+    let current: Value = serde_json::from_str(current).map_err(|e| format!("Properties: {e}"))?;
+    let baseline: Value =
+        serde_json::from_str(baseline).map_err(|e| format!("Loaded properties: {e}"))?;
+    let current = current
+        .as_object()
+        .ok_or("Properties must be a JSON object")?;
+    let baseline = baseline
+        .as_object()
+        .ok_or("Loaded properties must be a JSON object")?;
+    Ok(current
+        .iter()
+        .filter(|(key, value)| baseline.get(*key) != Some(*value))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect())
+}
 pub struct FormField {
     pub path: &'static str,
     label: &'static str,
@@ -28,6 +47,8 @@ pub fn make_fields(window: &mut Window, cx: &mut Context<Wirecraft>) -> Vec<Form
         ("/link/interactionKind", "Interaction"),
         ("/link/typeDefinitionId", "Type definition ID"),
         ("/link/typeName", "Payload type"),
+        ("/masterRevision/name", "Master revision"),
+        ("/masterRevision/date", "Master revision date"),
     ]
     .into_iter()
     .map(|(path, label)| FormField {
@@ -47,9 +68,9 @@ const STATUSES: [&str; 6] = [
     "CANCELED",
 ];
 #[derive(Clone)]
-struct Ticket {
-    id: String,
-    name: String,
+pub(super) struct Ticket {
+    pub id: String,
+    pub name: String,
 }
 impl Render for Ticket {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -209,6 +230,13 @@ const COMMANDS: &[Command] = &[
         label: "Zoom Extents",
         shortcut: "",
         icon: "fit",
+    },
+    Command {
+        id: "sheet-preview",
+        group: "Sheet",
+        label: "Toggle Preview",
+        shortcut: "",
+        icon: "sheet",
     },
     Command {
         id: "select",
@@ -402,6 +430,8 @@ impl Wirecraft {
     }
     pub(super) fn palette(&mut self, _: &CommandPalette, w: &mut Window, cx: &mut Context<Self>) {
         self.menu = Some("Commands".into());
+        self.palette_index = 0;
+        self.palette_scroll.scroll_to_item(0);
         self.query.update(cx, |s, cx| {
             s.set_value("", w, cx);
             s.focus(w, cx);
@@ -422,11 +452,15 @@ impl Wirecraft {
     }
     pub(super) fn submit_command(&mut self, w: &mut Window, cx: &mut Context<Self>) {
         let query = self.query.read(cx).value().to_lowercase();
-        if let Some(command) = COMMANDS.iter().find(|c| {
-            format!("{} {}", c.group, c.label)
-                .to_lowercase()
-                .contains(&query)
-        }) {
+        if let Some(command) = COMMANDS
+            .iter()
+            .filter(|c| {
+                format!("{} {}", c.group, c.label)
+                    .to_lowercase()
+                    .contains(&query)
+            })
+            .nth(self.palette_index)
+        {
             self.command(command.id, w, cx);
             self.focus.focus(w);
         }
@@ -444,6 +478,13 @@ impl Wirecraft {
             "cut" => self.cut(&CutEntities, w, cx),
             "paste" => self.paste(&PasteEntities, w, cx),
             "fit" => self.fit(&Fit, w, cx),
+            "sheet-preview" => {
+                if self.tab == "Export" {
+                    self.tab = "Designer".into();
+                } else {
+                    self.show_export(&ShowExport, w, cx);
+                }
+            }
             "select" => self.select_mode(&SelectMode, w, cx),
             "node" => self.node_mode(&NodeMode, w, cx),
             "link" => self.link_mode(&LinkMode, w, cx),
@@ -561,6 +602,34 @@ impl Wirecraft {
             .border_color(crate::chrome::color(0x40505c))
             .bg(crate::chrome::color(0x1c242e))
             .shadow_lg();
+        panel = panel.capture_key_down(cx.listener(|this, event: &KeyDownEvent, w, cx| {
+            if event.keystroke.key == "escape" {
+                this.menu = None;
+                this.focus.focus(w);
+                cx.stop_propagation();
+                cx.notify();
+            } else if this.menu.as_deref() == Some("Commands")
+                && ["up", "down"].contains(&event.keystroke.key.as_str())
+            {
+                let query = this.query.read(cx).value().to_lowercase();
+                let count = COMMANDS
+                    .iter()
+                    .filter(|c| {
+                        format!("{} {}", c.group, c.label)
+                            .to_lowercase()
+                            .contains(&query)
+                    })
+                    .count();
+                this.palette_index = if event.keystroke.key == "up" {
+                    this.palette_index.saturating_sub(1)
+                } else {
+                    (this.palette_index + 1).min(count.saturating_sub(1))
+                };
+                this.palette_scroll.scroll_to_item(this.palette_index);
+                cx.stop_propagation();
+                cx.notify();
+            }
+        }));
         panel = panel.child(
             div()
                 .flex()
@@ -575,7 +644,107 @@ impl Wirecraft {
                     })),
                 ),
         );
-        if ["Sheet format", "Document format", "Sheet scale"].contains(&group) {
+        if group == "Type reference" {
+            let mut choices = [
+                ("string", "string"),
+                ("boolean", "boolean"),
+                ("number", "number"),
+                ("date", "date"),
+                ("int", "int"),
+                ("float", "float"),
+                ("double", "double"),
+                ("char *", "char *"),
+                ("void *", "void *"),
+            ]
+            .into_iter()
+            .map(|(id, name)| (id.to_string(), name.to_string()))
+            .collect::<Vec<_>>();
+            choices.extend(
+                self.snapshot
+                    .document
+                    .nodes
+                    .values()
+                    .filter(|n| n.kind == wirecraft_core::NodeKind::Type)
+                    .map(|n| (n.id.clone(), self.snapshot.document.qualified_name(&n.id))),
+            );
+            panel = panel.child(
+                div()
+                    .id("type-options")
+                    .max_h(px(480.))
+                    .overflow_y_scroll()
+                    .children(choices.into_iter().enumerate().map(|(i, (id, label))| {
+                        div()
+                            .id(i)
+                            .flex()
+                            .gap_2()
+                            .p_2()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(crate::chrome::color(0x293846)))
+                            .child(icons::icon("type"))
+                            .child(label)
+                            .on_click(cx.listener(move |this, _, w, cx| {
+                                let input = if let Some((index, key)) = this.type_choice {
+                                    this.tables.types.get(index).map(|row| {
+                                        if key {
+                                            row.key_type.clone()
+                                        } else {
+                                            row.type_id.clone()
+                                        }
+                                    })
+                                } else {
+                                    this.inspector
+                                        .iter()
+                                        .find(|f| f.path == "/link/typeDefinitionId")
+                                        .map(|f| f.input.clone())
+                                };
+                                if let Some(input) = input {
+                                    input.update(cx, |s, cx| s.set_value(id.clone(), w, cx));
+                                }
+                                this.menu = None;
+                                this.persist_ui(cx);
+                                cx.notify();
+                            }))
+                    })),
+            );
+        } else if ["Designer font", "Code font"].contains(&group) {
+            let path = if group == "Designer font" {
+                "/appearance/designerFont"
+            } else {
+                "/appearance/editorFont"
+            };
+            panel = panel.child(
+                uniform_list(
+                    "font-choices",
+                    self.font_choices.len(),
+                    cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
+                        range
+                            .map(|i| {
+                                let name = this.font_choices[i].clone();
+                                div()
+                                    .id(i)
+                                    .h(px(30.))
+                                    .px_2()
+                                    .cursor_pointer()
+                                    .font_family(name.clone())
+                                    .child(name.clone())
+                                    .on_click(cx.listener(move |this, _, w, cx| {
+                                        if let Some(field) =
+                                            this.options.fields.iter().find(|f| f.path == path)
+                                        {
+                                            field.input.update(cx, |s, cx| {
+                                                s.set_value(name.clone(), w, cx)
+                                            });
+                                        }
+                                        this.menu = None;
+                                        cx.notify();
+                                    }))
+                            })
+                            .collect::<Vec<_>>()
+                    }),
+                )
+                .h(px(480.)),
+            );
+        } else if ["Sheet format", "Document format", "Sheet scale"].contains(&group) {
             let choices: Vec<String> = if group == "Sheet scale" {
                 [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
                     .into_iter()
@@ -618,7 +787,31 @@ impl Wirecraft {
                 }),
             ));
         } else if group == "About" || group == "Guide" {
-            panel=panel.child(div().p_4().child(if group=="About" {format!("Wirecraft {}\nRust + GPUI\nMigrated from Threadworks 2.6.7\nSource: 7d392d3a0e30b86445e00e7c03032a5188b26593",env!("CARGO_PKG_VERSION"))}else{"Connect an MCP client using MCP → Copy configuration. The desktop and MCP share one design and undo history. Use threadwork.get_design, get_entity and validate_design to inspect it. Use expectedRevision with HTTP API mutations to prevent stale edits. Files keep the .orch format. Closing this desktop stops its owned backend and language servers. See README.md and docs/migration for the full interface, compiler capabilities and remaining gaps.".into()}));
+            let text = if group == "About" {
+                format!(
+                    "Wirecraft {}\nRust + GPUI\nMigrated from Threadworks 2.6.7\nSource: 7d392d3a0e30b86445e00e7c03032a5188b26593",
+                    env!("CARGO_PKG_VERSION")
+                )
+            } else {
+                wirecraft_runtime::mcp::GUIDE.into()
+            };
+            panel = panel.child(
+                div()
+                    .id("help-text")
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .p_4()
+                    .child(text),
+            );
+            if group == "Guide" {
+                panel = panel.child(button("copy-guide", "Copy agent guide").on_click(
+                    |_, _, cx| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(
+                            wirecraft_runtime::mcp::GUIDE.into(),
+                        ));
+                    },
+                ));
+            }
         } else {
             if group == "Commands" {
                 panel = panel.child(Input::new(&self.query));
@@ -629,43 +822,52 @@ impl Wirecraft {
                 String::new()
             };
             panel = panel.child(
-                div().id("command-list").overflow_y_scroll().children(
-                    COMMANDS
-                        .iter()
-                        .filter(|c| {
-                            (group == "Commands" || c.group == group)
-                                && format!("{} {}", c.group, c.label)
-                                    .to_lowercase()
-                                    .contains(&query)
-                        })
-                        .map(|c| {
-                            let id = c.id;
-                            div()
-                                .id(id)
-                                .flex()
-                                .items_center()
-                                .gap_3()
-                                .p_2()
-                                .rounded_sm()
-                                .cursor_pointer()
-                                .hover(|s| s.bg(crate::chrome::color(0x2d3b48)))
-                                .on_click(
-                                    cx.listener(move |this, _, w, cx| this.command(id, w, cx)),
-                                )
-                                .child(icons::icon(c.icon))
-                                .child(div().flex_1().child(if group == "Commands" {
-                                    format!("{}: {}", c.group, c.label)
-                                } else {
-                                    c.label.into()
-                                }))
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(crate::chrome::color(0x8a9aab))
-                                        .child(c.shortcut),
-                                )
-                        }),
-                ),
+                div()
+                    .id("command-list")
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .track_scroll(&self.palette_scroll)
+                    .children(
+                        COMMANDS
+                            .iter()
+                            .filter(|c| {
+                                (group == "Commands" || c.group == group)
+                                    && format!("{} {}", c.group, c.label)
+                                        .to_lowercase()
+                                        .contains(&query)
+                            })
+                            .enumerate()
+                            .map(|(index, c)| {
+                                let id = c.id;
+                                div()
+                                    .id(id)
+                                    .flex()
+                                    .items_center()
+                                    .gap_3()
+                                    .p_2()
+                                    .rounded_sm()
+                                    .cursor_pointer()
+                                    .when(group == "Commands" && index == self.palette_index, |s| {
+                                        s.bg(crate::chrome::color(0x255452))
+                                    })
+                                    .hover(|s| s.bg(crate::chrome::color(0x2d3b48)))
+                                    .on_click(
+                                        cx.listener(move |this, _, w, cx| this.command(id, w, cx)),
+                                    )
+                                    .child(icons::icon(c.icon))
+                                    .child(div().flex_1().child(if group == "Commands" {
+                                        format!("{}: {}", c.group, c.label)
+                                    } else {
+                                        c.label.into()
+                                    }))
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(crate::chrome::color(0x8a9aab))
+                                            .child(c.shortcut),
+                                    )
+                            }),
+                    ),
             );
         }
         Some(
@@ -702,7 +904,7 @@ impl Wirecraft {
                         b.bg(crate::chrome::color(0x255452))
                     })
                     .on_click(cx.listener(move |this, _, w, cx| {
-                        if this.has_draft(cx) {
+                        if this.has_draft(cx) || this.editor_request_pending {
                             this.status = "Apply the editor draft before changing section".into();
                         } else {
                             this.section = key.into();
@@ -755,7 +957,14 @@ impl Wirecraft {
                     .pb_2()
                     .text_xs()
                     .text_color(crate::chrome::color(0x8fa6b5))
-                    .child(format!("Effective language: {language}"))
+                    .child("Language")
+                    .when_some(
+                        self.inspector
+                            .iter()
+                            .find(|f| f.path == format!("/text/{}LanguageId", self.section)),
+                        |b, field| b.child(div().w(px(135.)).child(Input::new(&field.input))),
+                    )
+                    .child(format!("Effective: {language}"))
                     .child(button("reload-entity", "Discard draft / Reload").on_click(
                         cx.listener(|this, _, w, cx| {
                             this.load_editor(w, cx);
@@ -792,6 +1001,9 @@ impl Wirecraft {
             ));
         }
         for f in &self.inspector {
+            if f.path.starts_with("/masterRevision/") {
+                continue;
+            }
             if f.path.starts_with("/link/") && !n.is_some_and(|n| n.is_link()) {
                 continue;
             }
@@ -834,6 +1046,16 @@ impl Wirecraft {
             } else {
                 inspector =
                     inspector.child(field_row(f.label, Input::new(&f.input).into_any_element()));
+                if f.path == "/link/typeDefinitionId" {
+                    inspector =
+                        inspector.child(button("choose-link-type", "Choose type…").on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.type_choice = None;
+                                this.menu = Some("Type reference".into());
+                                cx.notify();
+                            }),
+                        ));
+                }
             }
         }
         if let Some(n) = n {
@@ -849,16 +1071,43 @@ impl Wirecraft {
                     self.snapshot.document.effective(&n.id, key),
                 ));
             }
+            let revision = self.snapshot.document.effective_revision(&n.id);
             inspector = inspector
                 .child(heading("TRACKING"))
-                .child(read_row("Modified", n.modified.to_string()))
                 .child(read_row(
-                    "Revision",
-                    n.revision
-                        .as_ref()
-                        .map(Value::to_string)
-                        .unwrap_or_default(),
+                    "Effective revision",
+                    revision
+                        .and_then(|v| v["name"].as_str())
+                        .unwrap_or("")
+                        .into(),
+                ))
+                .child(read_row(
+                    "Effective revision date",
+                    revision
+                        .and_then(|v| v["date"].as_str())
+                        .unwrap_or("")
+                        .into(),
+                ))
+                .child(read_row(
+                    "Modified by",
+                    n.modified["user"].as_str().unwrap_or("").into(),
+                ))
+                .child(read_row(
+                    "Modified date",
+                    n.modified["date"].as_str().unwrap_or("").into(),
                 ));
+            if n.id == self.snapshot.document.root_node_id {
+                for field in self
+                    .inspector
+                    .iter()
+                    .filter(|f| f.path.starts_with("/masterRevision/"))
+                {
+                    inspector = inspector.child(field_row(
+                        field.label,
+                        Input::new(&field.input).into_any_element(),
+                    ));
+                }
+            }
             for (i, event) in n.status_changes.iter().rev().enumerate() {
                 inspector = inspector.child(
                     div()
@@ -873,6 +1122,35 @@ impl Wirecraft {
                             event["endStatus"].as_str().unwrap_or("none"),
                             event["userId"].as_str().unwrap_or("")
                         )),
+                );
+            }
+        }
+        if let Some(n) = n
+            && !n.diagnostics.is_empty()
+        {
+            inspector = inspector.child(heading("STORED DIAGNOSTICS"));
+            for (i, d) in n.diagnostics.iter().enumerate() {
+                let diagnostic = json!({"source":{"nodeId":n.id,"section":d["textSection"],"line":d["line"],"column":d["column"]},"message":d["message"]});
+                let mapped = d["textSection"].is_string() && d["line"].is_number();
+                inspector = inspector.child(
+                    div()
+                        .id(("stored-diagnostic", i))
+                        .p_2()
+                        .rounded_sm()
+                        .border_1()
+                        .border_color(crate::chrome::color(0x54604d))
+                        .text_xs()
+                        .child(format!(
+                            "{} · {}",
+                            d["severity"].as_str().unwrap_or(""),
+                            d["message"].as_str().unwrap_or("")
+                        ))
+                        .when(mapped, |b| {
+                            b.cursor_pointer()
+                                .on_click(cx.listener(move |this, _, w, cx| {
+                                    this.reveal_diagnostic(&diagnostic, w, cx)
+                                }))
+                        }),
                 );
             }
         }
@@ -1145,7 +1423,7 @@ impl Wirecraft {
         let mut groups: BTreeMap<String, Vec<&Value>> = BTreeMap::new();
         for a in &self.archetypes {
             groups
-                .entry(a["technologyId"].as_str().unwrap_or("Other").into())
+                .entry(a["group"].as_str().unwrap_or("Other").into())
                 .or_default()
                 .push(a);
         }
@@ -1178,6 +1456,19 @@ impl Wirecraft {
                         .child(
                             div()
                                 .text_xs()
+                                .text_color(crate::chrome::color(0x96a9bb))
+                                .child(
+                                    a["description"]
+                                        .as_str()
+                                        .unwrap_or("")
+                                        .chars()
+                                        .take(180)
+                                        .collect::<String>(),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
                                 .text_color(crate::chrome::color(0x9bb0c3))
                                 .child(format!(
                                     "{} entities · {}",
@@ -1203,7 +1494,15 @@ impl Wirecraft {
                             f64::from(f32::from(bounds.size.width)),
                             f64::from(f32::from(bounds.size.height)),
                         ]);
-                        scene.paint(bounds, view, &BTreeSet::new(), [0., 0.], w, cx);
+                        scene.paint(
+                            bounds,
+                            view,
+                            &BTreeSet::new(),
+                            &BTreeSet::new(),
+                            [0., 0.],
+                            w,
+                            cx,
+                        );
                     },
                 )
                 .flex_1(),
@@ -1378,10 +1677,20 @@ impl Wirecraft {
                     )),
             );
         }
-        let mut findings = div().flex().gap_3().p_3();
-        for category in ["overview", "principal", "error", "dependency"] {
+        let mut findings = div().flex().flex_wrap().gap_3().p_3();
+        for category in [
+            "overview",
+            "principal",
+            "error",
+            "dependency",
+            "workflows",
+            "cross-layer",
+            "quality",
+        ] {
             let mut column = div()
                 .flex_1()
+                .min_w(px(300.))
+                .max_w(px(600.))
                 .flex()
                 .flex_col()
                 .gap_2()
@@ -1577,6 +1886,43 @@ impl Wirecraft {
                     .min_h_0()
                     .overflow_y_scroll()
                     .child(findings)
+                    .child(
+                        div().p_3().flex().flex_wrap().gap_2().children(
+                            report["actions"]
+                                .as_array()
+                                .into_iter()
+                                .flatten()
+                                .enumerate()
+                                .map(|(i, action)| {
+                                    let ids = action["affectedNodes"]
+                                        .as_array()
+                                        .into_iter()
+                                        .flatten()
+                                        .filter_map(|id| id.as_str().map(str::to_string))
+                                        .collect::<BTreeSet<_>>();
+                                    div()
+                                        .id(("inspection-action", i))
+                                        .p_2()
+                                        .rounded_sm()
+                                        .bg(crate::chrome::color(0x242c36))
+                                        .cursor_pointer()
+                                        .child(action["title"].as_str().unwrap_or("").to_string())
+                                        .on_click(cx.listener(move |this, _, w, cx| {
+                                            if !this.has_draft(cx) && !ids.is_empty() {
+                                                this.selected = ids.clone();
+                                                this.parent =
+                                                    this.snapshot.document.root_node_id.clone();
+                                                this.rebuild();
+                                                this.tab = "Designer".into();
+                                                this.fit(&Fit, w, cx);
+                                                this.load_editor(w, cx);
+                                                this.persist_ui(cx);
+                                                cx.notify();
+                                            }
+                                        }))
+                                }),
+                        ),
+                    )
                     .child(div().p_3().child(format!(
                             "Isolated entities: {} · Connected components: {}",
                             report["isolatedNodes"]

@@ -2,12 +2,13 @@ use gpui::*;
 use std::collections::{BTreeMap, BTreeSet};
 use wirecraft_core::{
     Document, NodeKind,
-    viewport::{Rect, SceneIndex, Viewport},
+    viewport::{Rect, RouteIndex, SceneIndex, Viewport},
 };
 pub struct Scene {
     appearance: wirecraft_runtime::config::Appearance,
     pub drawing: wirecraft_core::drawing::Drawing,
-    pub index: SceneIndex,
+    index: SceneIndex,
+    routes: RouteIndex,
     pub nodes: BTreeMap<String, (String, NodeKind, Rect)>,
     pub links: BTreeMap<String, (String, Vec<[f64; 2]>)>,
 }
@@ -17,6 +18,7 @@ impl Scene {
             appearance: wirecraft_runtime::config::Appearance::default(),
             drawing: wirecraft_core::drawing::Drawing::new(d, "__empty__"),
             index: SceneIndex::default(),
+            routes: RouteIndex::default(),
             nodes: BTreeMap::new(),
             links: BTreeMap::new(),
         };
@@ -27,31 +29,32 @@ impl Scene {
                 .insert(id.clone(), (shape.name.clone(), shape.kind, shape.rect));
         }
         for (id, edge) in &drawing.edges {
-            let points = &edge.points;
-            let x = points.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min);
-            let y = points.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
-            let max_x = points
-                .iter()
-                .map(|p| p[0])
-                .fold(f64::NEG_INFINITY, f64::max);
-            let max_y = points
-                .iter()
-                .map(|p| p[1])
-                .fold(f64::NEG_INFINITY, f64::max);
-            s.index.insert(
-                id.clone(),
-                Rect {
-                    x: x - 5.,
-                    y: y - 20.,
-                    width: max_x - x + 10.,
-                    height: max_y - y + 40.,
-                },
-            );
             s.links
                 .insert(id.clone(), (edge.name.clone(), edge.points.clone()));
         }
+        s.routes = RouteIndex::new(
+            drawing
+                .edges
+                .iter()
+                .map(|(id, edge)| (id.as_str(), edge.points.as_slice())),
+        );
+        for (id, annotation) in &drawing.annotations {
+            s.index.insert(
+                id.clone(),
+                Rect {
+                    x: annotation.rect.x - 22.,
+                    width: annotation.rect.width + 22.,
+                    ..annotation.rect
+                },
+            );
+        }
         s.drawing = drawing;
         s
+    }
+    pub fn query(&self, rect: Rect) -> Vec<String> {
+        let mut ids = self.index.query(rect);
+        ids.extend(self.routes.query(rect));
+        ids
     }
     pub fn with_appearance(mut self, appearance: wirecraft_runtime::config::Appearance) -> Self {
         self.appearance = appearance;
@@ -62,6 +65,8 @@ impl Scene {
             0x10161e => "canvasBackground",
             0x202a38 => "gridMinor",
             0x34404d => "gridMajor",
+            0x4c3b17 => "compilerFill",
+            0xf0ad36 => "compilerStroke",
             0x202c38 => "nodeFill",
             0x8196a9 => "nodeStroke",
             0x173b3a => "typeFill",
@@ -87,25 +92,21 @@ impl Scene {
         if self.nodes.is_empty() {
             return Viewport::default();
         }
-        let min_x = self
+        let rects = self
             .nodes
             .values()
-            .map(|n| n.2.x)
-            .fold(f64::INFINITY, f64::min);
-        let min_y = self
-            .nodes
-            .values()
-            .map(|n| n.2.y)
-            .fold(f64::INFINITY, f64::min);
-        let max_x = self
-            .nodes
-            .values()
-            .map(|n| n.2.x + n.2.width)
+            .map(|n| n.2)
+            .chain(self.drawing.annotations.values().map(|a| a.rect))
+            .collect::<Vec<_>>();
+        let min_x = rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
+        let min_y = rects.iter().map(|r| r.y).fold(f64::INFINITY, f64::min);
+        let max_x = rects
+            .iter()
+            .map(|r| r.x + r.width)
             .fold(f64::NEG_INFINITY, f64::max);
-        let max_y = self
-            .nodes
-            .values()
-            .map(|n| n.2.y + n.2.height)
+        let max_y = rects
+            .iter()
+            .map(|r| r.y + r.height)
             .fold(f64::NEG_INFINITY, f64::max);
         let zoom = ((size[0] - 80.) / (max_x - min_x).max(1.))
             .min((size[1] - 80.) / (max_y - min_y).max(1.))
@@ -116,11 +117,13 @@ impl Scene {
             zoom,
         }
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn paint(
         &self,
         bounds: Bounds<Pixels>,
         view: Viewport,
         selected: &BTreeSet<String>,
+        moving: &BTreeSet<String>,
         drag: [f64; 2],
         window: &mut Window,
         cx: &mut App,
@@ -129,7 +132,7 @@ impl Scene {
         let width = f64::from(f32::from(bounds.size.width));
         let height = f64::from(f32::from(bounds.size.height));
         let origin = view.world([0., 0.]);
-        let visible = self.index.query(Rect {
+        let visible = self.query(Rect {
             x: origin[0] - 200.,
             y: origin[1] - 100.,
             width: width / view.zoom + 400.,
@@ -183,18 +186,59 @@ impl Scene {
         ordered.sort_by_key(|(_, shape)| shape.depth);
         for (id, shape) in &ordered {
             if shape.composite && shape.expanded {
-                self.paint_shape(id, shape, view, selected, drag, &screen, window, cx);
+                self.paint_shape(id, shape, view, selected, moving, drag, &screen, window, cx);
             }
         }
         for id in &visible {
             if let Some((name, points)) = self.links.get(id) {
+                let edge = &self.drawing.edges[id];
+                let mut shifted = points.clone();
+                if moving.contains(&edge.source) && moving.contains(&edge.target) {
+                    for p in &mut shifted {
+                        p[0] += drag[0];
+                        p[1] += drag[1];
+                    }
+                } else if moving.contains(&edge.source) || moving.contains(&edge.target) {
+                    let mut a = shifted[0];
+                    let mut b = *shifted.last().unwrap();
+                    if moving.contains(&edge.source) {
+                        a[0] += drag[0];
+                        a[1] += drag[1];
+                    }
+                    if moving.contains(&edge.target) {
+                        b[0] += drag[0];
+                        b[1] += drag[1];
+                    }
+                    let mid = (a[0] + b[0]) / 2.;
+                    shifted = vec![a, [mid, a[1]], [mid, b[1]], b];
+                }
+                let points = &shifted;
                 let mut builder =
                     PathBuilder::stroke(px(if selected.contains(id) { 3. } else { 1.5 }));
-                for (i, p) in points.iter().enumerate() {
-                    if i == 0 {
-                        builder.move_to(screen(*p));
-                    } else {
-                        builder.line_to(screen(*p));
+                if edge.dashed {
+                    for segment in points.windows(2) {
+                        let a = screen(segment[0]);
+                        let b = screen(segment[1]);
+                        let delta = b - a;
+                        let length =
+                            (f32::from(delta.x).powi(2) + f32::from(delta.y).powi(2)).sqrt();
+                        if length < 0.1 {
+                            continue;
+                        }
+                        let mut start = 0.;
+                        while start < length {
+                            builder.move_to(a + delta * (start / length));
+                            builder.line_to(a + delta * ((start + 6.).min(length) / length));
+                            start += 10.;
+                        }
+                    }
+                } else {
+                    for (i, p) in points.iter().enumerate() {
+                        if i == 0 {
+                            builder.move_to(screen(*p));
+                        } else {
+                            builder.line_to(screen(*p));
+                        }
                     }
                 }
                 if let Some(end) = points.last() {
@@ -205,16 +249,11 @@ impl Scene {
                 if let Ok(path) = builder.build() {
                     window.paint_path(
                         path,
-                        rgb(self.color(if selected.contains(id) {
-                            0xf6c86c
+                        rgb(if selected.contains(id) {
+                            self.appearance.color("selection", 0x70d5c6)
                         } else {
-                            match self.drawing.edges[id].relation {
-                                Some(wirecraft_core::analysis::Relation::Error) => 0xe27b7b,
-                                Some(wirecraft_core::analysis::Relation::Dependency) => 0xe3b664,
-                                Some(wirecraft_core::analysis::Relation::TypeUsage) => 0x58c6a4,
-                                _ => 0x9cb5c8,
-                            }
-                        })),
+                            self.appearance.color(edge.color_key, 0x9cb5c8)
+                        }),
                     );
                 }
                 if view.zoom >= 0.35 {
@@ -258,7 +297,54 @@ impl Scene {
         }
         for (id, shape) in &ordered {
             if !shape.composite || !shape.expanded {
-                self.paint_shape(id, shape, view, selected, drag, &screen, window, cx);
+                self.paint_shape(id, shape, view, selected, moving, drag, &screen, window, cx);
+            }
+        }
+        for id in &visible {
+            if let Some(annotation) = self.drawing.annotations.get(id) {
+                let mut r = annotation.rect;
+                let offset = if moving.contains(&annotation.owner) {
+                    drag
+                } else {
+                    [0., 0.]
+                };
+                r.x += offset[0];
+                r.y += offset[1];
+                let selected = selected.contains(&annotation.target);
+                let rect = Bounds::new(
+                    screen([r.x, r.y]),
+                    size(
+                        px((r.width * view.zoom) as f32),
+                        px((r.height * view.zoom) as f32),
+                    ),
+                );
+                let mut owner = self.drawing.shapes[&annotation.owner].rect;
+                owner.x += offset[0];
+                owner.y += offset[1];
+                let mut connector = PathBuilder::stroke(px(1.));
+                connector.move_to(screen([owner.x + owner.width, r.y + r.height / 2.]));
+                connector.line_to(screen([r.x, r.y + r.height / 2.]));
+                if let Ok(path) = connector.build() {
+                    window.paint_path(path, rgb(self.color(0x45baa8)));
+                }
+                window.paint_quad(quad(
+                    rect,
+                    px(1.),
+                    rgb(self.color(0x173b3a)),
+                    px(if selected { 2. } else { 1. }),
+                    rgb(self.color(if selected { 0x70d5c6 } else { 0x45baa8 })),
+                    BorderStyle::Solid,
+                ));
+                if view.zoom >= 0.3 {
+                    self.label(
+                        &annotation.label,
+                        rect.origin + point(px(4. * view.zoom as f32), px(2. * view.zoom as f32)),
+                        (10. * view.zoom as f32).max(5.),
+                        0x58c6a4,
+                        window,
+                        cx,
+                    );
+                }
             }
         }
     }
@@ -269,6 +355,7 @@ impl Scene {
         shape: &wirecraft_core::drawing::Shape,
         view: Viewport,
         selected: &BTreeSet<String>,
+        moving: &BTreeSet<String>,
         drag: [f64; 2],
         screen: &impl Fn([f64; 2]) -> Point<Pixels>,
         window: &mut Window,
@@ -276,7 +363,7 @@ impl Scene {
     ) {
         let r = shape.rect;
         let active = selected.contains(id);
-        let offset = if active { drag } else { [0., 0.] };
+        let offset = if moving.contains(id) { drag } else { [0., 0.] };
         let rect = Bounds::new(
             screen([r.x + offset[0], r.y + offset[1]]),
             size(
@@ -287,6 +374,7 @@ impl Scene {
         let (fill_color, stroke) = match shape.role.as_str() {
             "Type" => (0x173b3a, 0x45baa8),
             "ServiceLibrary" => (0x292e43, 0x8893e4),
+            "CompilerTemplate" => (0x4c3b17, 0xf0ad36),
             "ErrorHandler" | "CompositeErrorHandler" => (0x432a2a, 0xe27b7b),
             "Test" | "TestSuite" => (0x273d2c, 0x6ac284),
             _ => (0x202c38, 0x8196a9),

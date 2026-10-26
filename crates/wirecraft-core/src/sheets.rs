@@ -1,7 +1,7 @@
 //! Technical-sheet pagination in millimeters; source uses four world units per mm.
 use crate::{
     Document, Error, Result,
-    export::{escape, svg},
+    export::{drawing_svg, escape},
 };
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize)]
@@ -29,6 +29,7 @@ pub struct SheetPlan {
     pub width_mm: f64,
     pub height_mm: f64,
     pub rows: usize,
+    pub clipped: bool,
     pub columns: usize,
     pub pages: Vec<String>,
 }
@@ -79,7 +80,7 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
             "Invalid sheet format, scale or overlap",
         ));
     }
-    let diagram = svg(d, parent)?;
+    let diagram = drawing_svg(d, parent)?;
     let attribute = |key: &str| {
         diagram
             .split(&format!("{key}=\""))
@@ -109,6 +110,14 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
     }
     let usable_w = width - 25.;
     let usable_h = height - 35.;
+    let clipped = (!options.split || format.ends_with("roll"))
+        && (content_w > usable_w || content_h > usable_h);
+    if options.format == "Auto" && clipped {
+        return Err(Error::new(
+            "export",
+            "Drawing exceeds available Auto sheet formats. Increase the scale denominator or choose a fixed split format.",
+        ));
+    }
     let overlap = if options.split {
         options.overlap_mm
     } else {
@@ -167,7 +176,23 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
                     &format!("height=\"{content_h}\""),
                     1,
                 );
-            pages.push(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}mm\" height=\"{height}mm\" viewBox=\"0 0 {width} {height}\"><rect width=\"{width}\" height=\"{height}\" fill=\"white\"/><defs><clipPath id=\"drawingClip\"><rect x=\"20\" y=\"5\" width=\"{usable_w}\" height=\"{usable_h}\"/></clipPath></defs><g clip-path=\"url(#drawingClip)\">{nested}</g><g font-family=\"DejaVu Sans\" font-size=\"3\" fill=\"#263c50\"><rect x=\"20\" y=\"5\" width=\"{usable_w}\" height=\"{usable_h}\" fill=\"none\" stroke=\"#526777\" stroke-width=\".25\"/><text x=\"22\" y=\"{}\">{} · {} · Scale 1:{} · Page {} / {} (row {}, column {})</text><text x=\"22\" y=\"{}\">Revision: {} · Wirecraft technical plan</text></g></svg>",height-23.,escape(d.project_name()),format,options.scale,pages.len()+1,rows*columns,row+1,col+1,height-17.,escape(d.master_revision["name"].as_str().unwrap_or(""))))
+            let technical = technical_block(
+                d,
+                parent,
+                [width, height],
+                format,
+                options.scale,
+                [pages.len() + 1, rows * columns],
+            )?;
+            let warning = if clipped {
+                format!(
+                    "<text x=\"22\" y=\"{}\" font-family=\"DejaVu Sans\" font-size=\"3\" fill=\"#bd3333\">Drawing exceeds this fixed sheet: enable split or increase scale denominator.</text>",
+                    height - 9.
+                )
+            } else {
+                String::new()
+            };
+            pages.push(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}mm\" height=\"{height}mm\" viewBox=\"0 0 {width} {height}\"><rect width=\"{width}\" height=\"{height}\" fill=\"white\"/><defs><clipPath id=\"drawingClip\"><rect x=\"20\" y=\"5\" width=\"{usable_w}\" height=\"{usable_h}\"/></clipPath></defs><g clip-path=\"url(#drawingClip)\">{nested}</g><g font-family=\"DejaVu Sans\" font-size=\"3\" fill=\"#263c50\"><rect x=\"20\" y=\"5\" width=\"{usable_w}\" height=\"{usable_h}\" fill=\"none\" stroke=\"#526777\" stroke-width=\".25\"/><text x=\"22\" y=\"{}\">{} · {} · Scale 1:{} · Page {} / {} (row {}, column {})</text><text x=\"22\" y=\"{}\">Revision: {} · Wirecraft technical plan</text></g>{technical}{warning}</svg>",height-23.,escape(d.project_name()),format,options.scale,pages.len()+1,rows*columns,row+1,col+1,height-17.,escape(d.master_revision["name"].as_str().unwrap_or(""))))
         }
     }
     Ok(SheetPlan {
@@ -175,7 +200,133 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
         width_mm: width,
         height_mm: height,
         rows,
+        clipped,
         columns,
         pages,
     })
+}
+
+fn technical_block(
+    d: &Document,
+    parent: &str,
+    dimensions: [f64; 2],
+    format: &str,
+    scale: u32,
+    pagination: [usize; 2],
+) -> Result<String> {
+    let [width, height] = dimensions;
+    let [page, pages] = pagination;
+    use std::fmt::Write;
+    let drawing = crate::drawing::Drawing::new(d, parent);
+    let mut ids = drawing.shapes.keys().cloned().collect::<Vec<_>>();
+    ids.sort_by_key(|id| (d.nodes[id].name.to_lowercase(), id.clone()));
+    let table_w = (width - 30.).min(180.);
+    let x = width - 5. - table_w;
+    let row_h = 4.;
+    let max_rows = ((height - 80.) / row_h).max(1.) as usize;
+    let rows = ids.len().min(max_rows);
+    let table_h = (rows + 2) as f64 * row_h;
+    let columns = [4., 26., 22., 31., 9., 25., 16.];
+    let total = columns.iter().sum::<f64>();
+    let mut offsets = vec![0.];
+    for c in columns {
+        offsets.push(offsets.last().unwrap() + c / total * table_w);
+    }
+    let mut out = format!(
+        "<g font-family=\"DejaVu Sans\" fill=\"#243b53\" stroke=\"#637889\" stroke-width=\".15\"><rect x=\"{x}\" y=\"5\" width=\"{table_w}\" height=\"{table_h}\" fill=\"white\"/><g stroke=\"none\" font-size=\"2.1\"><text x=\"{}\" y=\"8\">PARTS LIST</text></g>",
+        x + 2.
+    );
+    for offset in &offsets[1..offsets.len() - 1] {
+        write!(out, "<path d=\"M{} 9v{}\"/>", x + offset, table_h - 4.).unwrap();
+    }
+    for row in 1..rows + 2 {
+        write!(
+            out,
+            "<path d=\"M{x} {}h{table_w}\"/>",
+            5. + row as f64 * row_h
+        )
+        .unwrap();
+    }
+    out.push_str("<g stroke=\"none\" font-size=\"1.6\">");
+    for (i, title) in [
+        "No.",
+        "Part",
+        "Kind",
+        "Modified",
+        "Rev.",
+        "Responsible",
+        "Signature",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        write!(
+            out,
+            "<text x=\"{}\" y=\"12\">{title}</text>",
+            x + offsets[i] + 0.8
+        )
+        .unwrap();
+    }
+    for (row, id) in ids.iter().take(max_rows).enumerate() {
+        let n = d.node(id)?;
+        let revision = d
+            .effective_revision(id)
+            .and_then(|r| r["name"].as_str())
+            .unwrap_or("");
+        let responsible = d.effective(id, "responsible");
+        let modified = n.modified["date"].as_str().unwrap_or("");
+        let values = [
+            (row + 1).to_string(),
+            n.name.clone(),
+            crate::analysis::stereotype(d, n).into(),
+            modified.into(),
+            revision.into(),
+            if responsible == "none" {
+                String::new()
+            } else {
+                responsible
+            },
+            String::new(),
+        ];
+        for (i, value) in values.into_iter().enumerate() {
+            let limit = ((offsets[i + 1] - offsets[i] - 1.5) / 0.85).max(1.) as usize;
+            let display = value.chars().take(limit).collect::<String>();
+            write!(
+                out,
+                "<text x=\"{}\" y=\"{}\">{}</text>",
+                x + offsets[i] + 0.8,
+                16. + row as f64 * row_h,
+                escape(&display)
+            )
+            .unwrap();
+        }
+    }
+    if ids.len() > max_rows {
+        write!(
+            out,
+            "<text x=\"{}\" y=\"{}\">+{} more; see complete documentation</text>",
+            x + 2.,
+            table_h + 8.,
+            ids.len() - max_rows
+        )
+        .unwrap();
+    }
+    out.push_str("</g>");
+    let block_w = (width - 25.).min(180.);
+    let bx = width - 5. - block_w;
+    let by = height - 37.;
+    let revision = d.master_revision["name"].as_str().unwrap_or("");
+    let date = d.master_revision["date"].as_str().unwrap_or("");
+    write!(out,"<rect x=\"{bx}\" y=\"{by}\" width=\"{block_w}\" height=\"32\" fill=\"white\"/><path d=\"M{bx} {}h{block_w}M{bx} {}h{block_w}\"/><g stroke=\"none\"><text x=\"{}\" y=\"{}\" font-size=\"4\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"2.5\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"2.5\">Revision: {} · {}</text><text x=\"{}\" y=\"{}\" font-size=\"2.5\">Format: {format} · Scale 1:{scale} · Sheet {page}/{pages} · Wirecraft</text></g></g>",by+15.,by+24.,bx+3.,by+6.,escape(d.project_name()),bx+3.,by+12.,escape(&d.qualified_name(parent)),bx+3.,by+21.,escape(revision),escape(date),bx+3.,by+29.).unwrap();
+    let mut mark = 210.;
+    while mark < width - 5. {
+        write!(
+            out,
+            "<path d=\"M{mark} 1v3M{mark} {}v3\" stroke=\"#637889\" stroke-width=\".2\"/>",
+            height - 4.
+        )
+        .unwrap();
+        mark += 185.;
+    }
+    Ok(out)
 }

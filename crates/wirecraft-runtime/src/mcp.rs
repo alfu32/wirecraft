@@ -2,7 +2,7 @@
 use crate::{backend::Application, service::Request};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
-const GUIDE: &str = include_str!("../resources/agent-guide.md");
+pub const GUIDE: &str = include_str!("../resources/agent-guide.md");
 fn definitions(which: &str) -> Value {
     serde_json::from_str(match which {
         "tools" => include_str!("../resources/tools.json"),

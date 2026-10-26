@@ -1,5 +1,6 @@
 mod chrome;
 mod client;
+mod fonts;
 mod icons;
 mod inspector;
 mod options;
@@ -55,6 +56,7 @@ enum Mode {
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
 struct UiSession {
+    document_id: String,
     viewport: Viewport,
     parent: String,
     selected: Option<String>,
@@ -82,6 +84,8 @@ struct Draft {
     tables: Option<Value>,
 }
 struct Wirecraft {
+    connected_document: bool,
+    initial_document_id: String,
     client: Client,
     snapshot: Arc<Snapshot>,
     scene: Arc<scene::Scene>,
@@ -104,6 +108,7 @@ struct Wirecraft {
     bounds: Rc<Cell<Bounds<Pixels>>>,
     drag_start: Option<[f64; 2]>,
     drag_delta: [f64; 2],
+    drag_ids: BTreeSet<String>,
     resize_start: Option<(String, [f64; 2], Rect)>,
     selection_end: Option<[f64; 2]>,
     pan_start: Option<([f64; 2], Viewport)>,
@@ -125,12 +130,19 @@ struct Wirecraft {
     tables: inspector::Tables,
     advanced: bool,
     editor_committed: bool,
+    editor_request_pending: bool,
+    submitted_editor: Option<Value>,
+    submitted_revision: Option<u64>,
     menu: Option<String>,
     query: Entity<InputState>,
+    palette_index: usize,
+    palette_scroll: ScrollHandle,
     report: Value,
     analysis_layer: String,
     analysis_column: usize,
     options: options::OptionsEditor,
+    font_choices: Vec<String>,
+    type_choice: Option<(usize, bool)>,
     mcp_status: Value,
     export_settings: reports::ExportState,
     export_image: Option<Arc<Image>>,
@@ -176,6 +188,9 @@ impl Wirecraft {
         cx.subscribe_in(&query, window, |this, _, event: &InputEvent, window, cx| {
             if matches!(event, InputEvent::PressEnter { .. }) {
                 this.submit_command(window, cx);
+            } else if matches!(event, InputEvent::Change) {
+                this.palette_index = 0;
+                this.palette_scroll.scroll_to_item(0);
             }
             cx.notify();
         })
@@ -183,6 +198,8 @@ impl Wirecraft {
         let focus = cx.focus_handle();
         focus.focus(window);
         let this = Self {
+            connected_document: false,
+            initial_document_id: session.document_id,
             client,
             snapshot,
             scene: Arc::new(scene::Scene::new(&Document::new(""), "root")),
@@ -221,6 +238,7 @@ impl Wirecraft {
             bounds: Rc::new(Cell::new(Bounds::default())),
             drag_start: None,
             drag_delta: [0., 0.],
+            drag_ids: BTreeSet::new(),
             resize_start: None,
             selection_end: None,
             pan_start: None,
@@ -250,12 +268,19 @@ impl Wirecraft {
             tables: inspector::Tables::default(),
             advanced: false,
             editor_committed: false,
+            editor_request_pending: false,
+            submitted_editor: None,
+            submitted_revision: None,
             menu: None,
             query,
+            palette_index: 0,
+            palette_scroll: ScrollHandle::new(),
             report: Value::Null,
             analysis_layer: "principal".into(),
             analysis_column: 0,
             options,
+            font_choices: vec![],
+            type_choice: None,
             mcp_status: json!({"enabled":true}),
             export_settings: session.export_settings,
             export_image: None,
@@ -306,10 +331,20 @@ impl Wirecraft {
                 self.status = "Connected".into();
                 self.tool("mcp.status");
             }
-            Update::Error(e) => {
-                self.status = e;
+            Update::Error { message, commit } => {
+                self.status = message;
+                if commit {
+                    self.editor_request_pending = false;
+                    self.submitted_editor = None;
+                    self.submitted_revision = None;
+                }
             }
-            Update::Result { command, value } => {
+            Update::Result {
+                command,
+                value,
+                revision,
+                commit,
+            } => {
                 self.status = match command.as_str() {
                     "file.save" | "file.commit_and_save" => "Project saved".into(),
                     "threadwork.update_entity" | "entities.patch" => "Changes applied".into(),
@@ -323,6 +358,7 @@ impl Wirecraft {
                     self.editor_entity = None;
                 }
                 if (command == "threadwork.update_entity" || command == "file.commit_and_save")
+                    && commit
                     && value["entity"]["id"].as_str() == self.selected.first().map(String::as_str)
                 {
                     self.base_name = value["entity"]["name"].as_str().unwrap_or("").into();
@@ -340,8 +376,17 @@ impl Wirecraft {
                         "outgoingLinks",
                         "text",
                         "modified",
+                        "revision",
+                        "diagnostics",
+                        "statusChanges",
                     ] {
                         props.as_object_mut().unwrap().remove(k);
+                    }
+                    if value["entity"]["id"] == self.snapshot.document.root_node_id {
+                        props["masterRevision"] = value
+                            .get("masterRevision")
+                            .cloned()
+                            .unwrap_or_else(|| self.snapshot.document.master_revision.clone());
                     }
                     self.base_properties = serde_json::to_string_pretty(&props).unwrap();
                 }
@@ -368,16 +413,19 @@ impl Wirecraft {
                     && let Ok(document) =
                         serde_json::from_value::<Document>(value["document"].clone())
                 {
-                    self.archetype_preview = Some(Arc::new(scene::Scene::new(
-                        &document,
-                        &document.root_node_id,
-                    )));
+                    self.archetype_preview = Some(Arc::new(
+                        scene::Scene::new(&document, &document.root_node_id)
+                            .with_appearance(self.options.saved.appearance.clone()),
+                    ));
                 }
                 if command == "export.preview"
                     && value["generation"].as_u64() == Some(self.export_generation)
                 {
                     self.export_pages = value["pages"].as_u64().unwrap_or(0) as usize;
                     self.export_summary = value["summary"].to_string();
+                    if value["summary"]["clipped"] == true {
+                        self.status="Drawing exceeds the fixed sheet. Enable split or increase scale denominator.".into();
+                    }
                     use base64::Engine;
                     self.export_image = value["pngBase64"]
                         .as_str()
@@ -399,9 +447,9 @@ impl Wirecraft {
                 if command == "analysis.report" {
                     self.report = value.clone();
                 }
-                if ["threadwork.update_entity", "file.commit_and_save"].contains(&command.as_str())
-                {
+                if commit {
                     self.editor_committed = true;
+                    self.submitted_revision = revision;
                 }
                 if command == "archetypes.list" {
                     self.archetypes = value["archetypes"].as_array().cloned().unwrap_or_default();
@@ -443,7 +491,21 @@ impl Wirecraft {
                 }
             }
             Update::Snapshot(snapshot) => {
+                let document_changed = (self.connected_document
+                    && snapshot.document.id != self.snapshot.document.id)
+                    || (!self.connected_document
+                        && !self.initial_document_id.is_empty()
+                        && self.initial_document_id != snapshot.document.id);
+                self.connected_document = true;
+                if snapshot.document.id != self.snapshot.document.id {
+                    self.editor_entity = None;
+                }
                 self.snapshot = Arc::new(*snapshot);
+                if document_changed {
+                    self.parent = self.snapshot.document.root_node_id.clone();
+                    self.selected.clear();
+                    self.viewport = Viewport::default();
+                }
                 if self.snapshot.revision != self.generated_revision {
                     self.generated_diagnostics.clear();
                 }
@@ -456,13 +518,33 @@ impl Wirecraft {
                     self.selected.insert(self.parent.clone());
                 }
                 self.rebuild();
-                if let Some(draft) = self.pending_draft.take()
+                if document_changed {
+                    self.fit(&Fit, window, cx);
+                }
+                if let Some(mut draft) = self.pending_draft.take()
                     && draft.document_id == self.snapshot.document.id
                     && self.snapshot.document.nodes.contains_key(&draft.node_id)
                 {
                     self.selected = BTreeSet::from([draft.node_id.clone()]);
                     self.section = draft.section.clone();
                     self.load_editor(window, cx);
+                    if let (Ok(mut baseline), Ok(mut properties)) = (
+                        serde_json::from_str::<Value>(&draft.base_properties),
+                        serde_json::from_str::<Value>(&draft.properties),
+                    ) {
+                        for key in ["revision", "diagnostics", "statusChanges"] {
+                            if baseline.get(key) == properties.get(key) {
+                                if let Some(o) = baseline.as_object_mut() {
+                                    o.remove(key);
+                                }
+                                if let Some(o) = properties.as_object_mut() {
+                                    o.remove(key);
+                                }
+                            }
+                        }
+                        draft.base_properties = serde_json::to_string_pretty(&baseline).unwrap();
+                        draft.properties = serde_json::to_string_pretty(&properties).unwrap();
+                    }
                     let matches = self.base_name == draft.base_name
                         && self.base_text == draft.base_text
                         && self.base_properties == draft.base_properties;
@@ -487,15 +569,29 @@ impl Wirecraft {
                     }
                 }
                 let clean = !self.has_draft(cx);
+                let committed_unchanged = self.editor_committed
+                    && self
+                        .submitted_editor
+                        .as_ref()
+                        .is_some_and(|submitted| submitted == &self.editor_fingerprint(cx));
+                if self.editor_committed && self.submitted_revision == Some(self.snapshot.revision)
+                {
+                    self.edit_revision = self.snapshot.revision;
+                }
                 if clean
-                    || self.editor_committed
+                    || committed_unchanged
                     || self.editor_entity.as_ref() != self.selected.first()
                 {
-                    self.editor_committed = false;
                     self.load_editor(window, cx);
                 } else {
                     self.status =
                         "Draft retained. Apply checks for concurrent project changes.".into();
+                }
+                if self.editor_committed {
+                    self.submitted_editor = None;
+                    self.submitted_revision = None;
+                    self.editor_committed = false;
+                    self.editor_request_pending = false;
                 }
             }
         }
@@ -512,13 +608,38 @@ impl Wirecraft {
             if let Some(n) = self.snapshot.document.nodes.get(&id) {
                 self.tree.push((id.clone(), depth));
                 if !self.collapsed.contains(&id) {
-                    stack.extend(n.children.iter().rev().cloned().map(|id| (id, depth + 1)));
+                    let mut children = n
+                        .children
+                        .iter()
+                        .filter_map(|id| self.snapshot.document.nodes.get(id))
+                        .collect::<Vec<_>>();
+                    children.sort_by_cached_key(|n| {
+                        (
+                            if n.is_link() {
+                                3
+                            } else if n.is_composite() {
+                                0
+                            } else if n.kind == wirecraft_core::NodeKind::Type {
+                                1
+                            } else {
+                                2
+                            },
+                            n.name.to_lowercase(),
+                        )
+                    });
+                    stack.extend(
+                        children
+                            .into_iter()
+                            .rev()
+                            .map(|n| (n.id.clone(), depth + 1)),
+                    );
                 }
             }
         }
     }
     fn persist_ui(&self, cx: &App) {
         let state = UiSession {
+            document_id: self.snapshot.document.id.clone(),
             viewport: self.viewport,
             parent: self.parent.clone(),
             selected: self.selected.first().cloned(),
@@ -571,11 +692,20 @@ impl Wirecraft {
                 "outgoingLinks",
                 "text",
                 "modified",
+                "revision",
+                "diagnostics",
+                "statusChanges",
             ] {
                 props.as_object_mut().unwrap().remove(k);
             }
+            if n.id == self.snapshot.document.root_node_id {
+                props["masterRevision"] = self.snapshot.document.master_revision.clone();
+            }
             self.base_properties = serde_json::to_string_pretty(&props).unwrap();
-            let all = serde_json::to_value(n).unwrap();
+            let mut all = serde_json::to_value(n).unwrap();
+            if n.id == self.snapshot.document.root_node_id {
+                all["masterRevision"] = self.snapshot.document.master_revision.clone();
+            }
             self.tables = inspector::Tables::load(&all, window, cx);
             for field in &mut self.inspector {
                 let value = all
@@ -606,7 +736,15 @@ impl Wirecraft {
             });
         }
     }
+    fn editor_fingerprint(&self, cx: &App) -> Value {
+        json!({"nodeId":self.editor_entity,"name":self.name.read(cx).value().to_string(),"text":self.editor.read(cx).value().to_string(),"section":self.section,"properties":self.merged_properties(cx),"tables":self.tables.draft(cx)})
+    }
     fn apply(&mut self, _: &Apply, window: &mut Window, cx: &mut Context<Self>) {
+        if self.editor_request_pending {
+            self.status = "An editor commit is already pending".into();
+            cx.notify();
+            return;
+        }
         if let Err(error) = self.tables.merge(&mut json!({}), cx) {
             self.status = error;
             cx.notify();
@@ -624,10 +762,10 @@ impl Wirecraft {
         }
 
         if properties != self.base_properties {
-            match serde_json::from_str::<Value>(&properties) {
-                Ok(Value::Object(o)) => patch.as_object_mut().unwrap().extend(o),
-                _ => {
-                    self.status = "Properties must be a valid JSON object".into();
+            match workbench::property_changes(&properties, &self.base_properties) {
+                Ok(changes) => patch.as_object_mut().unwrap().extend(changes),
+                Err(error) => {
+                    self.status = error;
                     cx.notify();
                     return;
                 }
@@ -647,7 +785,9 @@ impl Wirecraft {
             arguments: json!({"nodeId":id,"patch":patch}),
             expected_revision: Some(self.edit_revision),
         };
-        let _ = self.client.sender.send(Message::Execute(request));
+        self.editor_request_pending = true;
+        self.submitted_editor = Some(self.editor_fingerprint(cx));
+        let _ = self.client.sender.send(Message::Commit(request));
         self.status = "Applying…".into();
         cx.notify();
     }
@@ -658,7 +798,7 @@ impl Wirecraft {
             || self.tables.changed(cx)
     }
     fn select(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.has_draft(cx) {
+        if self.has_draft(cx) || self.editor_request_pending {
             self.status = "Apply the editor draft before changing entity".into();
             cx.notify();
             return;
@@ -669,11 +809,6 @@ impl Wirecraft {
         cx.notify();
     }
     fn open(&mut self, _: &Open, window: &mut Window, cx: &mut Context<Self>) {
-        if self.has_draft(cx) {
-            self.status = "Apply the editor draft before opening another project".into();
-            cx.notify();
-            return;
-        }
         let paths = cx.prompt_for_paths(PathPromptOptions {
             files: true,
             directories: false,
@@ -682,11 +817,13 @@ impl Wirecraft {
         });
         cx.spawn_in(window, async move |this, cx| match paths.await {
             Ok(Ok(Some(paths))) => {
-                let _ = this.update_in(cx, |this, _, _| {
-                    if let Some(path) = paths.first() {
-                        this.client.send("file.open", json!({"path":path}));
-                    }
-                });
+                let _=this.update_in(cx,|this,window,cx|{if let Some(path)=paths.first(){
+                    let arguments=json!({"path":path});
+                    if this.snapshot.dirty||this.has_draft(cx){
+                        let answer=window.prompt(PromptLevel::Warning,"Open another design?",Some("This discards current unsaved graph changes and the editor draft."),&["Discard and open","Cancel"],cx);
+                        cx.spawn_in(window,async move|this,cx|{if answer.await.ok()==Some(0){let _=this.update_in(cx,|this,_,_|{let mut arguments=arguments;arguments["discardChanges"]=json!(true);this.client.send("file.open",arguments);});}}).detach();
+                    }else{this.client.send("file.open",arguments);}
+                }});
             }
             Ok(Err(e)) => {
                 let _ = this.update_in(cx, |this, _, cx| {
@@ -717,19 +854,30 @@ impl Wirecraft {
                 patch["text"] = json!({self.section.clone():text});
             }
             if properties != self.base_properties {
-                let p: Value = serde_json::from_str(&properties).map_err(|e| e.to_string())?;
-                let o = p.as_object().ok_or("Properties must be an object")?;
-                patch.as_object_mut().unwrap().extend(o.clone());
+                patch
+                    .as_object_mut()
+                    .unwrap()
+                    .extend(workbench::property_changes(
+                        &properties,
+                        &self.base_properties,
+                    )?);
             }
             if text != self.base_text {
                 patch["text"][&self.section] = json!(text);
             }
-            a["nodeId"] = json!(id);
-            a["patch"] = patch;
+            if !patch.as_object().unwrap().is_empty() {
+                a["nodeId"] = json!(id);
+                a["patch"] = patch;
+            }
         }
         Ok(a)
     }
     fn commit_save(&mut self, path: Option<PathBuf>, cx: &mut Context<Self>) {
+        if self.editor_request_pending {
+            self.status = "An editor commit is already pending".into();
+            cx.notify();
+            return;
+        }
         match self.save_arguments(path, cx) {
             Ok(arguments) => {
                 let request = Request {
@@ -741,7 +889,13 @@ impl Wirecraft {
                         self.snapshot.revision
                     }),
                 };
-                let _ = self.client.sender.send(Message::Execute(request));
+                self.submitted_editor = if self.has_draft(cx) {
+                    Some(self.editor_fingerprint(cx))
+                } else {
+                    None
+                };
+                self.editor_request_pending = true;
+                let _ = self.client.sender.send(Message::Commit(request));
             }
             Err(e) => {
                 self.status = e;
@@ -775,13 +929,26 @@ impl Wirecraft {
         })
         .detach();
     }
-    fn new_project(&mut self, _: &New, _: &mut Window, cx: &mut Context<Self>) {
-        if self.has_draft(cx) {
-            self.status = "Apply the editor draft before creating a project".into();
-            cx.notify();
-            return;
+    fn new_project(&mut self, _: &New, window: &mut Window, cx: &mut Context<Self>) {
+        if self.snapshot.dirty || self.has_draft(cx) {
+            let answer = window.prompt(
+                PromptLevel::Warning,
+                "Create a new design?",
+                Some("This discards the current unsaved graph changes and editor draft."),
+                &["Discard and create", "Cancel"],
+                cx,
+            );
+            cx.spawn_in(window, async move |this, cx| {
+                if answer.await.ok() == Some(0) {
+                    let _ = this.update_in(cx, |this, _, _| {
+                        this.client.send("file.new", json!({"discardChanges":true}))
+                    });
+                }
+            })
+            .detach();
+        } else {
+            self.client.send("file.new", json!({}));
         }
-        self.client.send("file.new", json!({}));
     }
     fn undo(&mut self, _: &Undo, _: &mut Window, _: &mut Context<Self>) {
         self.client.send("edit.undo", json!({}));
@@ -790,7 +957,7 @@ impl Wirecraft {
         self.client.send("edit.redo", json!({}));
     }
     fn delete(&mut self, _: &DeleteSelection, _: &mut Window, cx: &mut Context<Self>) {
-        if self.has_draft(cx) {
+        if self.has_draft(cx) || self.editor_request_pending {
             self.status = "Apply the editor draft before deleting".into();
             cx.notify();
             return;
@@ -818,40 +985,11 @@ impl Wirecraft {
         cx.notify();
     }
     fn fit(&mut self, _: &Fit, _: &mut Window, cx: &mut Context<Self>) {
-        if !self.scene.nodes.is_empty() {
-            let min_x = self
-                .scene
-                .nodes
-                .values()
-                .map(|n| n.2.x)
-                .fold(f64::INFINITY, f64::min);
-            let min_y = self
-                .scene
-                .nodes
-                .values()
-                .map(|n| n.2.y)
-                .fold(f64::INFINITY, f64::min);
-            let max_x = self
-                .scene
-                .nodes
-                .values()
-                .map(|n| n.2.x + n.2.width)
-                .fold(f64::NEG_INFINITY, f64::max);
-            let max_y = self
-                .scene
-                .nodes
-                .values()
-                .map(|n| n.2.y + n.2.height)
-                .fold(f64::NEG_INFINITY, f64::max);
-            let b = self.bounds.get();
-            let w = f64::from(f32::from(b.size.width));
-            let h = f64::from(f32::from(b.size.height));
-            self.viewport.zoom = ((w - 80.) / (max_x - min_x))
-                .min((h - 80.) / (max_y - min_y))
-                .clamp(0.1, 2.);
-            self.viewport.x = 40. - min_x * self.viewport.zoom;
-            self.viewport.y = 40. - min_y * self.viewport.zoom;
-        }
+        let b = self.bounds.get();
+        self.viewport = self.scene.fitted([
+            f64::from(f32::from(b.size.width)),
+            f64::from(f32::from(b.size.height)),
+        ]);
         self.persist_ui(cx);
         cx.notify();
     }
@@ -869,14 +1007,14 @@ impl Wirecraft {
             self.pan_start = Some((local, self.viewport));
             return;
         }
-        if self.has_draft(cx) {
+        if self.has_draft(cx) || self.editor_request_pending {
             self.status = "Apply the editor draft before changing selection".into();
             cx.notify();
             return;
         }
         let world = self.viewport.world(local);
         let tolerance = 6. / self.viewport.zoom;
-        let hits = self.scene.index.query(Rect {
+        let hits = self.scene.query(Rect {
             x: world[0] - tolerance,
             y: world[1] - tolerance,
             width: tolerance * 2.,
@@ -899,6 +1037,16 @@ impl Wirecraft {
                     .unwrap_or(0)
             })
             .cloned()
+            .or_else(|| {
+                hits.iter().find_map(|id| {
+                    self.scene
+                        .drawing
+                        .annotations
+                        .get(id)
+                        .filter(|a| a.rect.contains(world))
+                        .map(|a| a.target.clone())
+                })
+            })
             .or_else(|| {
                 if self.mode != Mode::Select {
                     return None;
@@ -967,6 +1115,11 @@ impl Wirecraft {
                     } else {
                         if self.scene.nodes.contains_key(&id) {
                             self.drag_start = Some(world);
+                            self.drag_ids = self
+                                .selected
+                                .iter()
+                                .flat_map(|id| self.snapshot.document.descendants(id))
+                                .collect();
                             self.drag_delta = [0., 0.];
                         }
                     }
@@ -1005,7 +1158,6 @@ impl Wirecraft {
             };
             self.selected = self
                 .scene
-                .index
                 .query(rect)
                 .into_iter()
                 .filter(|id| self.scene.nodes.contains_key(id))
@@ -1049,6 +1201,7 @@ impl Wirecraft {
                 .send("entities.patch", json!({"changes":changes}));
         }
         self.drag_delta = [0., 0.];
+        self.drag_ids.clear();
         self.pan_start = None;
         self.selection_start = None;
         self.selection_end = None;
@@ -1173,7 +1326,7 @@ impl Wirecraft {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.has_draft(cx) {
+        if self.has_draft(cx) || self.editor_request_pending {
             self.status = "Apply the editor draft before revealing another diagnostic".into();
             cx.notify();
             return;
@@ -1385,6 +1538,11 @@ impl Render for Wirecraft {
                         let kind = node.kind;
                         let collapsed = this.collapsed.contains(&id);
                         let toggle = id.clone();
+                        let target = id.clone();
+                        let ticket = workbench::Ticket {
+                            id: id.clone(),
+                            name: name.clone(),
+                        };
                         div()
                             .id(i)
                             .h(px(28.))
@@ -1398,6 +1556,21 @@ impl Render for Wirecraft {
                             .on_click(_cx.listener(move |this, _, window, cx| {
                                 this.select(id.clone(), window, cx)
                             }))
+                            .on_drag(ticket, |ticket, _, _, cx| cx.new(|_| ticket.clone()))
+                            .on_drop(_cx.listener(
+                                move |this, ticket: &workbench::Ticket, _, cx| {
+                                    if !this.has_draft(cx) {
+                                        this.client.send(
+                                            "threadwork.move_entity",
+                                            json!({"nodeId":ticket.id,"parentId":target}),
+                                        );
+                                    } else {
+                                        this.status =
+                                            "Apply the editor draft before moving entities".into();
+                                        cx.notify();
+                                    }
+                                },
+                            ))
                             .flex()
                             .items_center()
                             .gap_2()
@@ -1500,7 +1673,16 @@ impl Render for Wirecraft {
             let bounds = self.bounds.clone();
             let view = self.viewport;
             let selected = self.selected.clone();
-            let drag = self.drag_delta;
+            let drag = if self.resize_start.is_some() {
+                [0., 0.]
+            } else {
+                self.drag_delta
+            };
+            let moving = self.drag_ids.clone();
+            let resize = self
+                .resize_start
+                .as_ref()
+                .map(|(_, _, r)| (*r, self.drag_delta));
             let selection = self.selection_start.zip(self.selection_end);
             let parent_name = self.snapshot.document.qualified_name(&self.parent);
             content = content
@@ -1528,6 +1710,9 @@ impl Render for Wirecraft {
                             button("fit", "Fit")
                                 .on_click(cx.listener(|this, _, w, cx| this.fit(&Fit, w, cx))),
                         )
+                        .child(button("sheet", "Sheet").on_click(
+                            cx.listener(|this, _, w, cx| this.show_export(&ShowExport, w, cx)),
+                        ))
                         .child(button("up", "Up").on_click(cx.listener(|this, _, _, cx| {
                             if let Some(p) =
                                 this.snapshot.document.nodes[&this.parent].parent_id.clone()
@@ -1568,7 +1753,30 @@ impl Render for Wirecraft {
                                     b
                                 },
                                 move |b, _, window, cx| {
-                                    scene.paint(b, view, &selected, drag, window, cx);
+                                    scene.paint(b, view, &selected, &moving, drag, window, cx);
+                                    if let Some((r, delta)) = resize {
+                                        let p = view.screen([r.x, r.y]);
+                                        window.paint_quad(quad(
+                                            Bounds::new(
+                                                b.origin + point(px(p[0] as f32), px(p[1] as f32)),
+                                                size(
+                                                    px(
+                                                        ((r.width + delta[0]).max(100.) * view.zoom)
+                                                            as f32,
+                                                    ),
+                                                    px(
+                                                        ((r.height + delta[1]).max(70.) * view.zoom)
+                                                            as f32,
+                                                    ),
+                                                ),
+                                            ),
+                                            px(4.),
+                                            rgba(0x70d5c620),
+                                            px(2.),
+                                            crate::chrome::color(0x70d5c6),
+                                            BorderStyle::Dashed,
+                                        ));
+                                    }
                                     if let Some((a, z)) = selection {
                                         let a = view.screen(a);
                                         let z = view.screen(z);
@@ -1673,6 +1881,9 @@ fn main() -> anyhow::Result<()> {
     gpui::Application::new()
         .with_assets(icons::Assets)
         .run(move |cx| {
+            if let Err(error) = fonts::register(cx) {
+                eprintln!("Font registration: {error}");
+            }
             gpui_component::init(cx);
             crate::chrome::set_light(initial_settings.appearance.theme == "light");
             Theme::change(
@@ -1684,6 +1895,8 @@ fn main() -> anyhow::Result<()> {
                 None,
                 cx,
             );
+            Theme::global_mut(cx).mono_font_family =
+                initial_settings.appearance.editor_font.clone().into();
             cx.bind_keys([
                 KeyBinding::new("ctrl-shift-p", CommandPalette, Some("Wirecraft")),
                 KeyBinding::new("ctrl-p", ShowExport, Some("Wirecraft")),

@@ -1,0 +1,587 @@
+{
+  "id": "wirecraft-walkthrough-fixture",
+  "name": "WebServer",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "WebServer",
+      "kind": "Processor",
+      "parentId": null,
+      "children": [
+        "routes",
+        "reqrep",
+        "request-type",
+        "response-type",
+        "base-lib",
+        "router",
+        "accept",
+        "respond",
+        "data-0",
+        "data-1",
+        "data-2",
+        "data-3",
+        "data-4",
+        "data-5",
+        "data-6",
+        "data-7",
+        "data-8",
+        "capability"
+      ],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "technology": {
+        "languageId": "c",
+        "technologyId": "c-native"
+      },
+      "fileLayoutStrategyId": "single-file"
+    },
+    {
+      "id": "routes",
+      "name": "routes",
+      "kind": "Group",
+      "parentId": "root",
+      "children": [
+        "route-api",
+        "route-about",
+        "route-version"
+      ],
+      "layout": {
+        "x": 1500,
+        "y": 450,
+        "width": 700,
+        "height": 550,
+        "openWidth": 700,
+        "openHeight": 550,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "IMPLEMENTATION"
+    },
+    {
+      "id": "route-api",
+      "name": "routeApiUserDetails",
+      "kind": "Processor",
+      "parentId": "routes",
+      "children": [],
+      "layout": {
+        "x": 1650,
+        "y": 530,
+        "width": 260,
+        "height": 90,
+        "openWidth": 260,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "FUNCTIONAL",
+      "text": {
+        "source": "/* Authored walkthrough fixture route. */\n(void)context;",
+        "specification": "Preserve the incoming request contract and publish the matching response."
+      }
+    },
+    {
+      "id": "route-about",
+      "name": "routeHomeAbout",
+      "kind": "Processor",
+      "parentId": "routes",
+      "children": [],
+      "layout": {
+        "x": 1750,
+        "y": 700,
+        "width": 260,
+        "height": 90,
+        "openWidth": 260,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "FUNCTIONAL",
+      "text": {
+        "source": "/* Authored walkthrough fixture route. */\n(void)context;",
+        "specification": "Preserve the incoming request contract and publish the matching response."
+      }
+    },
+    {
+      "id": "route-version",
+      "name": "routeHomeVersion",
+      "kind": "Processor",
+      "parentId": "routes",
+      "children": [],
+      "layout": {
+        "x": 1630,
+        "y": 860,
+        "width": 260,
+        "height": 90,
+        "openWidth": 260,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "FUNCTIONAL",
+      "text": {
+        "source": "/* Authored walkthrough fixture route. */\n(void)context;",
+        "specification": "Preserve the incoming request contract and publish the matching response."
+      }
+    },
+    {
+      "id": "request-type",
+      "name": "Request",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 420,
+        "y": 100,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "TESTING",
+      "typeDefinition": {
+        "qualifier": "object",
+        "fields": [
+          {
+            "name": "path",
+            "typeId": "string",
+            "isReference": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "response-type",
+      "name": "Response",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 1000,
+        "y": 100,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "TESTING",
+      "typeDefinition": {
+        "qualifier": "object",
+        "fields": [
+          {
+            "name": "status",
+            "typeId": "int",
+            "isReference": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "reqrep",
+      "name": "ReqRep",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 750,
+        "y": 270,
+        "width": 220,
+        "height": 260,
+        "openWidth": 220,
+        "openHeight": 260,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "TESTING",
+      "typeDefinition": {
+        "qualifier": "object",
+        "fields": [
+          {
+            "name": "id",
+            "typeId": "string",
+            "isReference": false
+          },
+          {
+            "name": "request",
+            "typeId": "request-type",
+            "isReference": false
+          },
+          {
+            "name": "response",
+            "typeId": "response-type",
+            "isReference": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "base-lib",
+      "name": "base_lib",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 120,
+        "y": 380,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "IMPLEMENTATION",
+      "text": {
+        "source": "int fixture_service(void) { return 0; }"
+      }
+    },
+    {
+      "id": "router",
+      "name": "router",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 800,
+        "y": 650,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "IMPLEMENTATION"
+    },
+    {
+      "id": "accept",
+      "name": "socket_accept",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 240,
+        "y": 620,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "IMPLEMENTATION"
+    },
+    {
+      "id": "respond",
+      "name": "socket_respond",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 830,
+        "y": 1000,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": "IMPLEMENTATION"
+    },
+    {
+      "id": "data-0",
+      "name": "request",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "accept",
+        "targetNodeId": "router",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-1",
+      "name": "routeApiUserDetailsRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "router",
+        "targetNodeId": "route-api",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-2",
+      "name": "routeHomeAboutRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "router",
+        "targetNodeId": "route-about",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-3",
+      "name": "routeHomeVersionRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "router",
+        "targetNodeId": "route-version",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-4",
+      "name": "routeApiUserDetailsResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "route-api",
+        "targetNodeId": "respond",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-5",
+      "name": "routeHomeAboutResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "route-about",
+        "targetNodeId": "respond",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-6",
+      "name": "routeHomeVersionResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "route-version",
+        "targetNodeId": "respond",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-7",
+      "name": "response",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "respond",
+        "targetNodeId": "accept",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "data-8",
+      "name": "awitResponseLoop",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "accept",
+        "targetNodeId": "accept",
+        "sourcePortName": "out",
+        "targetPortName": "in",
+        "typeDefinitionId": "reqrep",
+        "interactionKind": "data"
+      }
+    },
+    {
+      "id": "capability",
+      "name": "base_lib -> socket_accept",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 90,
+        "openWidth": 200,
+        "openHeight": 90,
+        "closedWidth": 200,
+        "closedHeight": 90,
+        "isExpanded": true
+      },
+      "status": null,
+      "link": {
+        "sourceNodeId": "base-lib",
+        "targetNodeId": "accept",
+        "sourcePortName": "service",
+        "targetPortName": "service",
+        "interactionKind": "lib"
+      }
+    }
+  ]
+}

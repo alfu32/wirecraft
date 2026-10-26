@@ -158,3 +158,124 @@ pub fn distance_to_segment(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     .clamp(0., 1.);
     ((p[0] - a[0] - t * dx).powi(2) + (p[1] - a[1] - t * dy).powi(2)).sqrt()
 }
+
+/// Immutable segment BVH for routed links. A route's empty bounding-box interior
+/// must not enqueue it for painting or hit testing. Built once per graph revision.
+#[derive(Default)]
+pub struct RouteIndex {
+    ids: Vec<String>,
+    segments: Vec<RouteSegment>,
+    nodes: Vec<RouteBranch>,
+}
+struct RouteSegment {
+    route: usize,
+    bounds: Rect,
+}
+struct RouteBranch {
+    bounds: Rect,
+    children: RouteChildren,
+}
+enum RouteChildren {
+    Leaf { start: usize, end: usize },
+    Branch { left: usize, right: usize },
+}
+impl RouteIndex {
+    pub fn new<'a>(routes: impl IntoIterator<Item = (&'a str, &'a [[f64; 2]])>) -> Self {
+        let mut index = Self::default();
+        for (id, points) in routes {
+            let route = index.ids.len();
+            index.ids.push(id.into());
+            for pair in points.windows(2) {
+                index.segments.push(RouteSegment {
+                    route,
+                    bounds: Rect {
+                        x: pair[0][0].min(pair[1][0]) - 6.,
+                        y: pair[0][1].min(pair[1][1]) - 24.,
+                        width: (pair[0][0] - pair[1][0]).abs() + 12.,
+                        height: (pair[0][1] - pair[1][1]).abs() + 48.,
+                    },
+                });
+            }
+        }
+        if !index.segments.is_empty() {
+            Self::build(&mut index.segments, 0, &mut index.nodes);
+        }
+        index
+    }
+    fn build(segments: &mut [RouteSegment], start: usize, nodes: &mut Vec<RouteBranch>) -> usize {
+        let left = segments
+            .iter()
+            .map(|s| s.bounds.x)
+            .fold(f64::INFINITY, f64::min);
+        let top = segments
+            .iter()
+            .map(|s| s.bounds.y)
+            .fold(f64::INFINITY, f64::min);
+        let right = segments
+            .iter()
+            .map(|s| s.bounds.x + s.bounds.width)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let bottom = segments
+            .iter()
+            .map(|s| s.bounds.y + s.bounds.height)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let bounds = Rect {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        };
+        let node = nodes.len();
+        nodes.push(RouteBranch {
+            bounds,
+            children: RouteChildren::Leaf {
+                start,
+                end: start + segments.len(),
+            },
+        });
+        if segments.len() > 8 {
+            let horizontal = bounds.width >= bounds.height;
+            let mid = segments.len() / 2;
+            let center = |s: &RouteSegment| {
+                if horizontal {
+                    s.bounds.x + s.bounds.width / 2.
+                } else {
+                    s.bounds.y + s.bounds.height / 2.
+                }
+            };
+            segments.select_nth_unstable_by(mid, |a, b| center(a).total_cmp(&center(b)));
+            let (a, b) = segments.split_at_mut(mid);
+            let left = Self::build(a, start, nodes);
+            let right = Self::build(b, start + mid, nodes);
+            nodes[node].children = RouteChildren::Branch { left, right };
+        }
+        node
+    }
+    pub fn query(&self, rect: Rect) -> Vec<String> {
+        if self.nodes.is_empty() {
+            return Vec::new();
+        }
+        let mut pending = vec![0];
+        let mut routes = BTreeSet::new();
+        while let Some(index) = pending.pop() {
+            let node = &self.nodes[index];
+            if !node.bounds.intersects(rect) {
+                continue;
+            }
+            match node.children {
+                RouteChildren::Leaf { start, end } => {
+                    for segment in &self.segments[start..end] {
+                        if segment.bounds.intersects(rect) {
+                            routes.insert(segment.route);
+                        }
+                    }
+                }
+                RouteChildren::Branch { left, right } => {
+                    pending.push(left);
+                    pending.push(right);
+                }
+            }
+        }
+        routes.into_iter().map(|id| self.ids[id].clone()).collect()
+    }
+}

@@ -108,9 +108,17 @@ impl Appearance {
             .unwrap_or(fallback)
     }
 }
+#[derive(Clone, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct InferenceProfile {
+    pub endpoint: String,
+    pub model: String,
+    pub token_env: String,
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Inference {
+    pub profiles: BTreeMap<String, InferenceProfile>,
     pub provider: String,
     pub endpoint: String,
     pub model: String,
@@ -119,6 +127,24 @@ pub struct Inference {
 impl Default for Inference {
     fn default() -> Self {
         Self {
+            profiles: [
+                ("claude", "https://api.anthropic.com", "claude-sonnet"),
+                ("codex", "https://api.openai.com/v1", "gpt-5-codex"),
+                ("chatgpt", "https://api.openai.com/v1", "gpt-5"),
+                ("ollama", "http://localhost:11434", "llama3.2"),
+            ]
+            .into_iter()
+            .map(|(id, endpoint, model)| {
+                (
+                    id.into(),
+                    InferenceProfile {
+                        endpoint: endpoint.into(),
+                        model: model.into(),
+                        token_env: String::new(),
+                    },
+                )
+            })
+            .collect(),
             provider: "clipboard".into(),
             endpoint: String::new(),
             model: String::new(),
@@ -192,20 +218,40 @@ impl Settings {
                 "Invalid appearance settings or #RRGGBB color",
             ));
         }
-        if !["clipboard", "openai", "anthropic", "ollama"]
-            .contains(&self.inference.provider.as_str())
+        if ![
+            "clipboard",
+            "openai",
+            "anthropic",
+            "ollama",
+            "claude",
+            "codex",
+            "chatgpt",
+        ]
+        .contains(&self.inference.provider.as_str())
         {
             return Err(Error::new("invalid_input", "Unknown inference provider"));
         }
-        if !self
-            .inference
-            .token_env
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        if std::iter::once(self.inference.token_env.as_str())
+            .chain(
+                self.inference
+                    .profiles
+                    .values()
+                    .map(|p| p.token_env.as_str()),
+            )
+            .any(|value| !value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
         {
             return Err(Error::new(
                 "invalid_input",
                 "Token environment variable must contain letters, digits or underscores",
+            ));
+        }
+        if ["claude", "codex", "chatgpt", "ollama"]
+            .iter()
+            .any(|id| !self.inference.profiles.contains_key(*id))
+        {
+            return Err(Error::new(
+                "invalid_input",
+                "Inference profiles must include claude, codex, chatgpt and ollama",
             ));
         }
         Ok(())
@@ -264,6 +310,7 @@ pub fn import_preferences(xml: &str) -> Result<Settings> {
                     "/com/threadwork/app/ui",
                     "/com/threadwork/app/designer",
                     "/com/threadwork/app/appearance",
+                    "/com/threadwork/app/fonts",
                 ]
                 .iter()
                 .any(|p| path == *p)
@@ -292,6 +339,82 @@ pub fn import_preferences(xml: &str) -> Result<Settings> {
             "invalid_input",
             "Expected a Java Preferences export with a preferences root",
         ));
+    }
+    let pref = |path: &str, key: &str| {
+        settings
+            .legacy_preferences
+            .get(&format!("/com/threadwork/app/{path}/{key}"))
+            .cloned()
+    };
+    if let Some(theme) = pref("appearance", "theme") {
+        settings.appearance.theme = theme.to_lowercase();
+        if settings.appearance.theme == "light" {
+            settings.appearance.colors = Appearance::light_colors();
+        }
+    }
+    if let Some(rows) = pref("appearance", "scroll.rows.per.wheel.tick") {
+        settings.appearance.wheel_rows = rows
+            .parse::<f32>()
+            .map_err(|_| Error::new("invalid_input", "Invalid legacy wheel rows"))?
+            .clamp(1., 12.);
+    }
+    if let Some(value) = pref("designer", "compositeTitleTargetScreenPx") {
+        settings.appearance.composite_title_size = value
+            .parse::<f32>()
+            .map_err(|_| Error::new("invalid_input", "Invalid legacy composite title size"))?
+            .clamp(8., 48.);
+    }
+    for (key, target) in [
+        (
+            "compositeReferenceViewportWidth",
+            &mut settings.appearance.reference_width,
+        ),
+        (
+            "compositeReferenceViewportHeight",
+            &mut settings.appearance.reference_height,
+        ),
+    ] {
+        if let Some(value) = pref("designer", key) {
+            *target = value
+                .parse::<f64>()
+                .map_err(|_| Error::new("invalid_input", "Invalid legacy reference viewport"))?
+                .clamp(300., 10000.);
+        }
+    }
+    for (key, value) in &mut settings.appearance.colors {
+        if let Some(color) = pref(
+            "appearance",
+            &format!(
+                "{}.{}",
+                settings.appearance.theme,
+                match key.as_str() {
+                    "linkSource" => "linksourcecapability".into(),
+                    "linkRunnable" => "linkrunnablecapability".into(),
+                    _ => key.to_lowercase(),
+                }
+            ),
+        ) {
+            *value = color;
+        }
+    }
+    let font_name = |id: &str| match id {
+        "system-monospace" => "DejaVu Sans Mono",
+        "d-din-regular" | "d-din-bold" | "d-din-italic" => "D-DIN",
+        "monaspace-neon-regular"
+        | "monaspace-neon-light"
+        | "monaspace-neon-bold"
+        | "monaspace-neon-italic" => "Monaspace Neon",
+        "monaspace-krypton-regular"
+        | "monaspace-krypton-light"
+        | "monaspace-krypton-bold"
+        | "monaspace-krypton-italic" => "Monaspace Krypton",
+        _ => "DejaVu Sans Mono",
+    };
+    if let Some(value) = pref("fonts", "designerFont") {
+        settings.appearance.designer_font = font_name(&value).into();
+    }
+    if let Some(value) = pref("fonts", "codeFont") {
+        settings.appearance.editor_font = font_name(&value).into();
     }
     settings.validate()?;
     Ok(settings)

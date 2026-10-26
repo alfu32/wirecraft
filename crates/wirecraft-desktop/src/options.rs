@@ -6,6 +6,7 @@ pub struct OptionsEditor {
     pub saved: Settings,
     pub fields: Vec<OptionField>,
     pub tab: &'static str,
+    pub provider_tab: &'static str,
 }
 pub struct OptionField {
     pub path: String,
@@ -52,13 +53,7 @@ impl OptionsEditor {
             ("/cppCompiler".into(), "C++ compiler executable".into()),
             (
                 "/inference/provider".into(),
-                "Active provider (clipboard / openai / anthropic / ollama)".into(),
-            ),
-            ("/inference/endpoint".into(), "Endpoint URL".into()),
-            ("/inference/model".into(), "Model".into()),
-            (
-                "/inference/tokenEnv".into(),
-                "API token environment variable".into(),
+                "Active provider (clipboard / claude / codex / chatgpt / ollama)".into(),
             ),
         ];
         definitions.extend(
@@ -68,6 +63,15 @@ impl OptionsEditor {
                 .keys()
                 .map(|key| (format!("/appearance/colors/{key}"), key.clone())),
         );
+        for id in ["claude", "codex", "chatgpt", "ollama"] {
+            for (key, label) in [
+                ("endpoint", "Endpoint URL"),
+                ("model", "Model"),
+                ("tokenEnv", "API token environment variable"),
+            ] {
+                definitions.push((format!("/inference/profiles/{id}/{key}"), label.into()));
+            }
+        }
         let fields = definitions
             .into_iter()
             .map(|(path, label)| {
@@ -124,6 +128,7 @@ impl OptionsEditor {
             saved,
             fields,
             tab: "General",
+            provider_tab: "claude",
         }
     }
     pub fn value(&self, cx: &App) -> Result<Value, String> {
@@ -202,6 +207,7 @@ impl Wirecraft {
             .detach();
             Theme::global_mut(cx).mono_font_family = settings.appearance.editor_font.clone().into();
             self.rebuild();
+            self.focus.focus(w);
             cx.notify();
         }
     }
@@ -228,12 +234,41 @@ impl Wirecraft {
             .flex()
             .flex_col()
             .gap_3();
+        if self.options.tab == "Inference Providers" {
+            form = form.child(
+                div().flex().gap_2().children(
+                    [
+                        ("claude", "Claude"),
+                        ("codex", "Codex"),
+                        ("chatgpt", "ChatGPT"),
+                        ("ollama", "Local Ollama"),
+                        ("clipboard", "Prompt to Clipboard"),
+                    ]
+                    .into_iter()
+                    .map(|(id, label)| {
+                        button(id, label)
+                            .when(self.options.provider_tab == id, |b| {
+                                b.bg(crate::chrome::color(0x255452))
+                            })
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.options.provider_tab = id;
+                                cx.notify();
+                            }))
+                    }),
+                ),
+            );
+        }
         for f in &self.options.fields {
             let colors = f.path.starts_with("/appearance/colors/");
             let inference = f.path.starts_with("/inference/");
             if (self.options.tab == "General" && (colors || inference))
                 || (self.options.tab == "Flow Designer colors" && !colors)
                 || (self.options.tab == "Inference Providers" && !inference)
+            {
+                continue;
+            }
+            if f.path.starts_with("/inference/profiles/")
+                && f.path.split('/').nth(3) != Some(self.options.provider_tab)
             {
                 continue;
             }
@@ -246,7 +281,28 @@ impl Wirecraft {
                     .child(div().w(px(380.)).child(Input::new(&f.input)))
                     .when_some(f.picker.as_ref(), |b, picker| {
                         b.child(gpui_component::color_picker::ColorPicker::new(picker))
-                    }),
+                    })
+                    .when(
+                        ["/appearance/designerFont", "/appearance/editorFont"]
+                            .contains(&f.path.as_str()),
+                        |b| {
+                            let path = f.path.clone();
+                            b.child(button("choose-font", "Choose…").on_click(cx.listener(
+                                move |this, _, w, cx| {
+                                    this.font_choices = w.text_system().all_font_names();
+                                    this.menu = Some(
+                                        if path.ends_with("designerFont") {
+                                            "Designer font"
+                                        } else {
+                                            "Code font"
+                                        }
+                                        .into(),
+                                    );
+                                    cx.notify();
+                                },
+                            )))
+                        },
+                    ),
             );
         }
         if self.options.tab == "Inference Providers" {

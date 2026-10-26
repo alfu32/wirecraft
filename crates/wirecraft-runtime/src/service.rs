@@ -140,6 +140,7 @@ impl Service {
                 let mut result = self.execute(Request::new("file.save", a.clone()))?;
                 if let Some(id) = a["nodeId"].as_str() {
                     result["entity"] = serde_json::to_value(self.document.node(id)?)?;
+                    result["masterRevision"] = self.document.master_revision.clone();
                 }
                 return Ok(result);
             }
@@ -329,7 +330,24 @@ impl Service {
                     store::atomic_write(Path::new(required(a, "path")?), text.as_bytes())?;
                     return Ok(json!({"exported":true,"path":a["path"]}));
                 }
-                let (pages, summary) = if documentation {
+                let (pages, summary) = if a["kind"] == "all" {
+                    let sheet = serde_json::from_value(
+                        a.get("sheetOptions").cloned().unwrap_or(json!({})),
+                    )?;
+                    let doc = serde_json::from_value(
+                        a.get("documentOptions").cloned().unwrap_or(json!({})),
+                    )?;
+                    let mut plan = wirecraft_core::sheets::plan(&self.document, parent, &sheet)?;
+                    let plan_pages = plan.pages.len();
+                    let documentation =
+                        wirecraft_core::documentation::pages(&self.document, parent, &doc)?;
+                    let documentation_pages = documentation.len();
+                    plan.pages.extend(documentation);
+                    (
+                        plan.pages,
+                        json!({"kind":"all","planPages":plan_pages,"documentationPages":documentation_pages}),
+                    )
+                } else if documentation {
                     let options =
                         serde_json::from_value(a.get("options").cloned().unwrap_or(json!({})))?;
                     (
@@ -340,7 +358,7 @@ impl Service {
                     let options =
                         serde_json::from_value(a.get("options").cloned().unwrap_or(json!({})))?;
                     let plan = wirecraft_core::sheets::plan(&self.document, parent, &options)?;
-                    let summary = json!({"format":plan.format,"widthMm":plan.width_mm,"heightMm":plan.height_mm,"rows":plan.rows,"columns":plan.columns});
+                    let summary = json!({"format":plan.format,"widthMm":plan.width_mm,"heightMm":plan.height_mm,"rows":plan.rows,"columns":plan.columns,"clipped":plan.clipped});
                     (plan.pages, summary)
                 };
                 if r.command == "export.write" {
@@ -679,7 +697,7 @@ pub fn required<'a>(a: &'a Value, key: &str) -> Result<&'a str> {
 }
 fn entity(d: &Document, id: &str) -> Result<Value> {
     Ok(
-        json!({"entity":d.node(id)?,"fullyQualifiedName":d.qualified_name(id),"projectName":d.project_name()}),
+        json!({"entity":d.node(id)?,"fullyQualifiedName":d.qualified_name(id),"projectName":d.project_name(),"masterRevision":d.master_revision,"effectiveRevision":d.effective_revision(id)}),
     )
 }
 fn user_key(u: &Value) -> String {

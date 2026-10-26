@@ -78,6 +78,12 @@ pub fn stereotype(d: &Document, n: &Node) -> &'static str {
     if n.kind == NodeKind::Node {
         return "Node";
     }
+    if n.name.trim().eq_ignore_ascii_case("@StaticFile") {
+        return "StaticFile";
+    }
+    if n.name.trim().starts_with('@') && n.name.trim().len() > 1 {
+        return "CompilerTemplate";
+    }
     if n.is_composite() {
         return if named(&n.name, &["error", "err"]) {
             "CompositeErrorHandler"
@@ -189,6 +195,50 @@ impl Graph {
         }
         cycles
     }
+    fn reachable(&self, start: &str) -> BTreeSet<String> {
+        let mut seen = BTreeSet::new();
+        let mut pending = vec![start.to_string()];
+        while let Some(id) = pending.pop() {
+            if seen.insert(id.clone())
+                && let Some(next) = self.out.get(&id)
+            {
+                pending.extend(next.iter().cloned());
+            }
+        }
+        seen
+    }
+    fn weak_components(&self) -> Vec<Vec<String>> {
+        let mut seen = BTreeSet::new();
+        let mut result = Vec::new();
+        for root in self.out.keys() {
+            if seen.contains(root) {
+                continue;
+            }
+            let mut pending = vec![root.clone()];
+            let mut component = Vec::new();
+            while let Some(id) = pending.pop() {
+                if seen.insert(id.clone()) {
+                    component.push(id.clone());
+                    pending.extend(
+                        self.out[&id]
+                            .iter()
+                            .chain(self.incoming[&id].iter())
+                            .cloned(),
+                    );
+                }
+            }
+            component.sort();
+            result.push(component);
+        }
+        result.sort_by_key(|c| (std::cmp::Reverse(c.len()), c.first().cloned()));
+        result
+    }
+    fn pairs(&self) -> BTreeSet<(String, String)> {
+        self.out
+            .iter()
+            .flat_map(|(a, bs)| bs.iter().map(move |b| (a.clone(), b.clone())))
+            .collect()
+    }
     fn summary(&self) -> Value {
         json!({"edges":self.out.values().map(BTreeSet::len).sum::<usize>(),"links":self.links,"adjacency":self.out,"cycles":self.cycles(),"degrees":self.out.iter().map(|(id,row)|json!({"nodeId":id,"fanOut":row.len(),"fanIn":self.incoming[id].len()})).collect::<Vec<_>>()})
     }
@@ -200,7 +250,7 @@ pub fn report(d: &Document) -> Value {
         .filter(|n| !n.is_link())
         .map(|n| n.id.clone())
         .collect();
-    ids.sort_by_key(|id| (d.qualified_name(id), id.clone()));
+    ids.sort_by_cached_key(|id| (d.qualified_name(id), id.clone()));
     let mut principal = Graph::new(&ids);
     let mut error = Graph::new(&ids);
     let mut dependency = Graph::new(&ids);
@@ -384,5 +434,110 @@ pub fn report(d: &Document) -> Value {
     for cycle in error.cycles() {
         findings.push(json!({"severity":"NOTICE","category":"error","title":"Error flow contains a cycle","affectedNodes":cycle,"recommendation":"Verify retry, backoff and termination behavior for this region."}));
     }
-    json!({"nodeOrder":ids,"nodeLabels":ids.iter().map(|id|(id,d.qualified_name(id))).collect::<BTreeMap<_,_>>(),"indicators":indicators,"counts":d.network_counts(),"graphs":{"principal":principal.summary(),"error":error.summary(),"dependency":dependency.summary(),"structural":structural.summary(),"containment":containment.summary()},"isolatedNodes":isolated,"connectedComponents":components,"classifications":d.nodes.values().map(|n|json!({"nodeId":n.id,"stereotype":stereotype(d,n),"relation":relation(d,n)})).collect::<Vec<_>>(),"findings":findings,"limitations":["Layout optimization is not yet ported.","Threshold defaults are currently fixed at fan-out 8."]})
+    let workflows = principal.weak_components();
+    let error_sinks = select(&error, "sink");
+    let overview = indicators["overview"].as_array_mut().unwrap();
+    overview.extend([json!({"label":"Principal workflows","value":workflows.len()}),json!({"label":"Principal cycles","value":principal.cycles().len()}),json!({"label":"Error cycles","value":error.cycles().len()}),json!({"label":"Dependency cycles","value":dependency.cycles().len()}),json!({"label":"Principal self-links","value":principal.out.iter().filter(|(id,targets)|targets.contains(*id)).count()}),json!({"label":"Structural density (%)","value":if ids.is_empty(){0.}else{100.*structural.pairs().len()as f64/(ids.len()*ids.len())as f64}})]);
+    // Reachability can be quadratic in graph size. Keep the overview bounded on huge projects;
+    // independent degree/SCC/component findings still cover the complete graph.
+    let reachability_complete = ids.len() <= 4096;
+    let mut max_reach = 0;
+    let mut most_reachable = Vec::new();
+    let mut deep = Vec::new();
+    if reachability_complete {
+        for id in &ids {
+            let size = principal.reachable(id).len();
+            if size > max_reach {
+                max_reach = size;
+                most_reachable = vec![id.clone()];
+            }
+            if dependency.reachable(id).len() > 6 {
+                deep.push(id.clone());
+            }
+        }
+    }
+    indicators["principal"].as_array_mut().unwrap().push(json!({"label":"Largest downstream reachability","value":if reachability_complete{json!(max_reach)}else{json!("not computed above 4096 nodes")},"affectedNodes":most_reachable}));
+    indicators["dependency"].as_array_mut().unwrap().push(json!({"label":"Deep dependency reachability (>6)","value":if reachability_complete{json!(deep.len())}else{json!("not computed above 4096 nodes")},"affectedNodes":deep}));
+    let mut workflow_metrics = vec![
+        json!({"label":"Principal components","value":workflows.len()}),
+        json!({"label":"Largest workflow size","value":workflows.first().map(Vec::len).unwrap_or(0)}),
+    ];
+    let mut membership = BTreeMap::new();
+    for (index, workflow) in workflows.iter().enumerate() {
+        for id in workflow {
+            membership.insert(id.clone(), index);
+        }
+        workflow_metrics.push(json!({"label":format!("Workflow {}",index+1),"value":workflow.len(),"affectedNodes":workflow}));
+        if workflow.len() > 1
+            && (!workflow
+                .iter()
+                .any(|id| principal.incoming[id].is_empty() && !principal.out[id].is_empty())
+                || !workflow
+                    .iter()
+                    .any(|id| !principal.incoming[id].is_empty() && principal.out[id].is_empty()))
+        {
+            findings.push(json!({"severity":"NOTICE","category":"workflows","title":format!("Workflow {} has an incomplete boundary shape",index+1),"affectedNodes":workflow,"recommendation":"Inspect inputs, outputs and feedback at the workflow boundary."}));
+        }
+    }
+    indicators.insert("workflows".into(), json!(workflow_metrics));
+    let shared_pairs = principal
+        .pairs()
+        .intersection(&error.pairs())
+        .cloned()
+        .collect::<Vec<_>>();
+    let error_only = error.pairs().difference(&principal.pairs()).count();
+    let cross_error = error
+        .pairs()
+        .into_iter()
+        .filter(|(a, b)| membership.get(a) != membership.get(b))
+        .collect::<Vec<_>>();
+    let cross_dependency = dependency
+        .pairs()
+        .into_iter()
+        .filter(|(a, b)| {
+            processing.contains(a)
+                && processing.contains(b)
+                && membership.get(a) != membership.get(b)
+        })
+        .collect::<Vec<_>>();
+    indicators.insert("cross-layer".into(),json!([{"label":"Pairs carrying data and error","value":shared_pairs.len(),"affectedNodes":shared_pairs.iter().flat_map(|(a,b)|[a,b]).collect::<BTreeSet<_>>()},{"label":"Error-only directed pairs","value":error_only},{"label":"Cross-workflow error links","value":cross_error.len(),"affectedNodes":cross_error.iter().flat_map(|(a,b)|[a,b]).collect::<BTreeSet<_>>()},{"label":"Cross-workflow processing dependencies","value":cross_dependency.len(),"affectedNodes":cross_dependency.iter().flat_map(|(a,b)|[a,b]).collect::<BTreeSet<_>>()}]));
+    for (title, pairs) in [
+        ("Data and error share endpoint pairs", &shared_pairs),
+        ("Error flow crosses workflow boundaries", &cross_error),
+        ("Processing dependencies cross workflows", &cross_dependency),
+    ] {
+        if !pairs.is_empty() {
+            findings.push(json!({"severity":"NOTICE","category":"cross-layer","title":title,"affectedNodes":pairs.iter().flat_map(|(a,b)|[a,b]).collect::<BTreeSet<_>>(),"recommendation":"Review ownership and the explicit normal/error/capability contract across this boundary."}));
+        }
+    }
+    if reachability_complete {
+        let no_sink = select(&error, "generator")
+            .into_iter()
+            .filter(|id| {
+                error
+                    .reachable(id)
+                    .is_disjoint(&error_sinks.iter().cloned().collect())
+            })
+            .collect::<Vec<_>>();
+        if !no_sink.is_empty() {
+            findings.push(json!({"severity":"WARNING","category":"error","title":"Some error sources cannot reach an error sink","affectedNodes":no_sink,"recommendation":"Inspect termination, retry and ownership of the error path."}));
+        }
+    }
+    let high_dependency = libraries
+        .iter()
+        .filter(|id| dependency.incoming[*id].len() >= 8)
+        .cloned()
+        .collect::<Vec<_>>();
+    if !high_dependency.is_empty() {
+        findings.push(json!({"severity":"WARNING","category":"quality","title":"High dependency fan-in","affectedNodes":high_dependency,"recommendation":"Review the ownership and stability of this shared library contract."}));
+    }
+    indicators.insert("quality".into(),json!([{"label":"High fan-out threshold","value":8},{"label":"High dependency fan-in threshold","value":8},{"label":"Deep dependency reachability threshold","value":6},{"label":"Reachability scope complete","value":reachability_complete}]));
+    let mut actions = vec![
+        json!({"title":"Select processing candidates","affectedNodes":processing}),
+        json!({"title":"Select library candidates","affectedNodes":libraries}),
+        json!({"title":"Select isolated entities","affectedNodes":isolated}),
+        json!({"title":"Select all principal cyclic regions","affectedNodes":principal.cycles().into_iter().flatten().collect::<BTreeSet<_>>()}),
+    ];
+    actions.extend(workflows.iter().enumerate().filter(|(_,nodes)|nodes.len()>1).map(|(i,nodes)|json!({"title":format!("Select workflow {}",i+1),"affectedNodes":nodes})));
+    json!({"nodeOrder":ids,"nodeLabels":ids.iter().map(|id|(id,d.qualified_name(id))).collect::<BTreeMap<_,_>>(),"indicators":indicators,"actions":actions,"workflows":workflows,"counts":d.network_counts(),"graphs":{"principal":principal.summary(),"error":error.summary(),"dependency":dependency.summary(),"structural":structural.summary(),"containment":containment.summary()},"isolatedNodes":isolated,"connectedComponents":components,"classifications":d.nodes.values().map(|n|json!({"nodeId":n.id,"stereotype":stereotype(d,n),"relation":relation(d,n)})).collect::<Vec<_>>(),"findings":findings,"limitations":["Automatic layout/model optimization was a future action in the source; inspection actions remain read-only.","Threshold defaults: fan-out 8, dependency fan-in 8, deep dependency reachability 6.","All-node reachability summaries are bounded to 4096 nodes; degree/SCC/component analysis covers the full graph."]})
 }

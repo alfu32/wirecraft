@@ -17,13 +17,17 @@ cargo run -p wirecraft-runtime -- validate path/to/project.orch
 cargo run -p wirecraft-runtime -- new /tmp/new-project.orch
 ```
 
-The desktop supports node/type/link creation, selection, shift selection, drag and window selection, middle/right-button pan, wheel pan, Ctrl-wheel cursor zoom, Fit, hierarchy navigation, double-click entry/edit, five entity text sections, JSON property editing, Apply, undo/redo, load/save and recovery. Ctrl N/O/S/Shift-S/Z/Y/Shift-Z/Enter/Q and Escape retain familiar workflows. Apply drafts before changing entities or text sections; Reload entity explicitly discards a draft. Unsaved graph changes block New/Open until saved. Project Management currently uses the JSON entity property editor; it is not a port of the original dashboard.
+The workbench has Designer, Editor, Project Management, Analysis, Archetypes, Export, Tools and MCP views, with categorized menus and a searchable keyboard command palette (Ctrl-Shift-P, Up/Down, Enter, Escape). The icon set uses consistent GPU strokes rather than the old Swing toolbar artwork. [All 20 reference photos](docs/migration/threadworks/README.md) have chronological names and feature mappings; [walkthrough parity](docs/migration/walkthrough.md) records the implementation and its limits.
+
+Designer supports node/type/link creation, shift and box selection, composite subtree drag, resizing, collapse/expand, named typed ports and type-usage callouts. Middle/right-button pan, wheel pan, Ctrl-wheel zoom, Fit, hierarchy navigation and double-click entry/edit retain familiar workflows. Editor has the five source sections, C/C++ syntax highlighting, section language, structured general/management/link/type/metadata controls, inherited values, revision tracking and advanced JSON. Apply drafts before changing entities or sections; Reload entity explicitly discards a draft. Drafts, including invalid metadata tables, recover after restart. Ctrl N/O/S/Shift-S/Z/Y/Shift-Z/Enter/Q are supported. Unsaved graph changes block New/Open until saved.
+
+Project Management provides six status lanes, drag/drop, remove-to-backlog and undo. Archetypes provides grouped descriptions and a read-only preview before explicit insertion. Analysis shows sparse P/E/D/U matrices, clickable endpoints, indicators and findings. Root master revision and inherited node revisions retain their source storage semantics. Sidebar widths, hierarchy expansion, viewport, selection and export profiles restore across restarts.
 
 Session and draft data live in `$XDG_STATE_HOME/wirecraft` (fallback `~/.local/state/wirecraft`). `--state-dir` isolates them. Original Java Preferences are never changed. Closing the desktop stops only its owned backend; the Threadworks process is independent. A crash recovery snapshot preserves applied changes; UI session data preserves editor drafts. Independent sessions need separate state directories.
 
 ## MCP
 
-For a desktop session, open **MCP → Copy MCP client configuration**. It includes the ephemeral local endpoint and bearer header. Treat this configuration as access to the open design. The old `threadwork.*` tool names and `threadwork://` resource URIs are retained.
+For a desktop session, open **MCP → Manage Server**, then **Copy configuration**. It includes the ephemeral local endpoint and bearer header. Treat this configuration as access to the open design. Health checks and the bounded access log are visible here; Stop/Start disable/enable MCP without stopping the UI backend. The old `threadwork.*` tool names and `threadwork://` resource URIs are retained.
 
 For headless stdio clients, use the built executable (stdout contains protocol only):
 
@@ -33,11 +37,15 @@ For headless stdio clients, use the built executable (stdout contains protocol o
 
 For HTTP, `wirecraft serve` prints one JSON readiness record containing `endpoint`, `mcp`, and `token`; send `Authorization: Bearer <token>` to `/mcp`, `/api`, or `/events`. The backend binds only `127.0.0.1`, defaults to an OS-selected port, rejects browser Origin requests, and leaves the old server alone. `/health` is a non-mutating liveness route. Explicit `--port` and `--token` are available; `--recovery FILE` opts into recovery storage.
 
-An API request is `{"command":"threadwork.get_design","arguments":{}}`. Mutations can add `"expectedRevision": 3` to reject stale updates. `/events` is an authenticated SSE stream; reconnecting clients must reload a snapshot after a resync event. `file.open`, `file.save`, `edit.undo`, `edit.redo` and document commands share this contract. Errors carry a stable code and message. MCP retains the original 19 tool schemas and adds 17 Wirecraft tools for project files, graph fragments, archetypes, reports, exports, literal/C17 generation, mapped graph diagnostics, LSP and build jobs; unavailable desktop commands and graph compilers return explicit limitations rather than fake success.
+An API request is `{"command":"threadwork.get_design","arguments":{}}`. Mutations can add `"expectedRevision": 3` to reject stale updates. `/events` is an authenticated SSE stream; reconnecting clients must reload a snapshot after a resync event. `file.open`, `file.save`, `edit.undo`, `edit.redo` and document commands share this contract. Errors carry a stable code and message. MCP retains the original 19 tool schemas and adds 18 Wirecraft tools for project files, graph fragments, archetypes, reports, exports, literal/C17 generation, mapped graph diagnostics, LSP and build jobs. `wirecraft.workbench` exposes sheet/document previews and exports, clipboard prompts, settings, MCP controls and printers through the same services. Unavailable commands and graph compilers return explicit limitations.
 
 ## Reusable workflows, reports and exports
 
-Designer Copy/Cut/Paste retains subtrees and internal links, remapping IDs and typed references. Archetypes embeds the original reusable workflows; import a bundled design or a .orch file into the focused composite. Export can save a selected subtree as an archetype, copy Markdown component fiches, or write a focused diagram as SVG, PNG or vector PDF. These drawings are free-size; the original ISO sheets, rolls and poster assembly are still pending. Analysis reports principal/error/dependency/structural graph degrees, cycles, components, classifications and findings; actionable layout optimization remains pending.
+Designer Copy/Cut/Paste retains subtrees and internal links, remapping IDs and typed references. Archetypes embeds the original reusable workflows; import a bundled design or a .orch file into the focused composite. File/Export can save a selected subtree as an archetype and copy Markdown component fiches.
+
+Export has a real Plan/Documentation preview, ISO A0–A4/landscape/roll formats, 1:N scales, split/overlap, title block, parts/signature table and folding ticks. Plan writes SVG, PNG, Mermaid and searchable vector or compressed raster PDF; multipage output requires PDF. Documentation writes paginated PDF, escaped HTML or Markdown with header/footer/margins. PDF All combines plan and documentation. Auto refuses accidental cropping; fixed sheets report clipping. Raster allocation and page counts are bounded. CUPS printers are discovered and explicit Print submits a supervised job; no physical printer output was verified. Per-printer profiles persist. The Sheet toolbar opens this preview; the old editable in-canvas paper overlay and exact legacy typography/routing are still gaps.
+
+AI Support copies source/specification/test prompts with component dossiers and available compiler context. Options persists provider profiles and environment-variable names for credentials. All four network providers in the source baseline are stubs returning Unavailable; Wirecraft likewise reports network inference/browser authorization as unsupported. Clipboard assistance works without credentials.
 
 Literal filesystem generation supports `file-export` / `multi-tech` entities, text/binary files, relative `metadata.path` or `metadata.file`, hierarchy directories and origin maps. It rejects unmigrated language graph technologies and unsafe/colliding paths. The output directory must be new or empty; generation never merges into a nonempty user directory. `generate.files` optionally takes `nodeId` and `outputDir`; omitting the output returns the virtual files for inspection.
 
@@ -76,7 +84,7 @@ The backend supports other language servers through executable/argv/root configu
 
 ## Configuration import and Linux installation
 
-Wirecraft reads `settings.json` from its state directory. Supported settings include `schemaVersion: 1`, `editorIndentSpaces` (1–16; default 4), `clangd: {executable, args}`, `cCompiler` and `cppCompiler`. Environment executable overrides take precedence.
+Wirecraft reads `settings.json` from its state directory. Options has staged Save/Cancel/defaults for general appearance, semantic color pickers and inference profiles. Themes, designer/editor fonts, composite title/reference size, wheel rows, grid/colors and indentation apply and restore. Monaspace Neon/Krypton are embedded under the SIL OFL; system font choices are also available. Missing legacy fonts use the system fallback. Settings include `schemaVersion: 1`, `editorIndentSpaces` (1–16; default 4), `appearance`, `inference`, `clangd: {executable, args}`, `cCompiler` and `cppCompiler`. Environment executable overrides take precedence.
 
 Import an explicitly exported Java Preferences XML into a new JSON file:
 
@@ -84,11 +92,11 @@ Import an explicitly exported Java Preferences XML into a new JSON file:
 wirecraft migrate-settings threadworks-preferences.xml /tmp/imported-settings.json
 ```
 
-Review the output and place it at your chosen state directory's `settings.json`. Indentation is active; UI/designer/appearance preferences are archived under `legacyPreferences` until their controls are migrated. Identity/AI credentials are excluded. The importer never reads or writes the live preference store and refuses to overwrite an existing settings file.
+Review the output and place it at your chosen state directory's `settings.json`. Supported indentation, theme/font, composite, wheel and semantic colors activate; other panel values are retained in `legacyPreferences`. Identity/AI credentials are excluded. The importer never reads or writes the live preference store and refuses to overwrite an existing settings file.
 
 ```sh
 scripts/package-linux.sh release
-# Extract dist/wirecraft-0.3.0-linux-<architecture>.tar.gz, then:
+# Extract dist/wirecraft-0.4.0-linux-<architecture>.tar.gz, then:
 ./install.sh /your/prefix
 ```
 
@@ -101,8 +109,9 @@ cargo fmt --all -- --check
 cargo test --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 python3 scripts/desktop_smoke.py
+python3 scripts/walkthrough_smoke.py
 ```
 
 The desktop smoke requires a real X11/XWayland display with Vulkan/DRI3, xdotool and ImageMagick. It launches its own PID-scoped window with temporary state. Xvfb on this machine lacks DRI3 and cannot present GPUI. Available-platform evidence is Linux only. macOS/Windows packaging and interaction have not been verified.
 
-Pending capabilities include remaining C17 capability/template features and Go/Kotlin/JS/PHP/QuickJS graph compiler parity, ISO/roll technical sheets and poster tiling, advanced editor features, dedicated project management, OAuth and AI provider workflows, and full editor/analysis interaction fidelity. JVM plugin ABI is incompatible; plugin data survives. See the parity matrix for exact scope and continuation.
+Pending capabilities include remaining C17 capability/template features and Go/Kotlin/JS/PHP/QuickJS graph compiler parity, compiler-from-overrides export, inline LSP completion/navigation, OAuth identity, editable canvas paper overlays and exact legacy layout fidelity. Network AI and automatic layout optimization were unfinished in the source as well. JVM plugin ABI is incompatible; plugin data survives. See the parity matrix for exact scope and continuation.

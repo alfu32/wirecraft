@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   result=subprocess.run(['xdotool',*map(str,args)],env=env,text=True,capture_output=True)
   if result.returncode and args[-1]!='ctrl+q':raise subprocess.CalledProcessError(result.returncode,result.args,result.stdout,result.stderr)
   return result.stdout.strip()
- def caption():return subprocess.check_output(['import','-window',window,'-crop','300x32+770+132','rgba:-'],env=env)
+ def caption():return subprocess.check_output(['import','-window',window,'-crop','350x32+850+132','rgba:-'],env=env)
  def choose_mode(x,y):
   before=caption();until=time.monotonic()+8
   while time.monotonic()<until:
