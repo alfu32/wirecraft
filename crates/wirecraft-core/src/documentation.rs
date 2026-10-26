@@ -70,7 +70,13 @@ pub fn html(d: &Document, parent: &str) -> Result<String> {
         )
         .unwrap();
     }
-    out.push_str("</ul></nav>");
+    out.push_str("</ul></nav><section><h2>Composition</h2>");
+    out.push_str(&crate::export::drawing_svg(d, parent)?.replacen(
+        "<svg ",
+        "<svg style=\"max-width:100%;height:auto\" ",
+        1,
+    ));
+    out.push_str("</section>");
     for (i, id) in ids.iter().enumerate() {
         let n = d.node(id)?;
         write!(out,"<article id=\"part-{i}\"><h2>{}</h2><p>{} · {} · {}</p><table><tr><th>Status</th><th>Responsible</th><th>Assignee</th></tr><tr><td>{}</td><td>{}</td><td>{}</td></tr></table>",escape(&n.name),escape(crate::analysis::stereotype(d,n)),escape(&d.effective(id,"languageId")),escape(&d.effective(id,"technologyId")),escape(n.status.as_deref().unwrap_or("")),escape(&d.effective(id,"responsible")),escape(n.assignee.as_deref().unwrap_or(""))).unwrap();
@@ -112,30 +118,64 @@ pub fn pages(d: &Document, parent: &str, options: &Options) -> Result<Vec<String
     {
         return Err(Error::new("invalid_input", "Invalid documentation margins"));
     }
-    let text = markdown_document(d, parent)?;
+    let ids = ids(d, parent)?;
     let columns = ((w - options.left_mm - options.right_mm) / 1.65).floor() as usize;
     let lines_per_page = ((h - options.top_mm - options.bottom_mm - 15.) / 4.5).floor() as usize;
-    let mut lines = Vec::new();
-    for line in text.lines() {
-        let chars = line.chars().collect::<Vec<_>>();
-        if chars.is_empty() {
-            lines.push(String::new());
-        } else {
-            lines.extend(chars.chunks(columns).map(|c| c.iter().collect::<String>()));
+    let wrap = |text: &str| {
+        let mut lines = Vec::new();
+        for line in text.lines() {
+            let chars = line.chars().collect::<Vec<_>>();
+            if chars.is_empty() {
+                lines.push(String::new());
+            } else {
+                lines.extend(chars.chunks(columns).map(|c| c.iter().collect::<String>()));
+            }
         }
+        lines
+    };
+    let mut cover = format!(
+        "# {} Functional and Technical Specification\n\n## Contents\n\n",
+        d.project_name()
+    );
+    for id in &ids {
+        writeln!(cover, "- {}", d.qualified_name(id)).unwrap();
     }
-    if lines.len().div_ceil(lines_per_page) > 256 {
+    let contents = wrap(&cover);
+    let dossier = markdown(d, &ids)?;
+    let dossier = dossier
+        .split_once("\n\n")
+        .map(|(_, body)| body)
+        .unwrap_or(&dossier);
+    let body = wrap(dossier);
+    let total = contents.len().div_ceil(lines_per_page) + 1 + body.len().div_ceil(lines_per_page);
+    if total > 256 {
         return Err(Error::new("export", "Documentation exceeds 256 pages"));
     }
-    let total = lines.len().div_ceil(lines_per_page);
-    let mut pages = Vec::new();
-    for (page, lines) in lines.chunks(lines_per_page).enumerate() {
+    let start = || {
         let mut out = format!(
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}mm\" height=\"{h}mm\" viewBox=\"0 0 {w} {h}\"><rect width=\"{w}\" height=\"{h}\" fill=\"white\"/><g font-family=\"DejaVu Sans Mono\" font-size=\"2.7\" fill=\"#243b53\">"
         );
         if options.header {
-            write!(out,"<text x=\"{}\" y=\"{}\" font-family=\"DejaVu Sans\" font-size=\"3.5\">{} · Functional and Technical Specification</text>",options.left_mm,options.top_mm,escape(d.project_name())).unwrap();
+            write!(out,"<text x=\"{}\" y=\"{}\" font-family=\"DejaVu Sans\" font-size=\"3\">{} · Revision {} {}</text>",options.left_mm,options.top_mm,escape(d.project_name()),escape(d.master_revision["name"].as_str().unwrap_or("")),escape(d.master_revision["date"].as_str().unwrap_or(""))).unwrap();
         }
+        out
+    };
+    let finish = |mut out: String, index: usize| {
+        if options.footer {
+            write!(
+                out,
+                "<text x=\"{}\" y=\"{}\">Wirecraft · {} / {total}</text>",
+                options.left_mm,
+                h - options.bottom_mm,
+                index + 1
+            )
+            .unwrap();
+        }
+        out.push_str("</g></svg>");
+        out
+    };
+    let text_page = |lines: &[String]| {
+        let mut out = start();
         for (i, line) in lines.iter().enumerate() {
             let (text, size, weight, family) = if let Some(s) = line.strip_prefix("# ") {
                 (s, 4.2, "600", "DejaVu Sans")
@@ -150,18 +190,27 @@ pub fn pages(d: &Document, parent: &str, options: &Options) -> Result<Vec<String
                 write!(out,"<text x=\"{}\" y=\"{}\" font-size=\"{size}\" font-weight=\"{weight}\" font-family=\"{family}\" xml:space=\"preserve\">{}</text>",options.left_mm,options.top_mm+8.+i as f64*4.5,escape(text)).unwrap();
             }
         }
-        if options.footer {
-            write!(
-                out,
-                "<text x=\"{}\" y=\"{}\">Wirecraft · {} / {total}</text>",
-                options.left_mm,
-                h - options.bottom_mm,
-                page + 1
-            )
-            .unwrap();
-        }
-        out.push_str("</g></svg>");
-        pages.push(out);
+        out
+    };
+    let mut pages = Vec::new();
+    for chunk in contents.chunks(lines_per_page) {
+        pages.push(finish(text_page(chunk), pages.len()));
+    }
+    // Embed the shared drawing as nested SVG paths/text, never a preview PNG.
+    let svg = crate::export::drawing_svg(d, parent)?;
+    let opening = svg
+        .find('>')
+        .ok_or_else(|| Error::new("export", "Invalid composition SVG"))?;
+    let view_box = svg[..opening]
+        .split("viewBox=\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .ok_or_else(|| Error::new("export", "Composition has no viewBox"))?;
+    let mut figure = start();
+    write!(figure,"<text x=\"{}\" y=\"{}\" font-family=\"DejaVu Sans\" font-size=\"4.2\" font-weight=\"600\">Composition · {}</text><svg x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" viewBox=\"{view_box}\" preserveAspectRatio=\"xMidYMin meet\">{}",options.left_mm,options.top_mm+8.,escape(&d.node(parent)?.name),options.left_mm,options.top_mm+14.,w-options.left_mm-options.right_mm,h-options.top_mm-options.bottom_mm-23.,&svg[opening+1..]).unwrap();
+    pages.push(finish(figure, pages.len()));
+    for chunk in body.chunks(lines_per_page) {
+        pages.push(finish(text_page(chunk), pages.len()));
     }
     Ok(pages)
 }

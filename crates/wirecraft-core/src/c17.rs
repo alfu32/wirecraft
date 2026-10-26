@@ -34,9 +34,6 @@ impl Emitter {
         self.source.push('\n');
     }
     fn authored(&mut self, node: &Node, section: &str, text: &str, indent: &str) {
-        if text.is_empty() {
-            return;
-        }
         let start = self.next_line;
         for line in text.split('\n') {
             self.line(&format!("{indent}{line}"));
@@ -248,67 +245,11 @@ impl C17 {
             let n = document.node(id)?;
             out.authored(n, "source", &n.text.source, "");
         }
-        let function_pattern=regex::Regex::new(r"(?m)(?:^|[;}])\s*((?:[A-Za-z_][A-Za-z0-9_]*\s+)+(?:\*+\s*)?)([A-Za-z_][A-Za-z0-9_]*)\s*\(([^;{}]*)\)\s*(?:\{|;)").unwrap();
         let mut aliases = BTreeSet::new();
         for n in capabilities {
-            let link = n.link.as_ref().unwrap();
-            let library = document.node(&link.source_node_id)?;
-            let prefix = identifier(&n.name);
-            for capture in function_pattern.captures_iter(&library.text.source) {
-                let result = capture[1]
-                    .split_whitespace()
-                    .filter(|w| !["static", "extern", "inline", "_Noreturn"].contains(w))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                let name = &capture[2];
-                let parameters = capture[3].trim();
-                let parameters = if parameters.is_empty() {
-                    "void"
-                } else {
-                    parameters
-                };
-                let declaration = format!("{result} (*{prefix}__{name})({parameters}) = {name};");
-                if aliases.insert(format!("{prefix}__{name}")) {
-                    out.line(&declaration);
-                }
-            }
-            for (header, functions) in [
-                (
-                    "stdio.h",
-                    &[
-                        ("FILE *", "fopen", "const char *, const char *"),
-                        ("int", "fprintf", "FILE *, const char *, ..."),
-                        ("int", "fclose", "FILE *"),
-                    ][..],
-                ),
-                (
-                    "time.h",
-                    &[
-                        ("time_t", "time", "time_t *"),
-                        ("struct tm *", "localtime_r", "const time_t *, struct tm *"),
-                        (
-                            "size_t",
-                            "strftime",
-                            "char *, size_t, const char *, const struct tm *",
-                        ),
-                    ][..],
-                ),
-                (
-                    "uuid/uuid.h",
-                    &[
-                        ("void", "uuid_generate_random", "uuid_t"),
-                        ("void", "uuid_unparse_lower", "const uuid_t, char *"),
-                    ][..],
-                ),
-            ] {
-                if library.text.source.contains(header) {
-                    for (result, name, parameters) in functions {
-                        let declaration =
-                            format!("{result} (*{prefix}__{name})({parameters}) = {name};");
-                        if aliases.insert(format!("{prefix}__{name}")) {
-                            out.line(&declaration);
-                        }
-                    }
+            for function in library_functions(document, n)? {
+                if aliases.insert(function.name) {
+                    out.line(&function.declaration);
                 }
             }
         }
@@ -563,7 +504,7 @@ fn valid_identifier(s: &str) -> bool {
         .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
-fn identifier(value: &str) -> String {
+pub(crate) fn identifier(value: &str) -> String {
     if valid_identifier(value.trim()) {
         return value.trim().into();
     }
@@ -592,4 +533,85 @@ fn reserved(s: &str) -> bool {
         "union", "unsigned", "void", "volatile", "while", "_Atomic", "_Bool",
     ]
     .contains(&s)
+}
+
+pub(crate) struct LibraryFunction {
+    pub name: String,
+    pub declaration: String,
+    pub signature: String,
+}
+pub(crate) fn library_functions(document: &Document, n: &Node) -> Result<Vec<LibraryFunction>> {
+    let link = n
+        .link
+        .as_ref()
+        .ok_or_else(|| unsupported(n, "Library capability must be a link"))?;
+    let library = document.node(&link.source_node_id)?;
+    let prefix = identifier(&n.name);
+    let mut functions_out = Vec::new();
+    let mut aliases = BTreeSet::new();
+    let mut add = |result: &str, name: &str, parameters: &str| {
+        let alias = format!("{prefix}__{name}");
+        if aliases.insert(alias.clone()) {
+            functions_out.push(LibraryFunction {
+                name: alias.clone(),
+                declaration: format!("{result} (*{alias})({parameters}) = {name};"),
+                signature: format!("{result} {alias}({parameters})"),
+            });
+        }
+    };
+    let function_pattern=regex::Regex::new(r"(?m)(?:^|[;}])\s*((?:[A-Za-z_][A-Za-z0-9_]*\s+)+(?:\*+\s*)?)([A-Za-z_][A-Za-z0-9_]*)\s*\(([^;{}]*)\)\s*(?:\{|;)").unwrap();
+    for capture in function_pattern.captures_iter(&library.text.source) {
+        let result = capture[1]
+            .split_whitespace()
+            .filter(|w| !["static", "extern", "inline", "_Noreturn"].contains(w))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let parameters = capture[3].trim();
+        add(
+            &result,
+            &capture[2],
+            if parameters.is_empty() {
+                "void"
+            } else {
+                parameters
+            },
+        );
+    }
+    for (header, functions) in [
+        (
+            "stdio.h",
+            &[
+                ("FILE *", "fopen", "const char *, const char *"),
+                ("int", "fprintf", "FILE *, const char *, ..."),
+                ("int", "fclose", "FILE *"),
+            ][..],
+        ),
+        (
+            "time.h",
+            &[
+                ("time_t", "time", "time_t *"),
+                ("struct tm *", "localtime_r", "const time_t *, struct tm *"),
+                (
+                    "size_t",
+                    "strftime",
+                    "char *, size_t, const char *, const struct tm *",
+                ),
+            ][..],
+        ),
+        (
+            "uuid/uuid.h",
+            &[
+                ("void", "uuid_generate_random", "uuid_t"),
+                ("void", "uuid_unparse_lower", "const uuid_t, char *"),
+            ][..],
+        ),
+    ] {
+        if library.text.source.contains(header) {
+            for (result, name, parameters) in functions {
+                add(result, name, parameters);
+            }
+        }
+    }
+
+    Ok(functions_out)
 }

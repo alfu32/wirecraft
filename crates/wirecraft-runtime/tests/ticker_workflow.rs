@@ -175,3 +175,232 @@ async fn supplied_ticker_preserves_exports_reports_draft_error_and_runs_correcte
     app.shutdown().await;
     assert_eq!(serde_json::to_value(reference()).unwrap(), original);
 }
+
+#[tokio::test]
+async fn compiler_context_completes_runtime_channels_libraries_and_members_without_committing() {
+    let d = reference();
+    let id = d
+        .nodes
+        .values()
+        .find(|n| n.name == "write_append_file")
+        .unwrap()
+        .id
+        .clone();
+    let original = serde_json::to_value(&d).unwrap();
+    let app = Application::new(Service::new(d, None), "context-fixture".into(), None);
+    let context = app
+        .execute(Request::new(
+            "editor.context",
+            json!({"nodeId":id,"section":"source"}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        context["header"]
+            .as_str()
+            .unwrap()
+            .contains("threadwork_buffer *ip_word")
+    );
+    assert!(
+        context["symbols"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["label"] == "ip_word")
+    );
+    let mut completion_pid = None;
+    for (text, expected) in [
+        (
+            "threadwork_runner__shut",
+            "threadwork_runner__shutdown_request",
+        ),
+        ("ip_w", "ip_word"),
+        ("/*🙂*/ argslib__op", "argslib__option"),
+        ("Packet item;\nitem.tim", "timestamp"),
+    ] {
+        let result=app.execute(Request::new("editor.complete",json!({"nodeId":id,"section":"source","text":text,"offset":text.len(),"generation":7}))).await.unwrap();
+        completion_pid = result["pid"].as_u64();
+        assert_eq!(result["generation"], 7);
+        assert_eq!(result["positionEncoding"], "utf-32");
+        let item = result["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| {
+                i["filterText"]
+                    .as_str()
+                    .or(i["label"].as_str())
+                    .is_some_and(|s| s.trim() == expected)
+            })
+            .unwrap_or_else(|| panic!("{expected} missing: {result}"));
+        if expected == "argslib__option" {
+            assert!(
+                item["detail"].as_str().is_some_and(|s| !s.is_empty()),
+                "Missing library signature: {item}"
+            );
+        }
+        let range = &item["textEdit"]["range"];
+        let byte = |position: &Value| {
+            wirecraft_runtime::lsp::offset(
+                text,
+                position["line"].as_u64().unwrap() as usize,
+                position["character"].as_u64().unwrap() as usize,
+                "utf-32",
+            )
+            .unwrap()
+        };
+        let mut edited = text.to_string();
+        edited.replace_range(
+            byte(&range["start"])..byte(&range["end"]),
+            item["textEdit"]["newText"].as_str().unwrap(),
+        );
+        assert!(edited.ends_with(expected), "{edited}");
+        if expected == "ip_word" {
+            assert!(
+                item["detail"]
+                    .as_str()
+                    .unwrap()
+                    .contains("input buffer of Packet")
+            );
+        }
+        assert_eq!(result["revision"], 0);
+    }
+    let result = app
+        .execute(Request::new(
+            "editor.complete",
+            json!({"nodeId":id,"section":"initialization","text":"","offset":0}),
+        ))
+        .await
+        .unwrap();
+    assert!(!result["items"].as_array().unwrap().is_empty());
+    let text = "uuids__";
+    let result = app
+        .execute(Request::new(
+            "editor.complete",
+            json!({"nodeId":id,"section":"source","text":text,"offset":text.len()}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        !result["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["label"]
+                .as_str()
+                .unwrap_or("")
+                .trim()
+                .starts_with("uuids__")),
+        "Other node's dependency leaked"
+    );
+    let bad = app
+        .execute(Request::new(
+            "editor.complete",
+            json!({"nodeId":id,"section":"source","text":"🙂","offset":1}),
+        ))
+        .await
+        .unwrap_err();
+    assert_eq!(bad.code, "invalid_input");
+    let mut stale = Request::new(
+        "editor.complete",
+        json!({"nodeId":id,"section":"source","text":"ip_w","offset":4}),
+    );
+    stale.expected_revision = Some(999);
+    assert_eq!(app.execute(stale).await.unwrap_err().code, "conflict");
+    assert_eq!(
+        serde_json::to_value(&app.service.lock().unwrap().document).unwrap(),
+        original
+    );
+    app.shutdown().await;
+    #[cfg(target_os = "linux")]
+    assert!(!Path::new(&format!("/proc/{}", completion_pid.unwrap())).exists());
+}
+
+#[tokio::test]
+async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() {
+    let d = reference();
+    let id = d
+        .nodes
+        .values()
+        .find(|n| n.name == "read_time")
+        .unwrap()
+        .id
+        .clone();
+    let app = Application::new(Service::new(d, None), "ticker-mcp-token".into(), None);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let server_app = app.clone();
+    let server = tokio::spawn(async move {
+        server_app.serve(listener).await.unwrap();
+    });
+    let client = reqwest::Client::new();
+    for (operation, arguments) in [
+        ("editor_context", json!({"nodeId":id,"section":"source"})),
+        (
+            "complete",
+            json!({"nodeId":id,"section":"source","text":"tm__str","offset":7}),
+        ),
+    ] {
+        let value:Value=client.post(&url).bearer_auth("ticker-mcp-token").json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"wirecraft.workbench","arguments":{"operation":operation,"arguments":arguments}}})).send().await.unwrap().json().await.unwrap();
+        assert_eq!(value["result"]["isError"], false, "{value}");
+        if operation == "complete" {
+            assert!(
+                value["result"]["structuredContent"]["items"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|i| i["label"].as_str().unwrap_or("").trim() == "tm__strftime"),
+                "{value}"
+            );
+        }
+    }
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("documentation.pdf");
+    app.execute(Request::new(
+        "export.write",
+        json!({"kind":"documentation","format":"pdf","path":path}),
+    ))
+    .await
+    .unwrap();
+    let images = std::process::Command::new("pdfimages")
+        .arg("-list")
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(images.status.success());
+    let image_lines = String::from_utf8(images.stdout).unwrap();
+    assert_eq!(
+        image_lines.lines().count(),
+        2,
+        "Vector dossier embedded an image: {image_lines}"
+    );
+    let text = std::process::Command::new("pdftotext")
+        .arg(&path)
+        .arg("-")
+        .output()
+        .unwrap();
+    assert!(text.status.success());
+    let text = String::from_utf8(text.stdout).unwrap();
+    assert!(
+        text.contains("Composition")
+            && text.contains("read_time")
+            && text.contains("argslib__option")
+    );
+    assert!(!text.contains("flowchart LR"));
+    let svg = app
+        .execute(Request::new(
+            "export.preview",
+            json!({"kind":"documentation","page":1}),
+        ))
+        .await
+        .unwrap();
+    assert!(svg["svg"].as_str().unwrap().contains("<path"));
+    assert!(!svg["svg"].as_str().unwrap().contains("data:image"));
+    app.execute(Request::new("system.shutdown", json!({})))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), server)
+        .await
+        .unwrap()
+        .unwrap();
+}

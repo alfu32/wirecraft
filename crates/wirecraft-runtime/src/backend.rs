@@ -37,6 +37,7 @@ pub struct Application {
     pub jobs: Jobs,
     lsp: Arc<AsyncMutex<Option<LanguageSession>>>,
     generated: Arc<AsyncMutex<Option<crate::generated_analysis::GeneratedAnalysis>>>,
+    editor: Arc<AsyncMutex<Option<crate::generated_analysis::GeneratedAnalysis>>>,
     lifecycle: Arc<AsyncMutex<()>>,
     pub token: String,
     stop: watch::Sender<bool>,
@@ -58,6 +59,7 @@ impl Application {
             events,
             lsp: Arc::new(AsyncMutex::new(None)),
             generated: Arc::new(AsyncMutex::new(None)),
+            editor: Arc::new(AsyncMutex::new(None)),
             lifecycle: Arc::new(AsyncMutex::new(())),
             token,
             stop,
@@ -170,6 +172,98 @@ impl Application {
             "system.shutdown" => {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
+            }
+            "editor.context" | "editor.complete" => {
+                let node = required(a, "nodeId")?.to_string();
+                let section = a["section"].as_str().unwrap_or("source").to_string();
+                let draft = a["text"].as_str().map(str::to_string);
+                let offset = a["offset"].as_u64().unwrap_or(0) as usize;
+                let service = self.service.clone();
+                let expected = r.expected_revision;
+                let (context, text, revision) = tokio::task::spawn_blocking(move || {
+                    let service = service
+                        .lock()
+                        .map_err(|_| Error::new("internal", "Project lock poisoned"))?;
+                    if expected.is_some_and(|v| v != service.revision) {
+                        return Err(Error::new("conflict", "Editor context revision changed"));
+                    }
+                    let n = service.document.node(&node)?;
+                    let text = draft.clone().unwrap_or_else(|| {
+                        if section == "source" {
+                            n.text.source.clone()
+                        } else {
+                            n.text.initialization.clone()
+                        }
+                    });
+                    Ok::<_, Error>((
+                        wirecraft_core::editor::body_context(
+                            &service.document,
+                            &node,
+                            &section,
+                            draft.as_deref(),
+                        )?,
+                        text,
+                        service.revision,
+                    ))
+                })
+                .await
+                .map_err(|e| Error::new("internal", e.to_string()))??;
+                if r.command == "editor.context" {
+                    return Ok(
+                        json!({"header":context.header,"symbols":context.symbols,"revision":revision,"nodeId":a["nodeId"],"section":a["section"]}),
+                    );
+                }
+                let settings = self
+                    .settings
+                    .lock()
+                    .map_err(|_| Error::new("internal", "Settings lock poisoned"))?
+                    .0
+                    .clone();
+                let executable =
+                    std::env::var("WIRECRAFT_CLANGD").unwrap_or(settings.clangd.executable);
+                let _lifecycle = self.lifecycle.lock().await;
+                let mut editor = self.editor.lock().await;
+                if editor.as_ref().is_some_and(|s| !s.alive())
+                    && let Some(old) = editor.take()
+                {
+                    old.shutdown().await;
+                }
+                let project = context.project("Editor body");
+                if let Some(session) = editor.as_mut() {
+                    session.update(project).await?;
+                } else {
+                    *editor = Some(
+                        crate::generated_analysis::GeneratedAnalysis::start(
+                            project,
+                            &executable,
+                            &settings.clangd.args,
+                        )
+                        .await?,
+                    );
+                }
+                let mut result = editor
+                    .as_ref()
+                    .unwrap()
+                    .complete(&context, &text, offset)
+                    .await?;
+                if self.revision() != revision {
+                    return Err(Error::new(
+                        "stale_result",
+                        "Model changed during editor completion",
+                    ));
+                }
+                result["revision"] = json!(revision);
+                result["generation"] = a["generation"].clone();
+                result["nodeId"] = a["nodeId"].clone();
+                result["section"] = a["section"].clone();
+                return Ok(result);
+            }
+            "editor.stop" => {
+                let _lifecycle = self.lifecycle.lock().await;
+                if let Some(session) = self.editor.lock().await.take() {
+                    session.shutdown().await;
+                }
+                return Ok(json!({"stopped":true}));
             }
             "editor.analyze_generated" => {
                 let service = self.service.clone();
@@ -389,6 +483,9 @@ impl Application {
         let _lifecycle = self.lifecycle.lock().await;
         if let Some(session) = self.lsp.lock().await.take() {
             session.shutdown().await;
+        }
+        if let Some(editor) = self.editor.lock().await.take() {
+            editor.shutdown().await;
         }
         if let Some(generated) = self.generated.lock().await.take() {
             generated.shutdown().await;

@@ -16,3 +16,5 @@ pub mod sheets;
 pub mod documentation;
 
 pub mod assistance;
+
+pub mod editor;

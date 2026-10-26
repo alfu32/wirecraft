@@ -88,3 +88,134 @@ impl GeneratedAnalysis {
         self.session.shutdown().await;
     }
 }
+
+impl GeneratedAnalysis {
+    pub fn alive(&self) -> bool {
+        self.session.alive()
+    }
+    pub async fn complete(
+        &self,
+        context: &wirecraft_core::editor::BodyContext,
+        text: &str,
+        offset: usize,
+    ) -> Result<Value> {
+        use crate::lsp::{offset as byte_offset, position};
+        let local = position(text, offset, "utf-32")?;
+        let line =
+            context.source.generated_start_line - 1 + local["line"].as_u64().unwrap() as usize;
+        let column =
+            context.source.generated_column_offset + local["character"].as_u64().unwrap() as usize;
+        let generated_offset = byte_offset(&self.file.content, line, column, "utf-32")?;
+        let response = self.session.request("textDocument/completion", json!({"textDocument":{"uri":self.uri},"position":position(&self.file.content, generated_offset, &self.session.encoding)?,"context":{"triggerKind":1}})).await?;
+        let entries = response.as_array().or_else(|| response["items"].as_array());
+        let start = text[..offset]
+            .char_indices()
+            .rev()
+            .take_while(|(_, c)| c.is_alphanumeric() || *c == '_')
+            .last()
+            .map(|(i, _)| i)
+            .unwrap_or(offset);
+        let prefix = &text[start..offset];
+        let fallback = json!({"start":position(text,start,"utf-32")?,"end":local});
+        let map_position = |p: &Value| -> Option<Value> {
+            let byte = byte_offset(
+                &self.file.content,
+                p["line"].as_u64()? as usize,
+                p["character"].as_u64()? as usize,
+                &self.session.encoding,
+            )
+            .ok()?;
+            let p = position(&self.file.content, byte, "utf-32").ok()?;
+            let line = (p["line"].as_u64()? as usize)
+                .checked_sub(context.source.generated_start_line - 1)?;
+            let character = (p["character"].as_u64()? as usize)
+                .checked_sub(context.source.generated_column_offset)?;
+            byte_offset(text, line, character, "utf-32").ok()?;
+            Some(json!({"line":line,"character":character}))
+        };
+        let mut items = Vec::new();
+        let mut names = std::collections::BTreeSet::new();
+        for item in entries.into_iter().flatten() {
+            if item["additionalTextEdits"]
+                .as_array()
+                .is_some_and(|v| !v.is_empty())
+                || item["insertTextFormat"] == 2
+            {
+                continue;
+            }
+            let label = item["filterText"]
+                .as_str()
+                .or(item["label"].as_str())
+                .unwrap_or("")
+                .trim();
+            if context
+                .excluded_library_prefixes
+                .iter()
+                .any(|p| label.starts_with(p))
+            {
+                continue;
+            }
+            let edit = &item["textEdit"];
+            let mut range = fallback.clone();
+            if edit.is_object() {
+                let source_range = edit
+                    .get("range")
+                    .or_else(|| edit.get("replace"))
+                    .or_else(|| edit.get("insert"));
+                let Some(source_range) = source_range else {
+                    continue;
+                };
+                let (Some(start), Some(end)) = (
+                    map_position(&source_range["start"]),
+                    map_position(&source_range["end"]),
+                ) else {
+                    continue;
+                };
+                range = json!({"start":start,"end":end});
+            }
+            let new_text = edit["newText"]
+                .as_str()
+                .or(item["insertText"].as_str())
+                .or(item["label"].as_str())
+                .unwrap_or("");
+            let mut item = item.clone();
+            item["textEdit"] = json!({"range":range,"newText":new_text});
+            item.as_object_mut().unwrap().remove("additionalTextEdits");
+            names.insert(label.to_string());
+            items.push(item);
+        }
+        // Model context adds direction/type details for the exact generated buffer arguments.
+        if !text[..start].ends_with('.') && !text[..start].ends_with("->") {
+            for symbol in &context.symbols {
+                let label = symbol["label"].as_str().unwrap();
+                if !label.starts_with(prefix) {
+                    continue;
+                }
+                let mut item = symbol.clone();
+                item["textEdit"] = json!({"range":fallback,"newText":label});
+                if let Some(existing) = items.iter_mut().find(|i| {
+                    i["filterText"]
+                        .as_str()
+                        .or(i["label"].as_str())
+                        .is_some_and(|s| s.trim() == label)
+                }) {
+                    existing["detail"] = symbol["detail"].clone();
+                } else if names.insert(label.into()) {
+                    items.push(item);
+                }
+            }
+        }
+        items.sort_by_cached_key(|i| {
+            i["sortText"]
+                .as_str()
+                .or(i["filterText"].as_str())
+                .or(i["label"].as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string()
+        });
+        Ok(
+            json!({"items":items,"isIncomplete":response["isIncomplete"].as_bool().unwrap_or(false),"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"pid":self.session.pid(),"version":self.version}),
+        )
+    }
+}
