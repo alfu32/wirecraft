@@ -20,7 +20,7 @@ Rows have full-width hit targets and highlights. Individual selected objects hav
 
 An unmodified press on an already-selected object defers replacement until release, distinguishing a plain click from a group drag. Child IDs are deduplicated when both a composite and its child are selected. Drag previews do not mutate the backend; release submits one revision-checked batch. The preview remains visible until the authoritative snapshot arrives.
 
-Routing has an 80 ms quiet interval and one background projection at a time. Immediate pointer movement uses inexpensive endpoint feedback. Completed obstacle-avoiding routes retain their geometry at their computed offset; new movement applies a residual delta. Epoch/revision checks reject stale work, and preview positions remain subject to viewport culling.
+Routing has an 80 ms quiet interval and one background projection at a time. Immediate pointer movement uses inexpensive endpoint feedback. Completed obstacle-avoiding routes retain their geometry at their computed offset; new movement applies a residual delta. Epoch/revision checks reject stale work, and preview positions remain subject to viewport culling. Panning leaves staged editor drafts intact; it never reloads the editor.
 
 ## Verification
 
@@ -33,4 +33,4 @@ python3 scripts/canvas_smoke.py
 python3 scripts/package_smoke.py dist/wirecraft-0.4.1-linux-x86_64.tar.gz --desktop --walkthrough --editor --canvas
 ```
 
-The native script creates a temporary graph/state directory and owns its window and backend. It exercises actual wheel/button/modifier input, outside release, box directions, graph/tree highlights, bounds, preview-without-mutation, one-step undo, descendant deduplication, tree reparenting and rejected cycles. It needs the same X11/XWayland/Vulkan, xdotool and ImageMagick environment as the other desktop suites. Other platforms remain unverified.
+The native script creates a temporary graph/state directory and owns its window and backend. It exercises actual wheel/button/modifier input, outside release, box directions, graph/tree highlights, bounds, preview-without-mutation, one-step undo, descendant deduplication, tree reparenting, rejected cycles and panning with a staged draft. It needs the same X11/XWayland/Vulkan, xdotool and ImageMagick environment as the other desktop suites. Other platforms remain unverified.

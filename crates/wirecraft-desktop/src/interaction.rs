@@ -195,7 +195,10 @@ impl Wirecraft {
         if !self.move_pending {
             self.clear_drag_preview();
         }
-        self.load_editor(window, cx);
+        // Panning is allowed while an editor draft exists. It must never reload it.
+        if self.pan_start.is_none() {
+            self.load_editor(window, cx);
+        }
         self.pan_start = None;
         self.selection_start = None;
         self.selection_end = None;

@@ -154,8 +154,16 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   command('Undo');wait(lambda:all(document()['nodes'][id]['layout']==old for id,old in saved.items()))
   # A forbidden cycle does not mutate the graph.
   revision=api('session.status')['revision'];drag((95,214),(110,242));time.sleep(.3);assert api('session.status')['revision']==revision
+  # Panning is allowed with a staged editor draft and must preserve its contents.
+  click(95,242);wait(lambda:selected()=={'a'});click(165,102);wait(lambda:ui()['tab']=='Editor')
+  click(450,350);xd('type','--clearmodifiers','draft survives canvas pan')
+  wait(lambda:(ui().get('draft') or {}).get('text')=='draft survives canvas pan')
+  click(65,102);wait(lambda:ui()['tab']=='Designer');before=ui()['viewport']
+  drag((600,400),(630,420),2);wait(lambda:abs(ui()['viewport']['x']-before['x']-30)<2)
+  assert ui()['draft']['text']=='draft survives canvas pan'
+  assert document()['nodes']['a']['text']['source']==''
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0
-  print(json.dumps({'canvas':'passed','wheelZoomAnchored':True,'middleDragPan':True,'directionalWindows':True,'addRemoveReplace':True,'treeSelectionAndReparent':True,'selectionContoursAndBounds':True,'groupDragSingleUndo':True,'descendantsMoveOnce':True,'releaseOutsideCanvas':True,'debouncedPreviewWithoutMutation':True,'cycleRejected':True,'artifacts':str(ARTIFACT)}))
+  print(json.dumps({'canvas':'passed','wheelZoomAnchored':True,'middleDragPan':True,'directionalWindows':True,'addRemoveReplace':True,'treeSelectionAndReparent':True,'selectionContoursAndBounds':True,'groupDragSingleUndo':True,'descendantsMoveOnce':True,'releaseOutsideCanvas':True,'debouncedPreviewWithoutMutation':True,'cycleRejected':True,'panPreservesDraft':True,'artifacts':str(ARTIFACT)}))
  finally:
   if app is not None and app.poll() is None:
    if window is not None:subprocess.run(['import','-window',window,str(ARTIFACT/'interaction-failure.png')],env=env,capture_output=True)
