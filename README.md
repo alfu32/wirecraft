@@ -114,7 +114,7 @@ python3 scripts/editor_smoke.py
 python3 scripts/package_smoke.py dist/wirecraft-0.4.0-linux-x86_64.tar.gz --desktop --walkthrough --editor
 ```
 
-The desktop smoke requires a real X11/XWayland display with Vulkan/DRI3, xdotool and ImageMagick. It launches its own PID-scoped window with temporary state. Xvfb on this machine lacks DRI3 and cannot present GPUI. Available-platform evidence is Linux only. macOS/Windows packaging and interaction have not been verified.
+Full integration verification also needs clang/clangd, uuid-dev, poppler-utils (pdfimages/pdftotext) and fonts-dejavu-core. The desktop smoke requires a real X11/XWayland display with Vulkan/DRI3, xdotool and ImageMagick. It launches its own PID-scoped window with temporary state. Xvfb on this machine lacks DRI3 and cannot present GPUI. Available-platform evidence is Linux only. macOS/Windows packaging and interaction have not been verified.
 
 Ctrl-Space in C17 Declaration/Instantiation bodies queries the generated compilation context through clangd, showing runtime APIs, connected buffers, injected library functions and members of local typed values. Suggestions show signatures and insert into the draft; Enter/Tab accept, arrows select, Escape dismisses. A read-only generated function header identifies the wrapper. Unicode edits and stale replies are checked. Linux windows include minimize/maximize/restore/close controls.
 

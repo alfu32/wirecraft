@@ -1,0 +1,87 @@
+{
+  "codeCommit": "532743c1d33acab47e688e27969d07cc8146f2cb",
+  "integrationTests": 52,
+  "formatting": "passed",
+  "strictClippy": "passed",
+  "optimizedPackageSmoke": {
+    "package": "passed",
+    "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.4.0-linux-x86_64.tar.gz",
+    "installedBackend": true,
+    "mcpTools": 37,
+    "pdfExport": true,
+    "workbenchMcp": true,
+    "nativeC17Graph": true,
+    "generatedClangd": true,
+    "installedDesktop": true,
+    "installedWalkthrough": true,
+    "installedEditor": true
+  },
+  "vectorPdf": {
+    "file": "ticker-wirecraft-vector.pdf",
+    "pages": 26,
+    "embeddedImages": 0,
+    "searchableText": true,
+    "source": "Immutable supplied example-c.orch; original trailing pu retained in dossier"
+  },
+  "rust": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "platform": "Linux x86_64; X11/XWayland/Vulkan native tests; other platforms unverified",
+  "verifiedAt": "2026-10-26T20:57:09.485725+00:00",
+  "testHarnessCommit": "bdd7f800cd46e8958b8172cd49eec69e979badc6",
+  "nativeSuites": [
+    {
+      "desktop": "passed",
+      "generatedDiagnosticRevealed": true,
+      "generatedDiagnosticsMapped": true,
+      "clangdDiagnostics": true,
+      "externalCompilerDiagnostics": true,
+      "ownedChildrenStopped": true,
+      "editorDraft": true,
+      "draftRestoredAndApplied": true,
+      "nodes": 4,
+      "canvasLink": true,
+      "clipboardUndo": true,
+      "recovery": true,
+      "exitCode": 0,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/desktop-smoke"
+    },
+    {
+      "walkthrough": "passed",
+      "kanbanDrag": true,
+      "backlog": true,
+      "inspectorPreservedSource": true,
+      "panePersistence": true,
+      "lightThemeAndIndentPersistence": true,
+      "archetypePreviewAndInsert": true,
+      "realPlanPreview": true,
+      "mcpIndependentControls": true,
+      "compositeCollapseMoveResize": true,
+      "typeUsageCalloutSelection": true,
+      "typeAndMetadataEdits": true,
+      "invalidTableDraftRecovery": true,
+      "matrixEndpointNavigation": true,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/walkthrough-smoke"
+    },
+    {
+      "editor": "passed",
+      "compilerContextInsertion": true,
+      "completionUndo": true,
+      "applyShortcut": true,
+      "staleMenuDismissal": true,
+      "statusDropdownAndApply": true,
+      "inlineTablesVisible": true,
+      "minimizeMaximizeRestoreClose": true,
+      "ownedChildrenStopped": true,
+      "artifacts": "/home/alfu64/Development/wirecraft/target/editor-smoke"
+    }
+  ],
+  "binarySha256": {
+    "wirecraft": "7fca7678c7ffdef47018588e7fd8d6623730b2617fd403526a0a779222f931f1",
+    "wirecraft-desktop": "b36ff6aee99e2765c2a4c4ff3cbb28167a1fc9ad404569a8e66ce105535883bc"
+  },
+  "remoteCi": {
+    "codeCommit": "532743c1d33acab47e688e27969d07cc8146f2cb",
+    "result": "success",
+    "url": "https://github.com/alfu32/wirecraft/actions/runs/40399308971",
+    "scope": "Formatting, strict Clippy and full integration suite on Ubuntu; native UI verified locally"
+  }
+}

@@ -69,3 +69,9 @@ Core editor::body_context compiles a cloned snapshot with the authored draft sub
 The GPUI popup captures input actions for Enter/Tab/Up/Down/Escape, preserving normal editor actions when closed; raw key listeners alone cannot intercept bound Input actions. Linux Ctrl-Home/End and selection counterparts are explicitly bound. Dedicated completion cancellation beyond the generic LSP cancellation API remains a follow-up; stale frontend replies are rejected and shutdown owns the language server.
 
 Documentation composition embeds the shared drawing as nested SVG paths and text in vector PDFs, alongside searchable dossier text. Rasterization is restricted to preview thumbnails and explicit raster export. A real PDF inspection on the ticker checks zero embedded images. Retaining the vector contract does not require keeping a PostScript intermediate in Rust. The reference PDF's first-page JPEG is recorded separately from the stated renderer intent.
+
+## Linux window controls and compact inspector
+
+GPUI client decorations and gpui-component TitleBar supply actual minimize, zoom/maximize/restore and close actions. The title bar shares the menu row instead of taking space from the editor. Non-Linux platforms retain native decorations and require platform verification. Native smoke tests exercise the window-manager state and process cleanup, using only their owned window. Tests normalize content bounds because initial X11 bounds may include or exclude client shadows.
+
+The inspector uses compact label/value rows, native dropdown menus and inline metadata/type/history tables. Existing staged InputState values remain the source of patches; selecting a dropdown does not bypass validation or commit immediately. Root capture handlers intercept input actions for completion and secondary Enter for Apply. Consumed actions explicitly stop propagation so Ctrl-Enter cannot insert a newline after submitting its fingerprint.
