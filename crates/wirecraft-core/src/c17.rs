@@ -67,6 +67,15 @@ impl C17 {
         let mut executables = BTreeSet::new();
         for id in &scope {
             let n = document.node(id)?;
+            if document.effective(id, "technologyId") == "file-export" {
+                if !n.children.is_empty() || n.is_link() {
+                    return Err(unsupported(
+                        n,
+                        "C file exports must be standalone leaf files",
+                    ));
+                }
+                continue;
+            }
             if !["c-native", "none"].contains(&document.effective(id, "technologyId").as_str()) {
                 return Err(unsupported(
                     n,
@@ -142,6 +151,14 @@ impl C17 {
                     ));
                 }
                 _ => {}
+            }
+            if !executables.contains(&link.source_node_id)
+                || !executables.contains(&link.target_node_id)
+            {
+                return Err(unsupported(
+                    n,
+                    "Data links must connect executable C entities",
+                ));
             }
             let ctype = if let Some(expression) = &link.type_expression {
                 if expression["constructorId"]
@@ -360,15 +377,26 @@ impl C17 {
         }
         out.line("    threadwork_context_destroy(&context);\n    (void)threadwork_runner__destroy(&threadwork_runner);\n    return status==THREADWORK_OK ? EXIT_SUCCESS : EXIT_FAILURE;\n}");
         let name = identifier(document.node(root)?.name.as_str());
+        let mut files = vec![VirtualFile {
+            path: format!("{name}.c"),
+            content: out.source,
+            binary_content: None,
+            source_map: out.maps,
+        }];
+        files.extend(crate::generation::file_exports(document, root)?);
+        let mut paths = BTreeSet::new();
+        for file in &files {
+            if !paths.insert(&file.path) {
+                return Err(Error::new(
+                    "invalid_input",
+                    format!("Duplicate generated path '{}'", file.path),
+                ));
+            }
+        }
         Ok(GeneratedProject {
             name: document.project_name().into(),
             capability: "c17-topology".into(),
-            files: vec![VirtualFile {
-                path: format!("{name}.c"),
-                content: out.source,
-                binary_content: None,
-                source_map: out.maps,
-            }],
+            files,
         })
     }
 }

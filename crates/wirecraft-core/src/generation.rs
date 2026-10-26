@@ -34,6 +34,17 @@ pub struct GeneratedProject {
     pub capability: String,
 }
 pub fn literal_files(document: &Document, node_id: &str) -> Result<GeneratedProject> {
+    literal_files_impl(document, node_id, false)
+}
+/// Explicit file-export leaves embedded in an otherwise compiled graph.
+pub fn file_exports(document: &Document, node_id: &str) -> Result<Vec<VirtualFile>> {
+    Ok(literal_files_impl(document, node_id, true)?.files)
+}
+fn literal_files_impl(
+    document: &Document,
+    node_id: &str,
+    exports_only: bool,
+) -> Result<GeneratedProject> {
     document.node(node_id)?;
     let ids = document.descendants(node_id);
     let mut paths = BTreeSet::new();
@@ -44,6 +55,9 @@ pub fn literal_files(document: &Document, node_id: &str) -> Result<GeneratedProj
             continue;
         }
         let technology = document.effective(&id, "technologyId");
+        if exports_only && technology != "file-export" {
+            continue;
+        }
         if !["none", "file-export", "multi-tech"].contains(&technology.as_str()) {
             return Err(Error::new(
                 "unsupported",

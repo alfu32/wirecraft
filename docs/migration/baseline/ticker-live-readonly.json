@@ -1,0 +1,7 @@
+{
+  "observedAt": "2026-10-26T19:24:04.823016+00:00",
+  "process": "Threadwork 2.6.7 java desktop remains running; no TCP listening socket owned by its current PID",
+  "mcpAttempt": "Recorded endpoint http://127.0.0.1:8765/mcp refused connection; no connected Threadwork tool available",
+  "action": "No start/stop/restart or UI interaction performed; optional window capture was read-only",
+  "scope": "Source and supplied evidence remain available; MCP schema does not expose editor completion UI"
+}
