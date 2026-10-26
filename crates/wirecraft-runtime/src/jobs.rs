@@ -137,12 +137,12 @@ impl Jobs {
 }
 fn kill_group(pid: Option<u32>) {
     #[cfg(unix)]
-    if let Some(pid) = pid {
-        if let Ok(pid) = i32::try_from(pid) {
-            /* SAFETY: process_group(0) gave this child its own group. */
-            unsafe {
-                libc::kill(-pid, libc::SIGKILL);
-            }
+    if let Some(pid) = pid
+        && let Ok(pid) = i32::try_from(pid)
+    {
+        /* SAFETY: process_group(0) gave this child its own group. */
+        unsafe {
+            libc::kill(-pid, libc::SIGKILL);
         }
     }
     #[cfg(not(unix))]

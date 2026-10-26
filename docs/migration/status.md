@@ -11,3 +11,19 @@ Baseline captured; implementation in progress. No parity completion claim.
 Next: implement typed lossless .orch model and graph transactions, then shared application dispatcher and desktop workflow. Follow docs/migration/plan.md. Record actual command results here after each milestone.
 
 Milestone: domain + headless services implemented. `cargo test -p wirecraft-core -p wirecraft-runtime`: 12 integration tests passed (6 core + 6 runtime), including real authenticated HTTP/MCP, real clangd diagnostics after edits, document symbols/completion, restart/cleanup, Unicode positions, external process failure/cancellation/timeout. No test was skipped. Desktop is not connected yet; implementation continues. Core/source fixture is a copy, source checkout unchanged.
+
+## Runnable 0.1.0 milestone
+
+- `cargo build --workspace --locked`: passed on Linux with GPUI/Vulkan.
+- `cargo test --workspace --locked`: 14 integration tests passed (6 core, 8 runtime); includes real HTTP MCP and stdio client exchanges, real clangd sync/diagnostics/completion/symbols/restart/cleanup, process failures/cancellation/timeouts, save/recovery and transactional failures.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: passed. Transitive proc-macro-error2 emits Cargo's future-incompatibility notice; no project lint failures.
+- `cargo fmt --all`: applied; final format check included in release.
+- All 45 source .orch files load in Rust; per-file output in baseline/source-fixture-validation.json. No source file modified.
+- `python3 scripts/desktop_smoke.py`: passed on available X11/XWayland display. Creates two processors in temporary state, drags, edits an unapplied C source draft, exits, restarts, restores and applies that draft, and exits cleanly. Evidence images in evidence/. This does not automate the native file chooser or all canvas modes.
+- Xvfb smoke blocked by Vulkan presentation: no DRI3, PlatformNotSupported. No successful Xvfb claim. Initial title-only matching selected the unrelated IDE; test corrected to require the owned process PID and visible window. No source/project file changes resulted.
+- Desktop is a real HTTP client to its owned backend subprocess. UI handles Designer, five text sections, JSON entity properties, validation/counts, C/C++ standalone clangd/external syntax checking and MCP connection configuration. Backend supports all original MCP model tool names, resources and prompts; command/technology catalogs report implemented availability.
+- Recovery stores applied graph state and original save path/dirty baseline; UI state stores unapplied drafts, selected entity, text section and viewport. Filesystem failures preserve dirty state. Linux owned-backend parent-death signaling plus graceful SIGTERM protect abnormal desktop exit.
+
+Still incomplete: full old compiler/templates/layout/source maps, technical sheets and exports, rich graph analysis, archetype UX, clipboard/align/distribute, dedicated project management, OAuth/AI workflows, Java settings import, packaging and non-Linux verification. No complete migration claim.
+
+Next implementation slice: expand graph operations/analysis and portable exports/archetypes, then packaging/config migration. Keep parity.md synchronized. Commits and tags are pushed to origin/master; use patch/minor releases only.

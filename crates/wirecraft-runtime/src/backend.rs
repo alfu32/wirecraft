@@ -185,14 +185,16 @@ impl Application {
                 .lock()
                 .map_err(|_| Error::new("internal", "Project lock is poisoned"))?;
             let before = s.revision;
+            let persists = matches!(r.command.as_str(), "file.save" | "file.commit_and_save");
             let result = s.execute(r)?;
             if before != s.revision {
                 let _ = events.send(json!({"type":"document.changed","revision":s.revision}));
-                if let Some(path) = recovery {
-                    if let Err(error) = wirecraft_core::store::save(&s.document, &path) {
-                        let _ = events.send(json!({"type":"recovery.failed","error":error}));
-                    }
-                }
+            }
+            if (before != s.revision || persists)
+                && let Some(path) = recovery
+                && let Err(error) = s.write_recovery(&path)
+            {
+                let _ = events.send(json!({"type":"recovery.failed","error":error}));
             }
             Ok(result)
         })

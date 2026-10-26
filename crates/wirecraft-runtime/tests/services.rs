@@ -363,3 +363,67 @@ async fn build_jobs_failure_cancellation_and_timeout() {
             .is_err()
     );
 }
+
+#[test]
+fn recovery_preserves_unsaved_state_path_and_draft_save_failure() {
+    let temp = tempfile::tempdir().unwrap();
+    let recovery = temp.path().join("recovery.json");
+    let mut s = service();
+    s.execute(Request::new(
+        "threadwork.create_entity",
+        json!({"name":"unsaved"}),
+    ))
+    .unwrap();
+    s.write_recovery(&recovery).unwrap();
+    let restored = Service::read_recovery(&recovery).unwrap();
+    assert_eq!(restored.document.nodes.len(), 2);
+    assert!(restored.dirty());
+    assert!(restored.path.is_none());
+    let path = temp.path().join("saved.orch");
+    s.execute(Request::new("file.save", json!({"path":path})))
+        .unwrap();
+    s.write_recovery(&recovery).unwrap();
+    let restored = Service::read_recovery(&recovery).unwrap();
+    assert!(!restored.dirty());
+    assert_eq!(restored.path.as_deref(), Some(path.as_path()));
+    let before = std::fs::read(&path).unwrap();
+    assert!(
+        s.execute(Request::new(
+            "file.commit_and_save",
+            json!({"path":path,"nodeId":"root","patch":{"layout":{"height":-1}}})
+        ))
+        .is_err()
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+}
+#[test]
+fn stdio_client_initializes_lists_calls_and_stops() {
+    use std::io::Write;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_wirecraft"))
+        .arg("mcp-stdio")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let requests = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}),
+        json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+        json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+        json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"threadwork.validate_design","arguments":{}}}),
+    ];
+    let mut input = child.stdin.take().unwrap();
+    for request in requests {
+        writeln!(input, "{request}").unwrap();
+    }
+    drop(input);
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    let messages: Vec<Value> = text
+        .lines()
+        .map(|s| serde_json::from_str(s).unwrap())
+        .collect();
+    assert_eq!(messages.len(), 3);
+    assert_eq!(messages[1]["result"]["tools"].as_array().unwrap().len(), 19);
+    assert_eq!(messages[2]["result"]["structuredContent"]["valid"], true);
+}

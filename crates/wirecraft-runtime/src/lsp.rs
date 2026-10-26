@@ -266,10 +266,10 @@ async fn read_loop(output: tokio::process::ChildStdout, weak: Weak<Inner>) {
             if line.trim().is_empty() {
                 break;
             }
-            if let Some((key, value)) = line.split_once(':') {
-                if key.eq_ignore_ascii_case("Content-Length") {
-                    length = value.trim().parse::<usize>().ok();
-                }
+            if let Some((key, value)) = line.split_once(':')
+                && key.eq_ignore_ascii_case("Content-Length")
+            {
+                length = value.trim().parse::<usize>().ok();
             }
         }
         let Some(length) = length.filter(|n| *n <= 16 * 1024 * 1024) else {
@@ -328,15 +328,15 @@ async fn read_loop(output: tokio::process::ChildStdout, weak: Weak<Inner>) {
                     .events
                     .send(json!({"type":"lsp.notification","method":method,"data":v["params"]}));
             }
-        } else if let Some(id) = v["id"].as_u64() {
-            if let Some(p) = inner.pending.lock().unwrap().remove(&id) {
-                let result = if let Some(error) = v.get("error") {
-                    Err(Error::new("lsp", error.to_string()))
-                } else {
-                    Ok(v["result"].clone())
-                };
-                let _ = p.send(result);
-            }
+        } else if let Some(id) = v["id"].as_u64()
+            && let Some(p) = inner.pending.lock().unwrap().remove(&id)
+        {
+            let result = if let Some(error) = v.get("error") {
+                Err(Error::new("lsp", error.to_string()))
+            } else {
+                Ok(v["result"].clone())
+            };
+            let _ = p.send(result);
         }
     }
     if let Some(inner) = weak.upgrade() {

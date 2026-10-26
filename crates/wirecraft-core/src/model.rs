@@ -366,10 +366,10 @@ impl Document {
         let mut found = BTreeSet::new();
         let mut stack = vec![id.to_string()];
         while let Some(id) = stack.pop() {
-            if found.insert(id.clone()) {
-                if let Some(n) = self.nodes.get(&id) {
-                    stack.extend(n.children.clone());
-                }
+            if found.insert(id.clone())
+                && let Some(n) = self.nodes.get(&id)
+            {
+                stack.extend(n.children.clone());
             }
         }
         found
@@ -628,10 +628,10 @@ impl Document {
             if n.id == self.root_node_id && n.parent_id.is_some() {
                 add(Some(key), "Root cannot have a parent".into());
             }
-            if let Some(p) = &n.parent_id {
-                if !self.nodes.get(p).is_some_and(|p| p.children.contains(key)) {
-                    add(Some(key), format!("Parent '{p}' does not contain child"));
-                }
+            if let Some(p) = &n.parent_id
+                && !self.nodes.get(p).is_some_and(|p| p.children.contains(key))
+            {
+                add(Some(key), format!("Parent '{p}' does not contain child"));
             }
             let mut children = BTreeSet::new();
             for c in &n.children {
@@ -712,12 +712,12 @@ impl Document {
                     add(Some(key), "Link has incorrect common parent".into());
                 }
             }
-            if n.kind == NodeKind::Type {
-                if let Some(t) = &n.type_definition {
-                    for f in t["fields"].as_array().into_iter().flatten() {
-                        if f["name"].as_str().unwrap_or("").trim().is_empty() {
-                            add(Some(key), "Type field name cannot be blank".into());
-                        }
+            if n.kind == NodeKind::Type
+                && let Some(t) = &n.type_definition
+            {
+                for f in t["fields"].as_array().into_iter().flatten() {
+                    if f["name"].as_str().unwrap_or("").trim().is_empty() {
+                        add(Some(key), "Type field name cannot be blank".into());
                     }
                 }
             }
@@ -862,8 +862,8 @@ impl Document {
         if n.kind == NodeKind::Type && n.type_definition.is_none() {
             n.type_definition = Some(json!({"fields":[],"qualifier":"object","genericTypeIds":[]}));
         }
-        if let Some(status) = &n.status {
-            if ![
+        if let Some(status) = &n.status
+            && ![
                 "BUSINESS",
                 "FUNCTIONAL",
                 "IMPLEMENTATION",
@@ -872,9 +872,8 @@ impl Document {
                 "CANCELED",
             ]
             .contains(&status.as_str())
-            {
-                return Err(Error::new("invalid_input", "Unknown project status"));
-            }
+        {
+            return Err(Error::new("invalid_input", "Unknown project status"));
         }
         if current.status != n.status {
             n.status_changes.push(json!({"userId":"local","changedDate":timestamp(),"initStatus":current.status,"endStatus":n.status}));

@@ -64,19 +64,19 @@ impl SceneIndex {
         let mut index = Self::default();
         if let Ok(p) = d.node(parent) {
             for id in &p.children {
-                if let Ok(n) = d.node(id) {
-                    if !n.is_link() {
-                        let r = &n.layout;
-                        index.insert(
-                            id.clone(),
-                            Rect {
-                                x: r.x,
-                                y: r.y,
-                                width: r.width,
-                                height: r.height,
-                            },
-                        );
-                    }
+                if let Ok(n) = d.node(id)
+                    && !n.is_link()
+                {
+                    let r = &n.layout;
+                    index.insert(
+                        id.clone(),
+                        Rect {
+                            x: r.x,
+                            y: r.y,
+                            width: r.width,
+                            height: r.height,
+                        },
+                    );
                 }
             }
         }

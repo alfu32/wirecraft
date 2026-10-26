@@ -1,0 +1,227 @@
+[
+  {
+    "path": "document.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":14,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/collatz-c.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":10,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/example-c.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":30,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/MVC-design.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":21,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/test.threadwork.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":42,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/webserve-php.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":37,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/email.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":1,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/test-compilers.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":35,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/example-php.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":16,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/webserve-c.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":10,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/examples-njs.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":42,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/examples-qjs.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":42,\"diagnostics\":[]}"
+  },
+  {
+    "path": "examples/test-stress-LRU-cache.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":227,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/php/http-server.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":3,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/php/http-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/php/config-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/php/http-writer.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/php/file-queue.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/quality/validation-pipeline.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":9,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/integration/request-response.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":7,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/python/http-server.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":3,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/python/http-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/python/config-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/python/http-writer.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/python/file-queue.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/c/http-server.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":3,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/c/http-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/c/config-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/c/http-writer.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/c/file-queue.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/go/http-server.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":3,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/go/http-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/go/config-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/go/http-writer.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/go/file-queue.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/runtime/shutdown-signal-javascript.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/runtime/shutdown-signal-c.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/runtime/shutdown-signal-go.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/runtime/shutdown-signal-python.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/runtime/shutdown-signal-php.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/javascript/http-server.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":3,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/javascript/http-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/javascript/config-reader.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/javascript/http-writer.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  },
+  {
+    "path": "builtin-archetype/src/threadworks/main/javascript/file-queue.orch",
+    "ok": true,
+    "output": "{\"valid\":true,\"nodes\":2,\"diagnostics\":[]}"
+  }
+]

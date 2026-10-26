@@ -4,3 +4,5 @@ pub mod jobs;
 pub mod lsp;
 pub mod mcp;
 pub mod service;
+
+pub mod cli;

@@ -27,7 +27,7 @@ impl Request {
         }
     }
 }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub document: Document,
@@ -58,6 +58,23 @@ impl Service {
             redo: vec![],
         }
     }
+    pub fn write_recovery(&self, path: &Path) -> Result<()> {
+        store::atomic_write(
+            path,
+            &serde_json::to_vec(
+                &json!({"document":self.document,"path":self.path,"saved":self.saved}),
+            )?,
+        )
+    }
+    pub fn read_recovery(path: &Path) -> Result<Self> {
+        let v: Value = serde_json::from_slice(&std::fs::read(path)?)?;
+        let mut document: Document = serde_json::from_value(v["document"].clone())?;
+        document.repair()?;
+        document.ensure_valid()?;
+        let mut service = Self::new(document, v["path"].as_str().map(PathBuf::from));
+        service.saved = v["saved"].clone();
+        Ok(service)
+    }
     pub fn dirty(&self) -> bool {
         serde_json::to_value(&self.document).unwrap() != self.saved
     }
@@ -72,13 +89,13 @@ impl Service {
         }
     }
     pub fn execute(&mut self, r: Request) -> Result<Value> {
-        if let Some(expected) = r.expected_revision {
-            if expected != self.revision {
-                return Err(Error::new(
-                    "conflict",
-                    format!("Expected revision {expected}, current {}", self.revision),
-                ));
-            }
+        if let Some(expected) = r.expected_revision
+            && expected != self.revision
+        {
+            return Err(Error::new(
+                "conflict",
+                format!("Expected revision {expected}, current {}", self.revision),
+            ));
         }
         let command = r.command.strip_prefix("threadwork.").unwrap_or(&r.command);
         let a = &r.arguments;
@@ -102,6 +119,20 @@ impl Service {
                 self.path = None;
                 self.reset_history();
                 return Ok(serde_json::to_value(self.snapshot())?);
+            }
+            "file.commit_and_save" => {
+                // A failed draft commit must never be followed by saving the older graph.
+                if let Some(patch) = a.get("patch") {
+                    self.execute(Request::new(
+                        "threadwork.update_entity",
+                        json!({"nodeId":required(a,"nodeId")?,"patch":patch}),
+                    ))?;
+                }
+                let mut result = self.execute(Request::new("file.save", a.clone()))?;
+                if let Some(id) = a["nodeId"].as_str() {
+                    result["entity"] = serde_json::to_value(self.document.node(id)?)?;
+                }
+                return Ok(result);
             }
             "file.save" => {
                 let path = a["path"]
