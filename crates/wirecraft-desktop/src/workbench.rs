@@ -619,6 +619,7 @@ impl Wirecraft {
                 div()
                     .flex_1()
                     .min_h_0()
+                    .font_family(self.options.saved.appearance.editor_font.clone())
                     .child(Input::new(&self.editor).h_full()),
             );
         let mut inspector = div()

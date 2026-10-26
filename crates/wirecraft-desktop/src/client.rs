@@ -120,6 +120,8 @@ fn worker(
     command
         .args(["--backend", "serve", "--token", &token, "--recovery"])
         .arg(state_dir.join("recovery.json"))
+        .arg("--settings")
+        .arg(state_dir.join("settings.json"))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     if let Some(path) = project {
@@ -206,6 +208,9 @@ fn worker(
                 }
                 match backend.call(&request) {
                     Ok(value) => {
+                        if command == "settings.replace" {
+                            intelligence.settings = serde_json::from_value(value.clone())?;
+                        }
                         updates.send_blocking(Update::Result { command, value })?;
                         revision = None;
                     }

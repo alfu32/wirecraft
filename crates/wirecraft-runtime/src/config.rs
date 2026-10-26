@@ -18,8 +18,92 @@ impl Default for Tool {
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct Appearance {
+    pub theme: String,
+    pub designer_font: String,
+    pub editor_font: String,
+    pub composite_title_size: f32,
+    pub reference_width: f64,
+    pub reference_height: f64,
+    pub wheel_rows: f32,
+    pub colors: BTreeMap<String, String>,
+}
+impl Default for Appearance {
+    fn default() -> Self {
+        Self {
+            theme: "dark".into(),
+            designer_font: "DejaVu Sans".into(),
+            editor_font: "DejaVu Sans Mono".into(),
+            composite_title_size: 18.,
+            reference_width: 1500.,
+            reference_height: 1000.,
+            wheel_rows: 3.,
+            colors: [
+                ("canvasBackground", "#10161E"),
+                ("gridMinor", "#202A38"),
+                ("gridMajor", "#34404D"),
+                ("nodeFill", "#202C38"),
+                ("nodeStroke", "#8196A9"),
+                ("typeFill", "#173B3A"),
+                ("typeStroke", "#45BAA8"),
+                ("typeText", "#58C6A4"),
+                ("compilerFill", "#4C3B17"),
+                ("compilerStroke", "#F0AD36"),
+                ("libraryFill", "#292E43"),
+                ("libraryStroke", "#8893E4"),
+                ("errorFill", "#432A2A"),
+                ("errorStroke", "#E27B7B"),
+                ("testFill", "#273D2C"),
+                ("testStroke", "#6AC284"),
+                ("textPrimary", "#E6EDF3"),
+                ("textSecondary", "#9DB0C3"),
+                ("textMuted", "#829BAD"),
+                ("selection", "#70D5C6"),
+                ("linkDefault", "#9CB5C8"),
+                ("linkDependency", "#E3B664"),
+                ("linkError", "#E27B7B"),
+                ("linkLibrary", "#8893E4"),
+                ("linkSource", "#58C6A4"),
+                ("linkRunnable", "#CE93D8"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect(),
+        }
+    }
+}
+impl Appearance {
+    pub fn color(&self, key: &str, fallback: u32) -> u32 {
+        self.colors
+            .get(key)
+            .and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok())
+            .unwrap_or(fallback)
+    }
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct Inference {
+    pub provider: String,
+    pub endpoint: String,
+    pub model: String,
+    pub token_env: String,
+}
+impl Default for Inference {
+    fn default() -> Self {
+        Self {
+            provider: "clipboard".into(),
+            endpoint: String::new(),
+            model: String::new(),
+            token_env: String::new(),
+        }
+    }
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     pub schema_version: u32,
+    pub appearance: Appearance,
+    pub inference: Inference,
     pub editor_indent_spaces: usize,
     pub clangd: Tool,
     pub c_compiler: String,
@@ -30,6 +114,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             schema_version: 1,
+            appearance: Appearance::default(),
+            inference: Inference::default(),
             editor_indent_spaces: 4,
             clangd: Tool::default(),
             c_compiler: "clang".into(),
@@ -55,6 +141,43 @@ impl Settings {
             return Err(Error::new(
                 "invalid_input",
                 "Unsupported settings schema, indentation or language server executable",
+            ));
+        }
+        let a = &self.appearance;
+        if !["dark", "light"].contains(&a.theme.as_str())
+            || a.designer_font.trim().is_empty()
+            || a.editor_font.trim().is_empty()
+            || !a.composite_title_size.is_finite()
+            || !(8.0..=72.0).contains(&a.composite_title_size)
+            || !a.reference_width.is_finite()
+            || !(100.0..=20000.0).contains(&a.reference_width)
+            || !a.reference_height.is_finite()
+            || !(100.0..=20000.0).contains(&a.reference_height)
+            || !a.wheel_rows.is_finite()
+            || !(1.0..=30.0).contains(&a.wheel_rows)
+            || a.colors.values().any(|s| {
+                s.len() != 7 || !s.starts_with('#') || u32::from_str_radix(&s[1..], 16).is_err()
+            })
+        {
+            return Err(Error::new(
+                "invalid_input",
+                "Invalid appearance settings or #RRGGBB color",
+            ));
+        }
+        if !["clipboard", "openai", "anthropic", "ollama"]
+            .contains(&self.inference.provider.as_str())
+        {
+            return Err(Error::new("invalid_input", "Unknown inference provider"));
+        }
+        if !self
+            .inference
+            .token_env
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err(Error::new(
+                "invalid_input",
+                "Token environment variable must contain letters, digits or underscores",
             ));
         }
         Ok(())

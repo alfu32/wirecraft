@@ -148,3 +148,39 @@ fn repaired_endpoint_port_ids_match_the_source_naming_contract() {
     assert_eq!(d.nodes[&a].ports[0].id, "output_packet_out");
     assert_eq!(d.nodes[&b].ports[0].id, "input_packet_in");
 }
+
+#[test]
+fn composite_projection_keeps_absolute_children_and_collapses_boundary_links() {
+    use wirecraft_core::{Link, drawing::Drawing};
+    let mut d = Document::new("Composite");
+    let composite = d.create("root", "Group", NodeKind::Processor).unwrap();
+    let child = d.create(&composite, "Child", NodeKind::Processor).unwrap();
+    let peer = d.create("root", "Peer", NodeKind::Processor).unwrap();
+    d.patch(&composite,&json!({"layout":{"x":100.,"y":100.,"width":600.,"height":400.,"closedWidth":200.,"closedHeight":70.}})).unwrap();
+    d.patch(&child, &json!({"layout":{"x":200.,"y":200.}}))
+        .unwrap();
+    d.patch(&peer, &json!({"layout":{"x":900.,"y":200.}}))
+        .unwrap();
+    let link = d
+        .create_link(
+            "result",
+            Link {
+                source_node_id: child.clone(),
+                target_node_id: peer.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let open = Drawing::new(&d, "root");
+    assert_eq!(open.shapes[&child].rect.x, 200.);
+    assert_eq!(open.shapes[&child].depth, 1);
+    assert_eq!(open.edges[&link].points[0][0], 400.);
+    d.patch(&composite, &json!({"layout":{"isExpanded":false}}))
+        .unwrap();
+    let closed = Drawing::new(&d, "root");
+    assert!(!closed.shapes.contains_key(&child));
+    assert_eq!(closed.edges[&link].points[0][0], 300.);
+    let focused = Drawing::new(&d, &composite);
+    assert!(focused.shapes.contains_key(&child));
+    assert!(!focused.shapes.contains_key(&peer));
+}

@@ -1,5 +1,6 @@
 mod client;
 mod icons;
+mod options;
 mod scene;
 mod workbench;
 use client::{Client, Message, Update};
@@ -93,6 +94,8 @@ struct Wirecraft {
     bounds: Rc<Cell<Bounds<Pixels>>>,
     drag_start: Option<[f64; 2]>,
     drag_delta: [f64; 2],
+    resize_start: Option<(String, [f64; 2], Rect)>,
+    selection_end: Option<[f64; 2]>,
     pan_start: Option<([f64; 2], Viewport)>,
     selection_start: Option<[f64; 2]>,
     focus: FocusHandle,
@@ -111,6 +114,8 @@ struct Wirecraft {
     query: Entity<InputState>,
     report: Value,
     analysis_layer: String,
+    options: options::OptionsEditor,
+    mcp_status: Value,
     management_backlog: bool,
     archetype_selected: Option<String>,
     archetype_preview: Option<Arc<scene::Scene>>,
@@ -120,7 +125,7 @@ impl Wirecraft {
         client: Client,
         rx: async_channel::Receiver<Update>,
         session: UiSession,
-        indent: usize,
+        settings: wirecraft_runtime::config::Settings,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -129,7 +134,7 @@ impl Wirecraft {
             InputState::new(window, cx)
                 .code_editor("plain")
                 .tab_size(TabSize {
-                    tab_size: indent,
+                    tab_size: settings.editor_indent_spaces,
                     hard_tabs: false,
                 })
         });
@@ -142,6 +147,7 @@ impl Wirecraft {
             can_undo: false,
             can_redo: false,
         });
+        let options = options::OptionsEditor::new(settings, window, cx);
         let inspector = workbench::make_fields(window, cx);
         let query = cx.new(|cx| InputState::new(window, cx).placeholder("Search commands…"));
         cx.subscribe(&query, |_, _, _: &InputEvent, cx| cx.notify())
@@ -183,6 +189,8 @@ impl Wirecraft {
             bounds: Rc::new(Cell::new(Bounds::default())),
             drag_start: None,
             drag_delta: [0., 0.],
+            resize_start: None,
+            selection_end: None,
             pan_start: None,
             selection_start: None,
             focus,
@@ -201,6 +209,8 @@ impl Wirecraft {
             query,
             report: Value::Null,
             analysis_layer: "principal".into(),
+            options,
+            mcp_status: json!({"enabled":true}),
             management_backlog: false,
             archetype_selected: None,
             archetype_preview: None,
@@ -241,6 +251,7 @@ impl Wirecraft {
                 self.endpoint = endpoint;
                 self.token = token;
                 self.status = "Connected".into();
+                self.tool("mcp.status");
             }
             Update::Error(e) => {
                 self.status = e;
@@ -308,6 +319,15 @@ impl Wirecraft {
                         &document,
                         &document.root_node_id,
                     )));
+                }
+                if command == "settings.replace" {
+                    self.apply_settings(value.clone(), window, cx);
+                }
+                if command == "mcp.status" {
+                    self.mcp_status = value.clone();
+                }
+                if command == "mcp.set_enabled" {
+                    self.tool("mcp.status");
                 }
                 if command == "analysis.report" {
                     self.report = value.clone();
@@ -404,7 +424,10 @@ impl Wirecraft {
         cx.notify();
     }
     fn rebuild(&mut self) {
-        self.scene = Arc::new(scene::Scene::new(&self.snapshot.document, &self.parent));
+        self.scene = Arc::new(
+            scene::Scene::new(&self.snapshot.document, &self.parent)
+                .with_appearance(self.options.saved.appearance.clone()),
+        );
         self.tree.clear();
         let mut stack = vec![(self.snapshot.document.root_node_id.clone(), 0)];
         while let Some((id, depth)) = stack.pop() {
@@ -764,11 +787,19 @@ impl Wirecraft {
         });
         let hit = hits
             .iter()
-            .find(|id| {
+            .filter(|id| {
                 self.scene
                     .nodes
                     .get(*id)
                     .is_some_and(|n| n.2.contains(world))
+            })
+            .max_by_key(|id| {
+                self.scene
+                    .drawing
+                    .shapes
+                    .get(*id)
+                    .map(|s| s.depth)
+                    .unwrap_or(0)
             })
             .cloned()
             .or_else(|| {
@@ -811,6 +842,23 @@ impl Wirecraft {
                         self.selected = BTreeSet::from([id.clone()]);
                     }
                     self.load_editor(window, cx);
+                    if let Some(shape) = self.scene.drawing.shapes.get(&id) {
+                        let r = shape.rect;
+                        if (world[0] - r.x - r.width).abs() < 10. / self.viewport.zoom
+                            && (world[1] - r.y - r.height).abs() < 10. / self.viewport.zoom
+                        {
+                            self.resize_start = Some((id, world, r));
+                            cx.notify();
+                            return;
+                        }
+                        if shape.composite && world[0] < r.x + 28. && world[1] < r.y + 28. {
+                            let expanded = !shape.expanded;
+                            let layout = &self.snapshot.document.nodes[&id].layout;
+                            self.client.send("threadwork.update_entity",json!({"nodeId":id,"patch":{"layout":{"isExpanded":expanded,"width":if expanded{layout.open_width}else{layout.closed_width},"height":if expanded{layout.open_height}else{layout.closed_height}}}}));
+                            cx.notify();
+                            return;
+                        }
+                    }
                     if event.click_count == 2 {
                         if self.snapshot.document.nodes[&id].is_composite() {
                             self.parent = id;
@@ -841,12 +889,17 @@ impl Wirecraft {
             self.viewport.x = view.x + local[0] - start[0];
             self.viewport.y = view.y + local[1] - start[1];
             cx.notify();
+        } else if let Some((_, start, _)) = &self.resize_start {
+            let world = self.viewport.world(local);
+            self.drag_delta = [world[0] - start[0], world[1] - start[1]];
+            cx.notify();
         } else if let Some(start) = self.drag_start {
             let world = self.viewport.world(local);
             self.drag_delta = [world[0] - start[0], world[1] - start[1]];
             cx.notify();
         } else if let Some(start) = self.selection_start {
             let end = self.viewport.world(local);
+            self.selection_end = Some(end);
             let rect = Rect {
                 x: start[0].min(end[0]),
                 y: start[1].min(end[1]),
@@ -864,21 +917,51 @@ impl Wirecraft {
         }
     }
     fn up(&mut self, _: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if self.drag_start.take().is_some()
+        if let Some((id, _, r)) = self.resize_start.take() {
+            let n = &self.snapshot.document.nodes[&id];
+            let width = (r.width + self.drag_delta[0]).max(100.);
+            let height = (r.height + self.drag_delta[1]).max(70.);
+            let mut layout = json!({"width":width,"height":height});
+            if n.is_composite() && n.layout.is_expanded {
+                layout["openWidth"] = json!(width);
+                layout["openHeight"] = json!(height);
+            } else {
+                layout["closedWidth"] = json!(width);
+                layout["closedHeight"] = json!(height);
+            }
+            self.client.send(
+                "threadwork.update_entity",
+                json!({"nodeId":id,"patch":{"layout":layout}}),
+            );
+        } else if self.drag_start.take().is_some()
             && (self.drag_delta[0].abs() > 0.5 || self.drag_delta[1].abs() > 0.5)
         {
-            let changes=self.selected.iter().filter_map(|id|self.snapshot.document.nodes.get(id)).map(|n|json!({"nodeId":n.id,"patch":{"layout":{"x":n.layout.x+self.drag_delta[0],"y":n.layout.y+self.drag_delta[1]}}})).collect::<Vec<_>>();
+            let mut ids = self.selected.clone();
+            let mut stack = self.selected.iter().cloned().collect::<Vec<_>>();
+            while let Some(id) = stack.pop() {
+                if let Some(n) = self.snapshot.document.nodes.get(&id) {
+                    for child in &n.children {
+                        if ids.insert(child.clone()) {
+                            stack.push(child.clone());
+                        }
+                    }
+                }
+            }
+            let changes=ids.iter().filter_map(|id|self.snapshot.document.nodes.get(id)).filter(|n|!n.is_link()).map(|n|json!({"nodeId":n.id,"patch":{"layout":{"x":n.layout.x+self.drag_delta[0],"y":n.layout.y+self.drag_delta[1]}}})).collect::<Vec<_>>();
             self.client
                 .send("entities.patch", json!({"changes":changes}));
         }
         self.drag_delta = [0., 0.];
         self.pan_start = None;
         self.selection_start = None;
+        self.selection_end = None;
         self.persist_ui(cx);
         cx.notify();
     }
     fn wheel(&mut self, event: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let delta = event.delta.pixel_delta(px(20.));
+        let delta = event
+            .delta
+            .pixel_delta(px(20. * self.options.saved.appearance.wheel_rows / 3.));
         if event.modifiers.control {
             self.viewport.zoom_at(
                 self.local(event.position),
@@ -1193,6 +1276,9 @@ impl Render for Wirecraft {
                     .when(self.tab == tab, |b| b.bg(rgb(0x255452)))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.tab = tab.into();
+                        if tab == "MCP" {
+                            this.tool("mcp.status");
+                        }
                         if tab == "Analysis" {
                             this.tool("analysis.report");
                         }
@@ -1249,6 +1335,7 @@ impl Render for Wirecraft {
             let view = self.viewport;
             let selected = self.selected.clone();
             let drag = self.drag_delta;
+            let selection = self.selection_start.zip(self.selection_end);
             let parent_name = self.snapshot.document.qualified_name(&self.parent);
             content = content
                 .child(
@@ -1292,13 +1379,6 @@ impl Render for Wirecraft {
                                 .child(format!("{parent_name} · {:?}", self.mode)),
                         ),
                 )
-                .child(div().flex().gap_2().p_2()
-                   .child(button("copy-graph","Copy").on_click(cx.listener(|this,_,w,cx|this.copy(&CopyEntities,w,cx))))
-                   .child(button("cut-graph","Cut").on_click(cx.listener(|this,_,w,cx|this.cut(&CutEntities,w,cx))))
-                   .child(button("paste-graph","Paste").on_click(cx.listener(|this,_,w,cx|this.paste(&PasteEntities,w,cx))))
-                   .child(button("move-here","Move selection here").on_click(cx.listener(|this,_,_,_|{for id in &this.selected{this.client.send("threadwork.move_entity",json!({"nodeId":id,"parentId":this.parent}));}})))
-                   .child(button("align-left","Align left").on_click(cx.listener(|this,_,_,_|this.client.send("entities.align",json!({"nodeIds":this.selected,"operation":"left"})))))
-                   .child(button("distribute-x","Distribute horizontally").on_click(cx.listener(|this,_,_,_|this.client.send("entities.align",json!({"nodeIds":this.selected,"operation":"distribute-horizontal"}))))))
                 .child(
                     div()
                         .id("canvas")
@@ -1322,7 +1402,29 @@ impl Render for Wirecraft {
                                     b
                                 },
                                 move |b, _, window, cx| {
-                                    scene.paint(b, view, &selected, drag, window, cx)
+                                    scene.paint(b, view, &selected, drag, window, cx);
+                                    if let Some((a, z)) = selection {
+                                        let a = view.screen(a);
+                                        let z = view.screen(z);
+                                        window.paint_quad(quad(
+                                            Bounds::new(
+                                                b.origin
+                                                    + point(
+                                                        px(a[0].min(z[0]) as f32),
+                                                        px(a[1].min(z[1]) as f32),
+                                                    ),
+                                                size(
+                                                    px((a[0] - z[0]).abs() as f32),
+                                                    px((a[1] - z[1]).abs() as f32),
+                                                ),
+                                            ),
+                                            px(0.),
+                                            rgba(0x70d5c630),
+                                            px(1.),
+                                            rgb(0x70d5c6),
+                                            BorderStyle::Dashed,
+                                        ));
+                                    }
                                 },
                             )
                             .size_full(),
@@ -1343,6 +1445,8 @@ impl Render for Wirecraft {
               .child(button("export-png","PNG").on_click(cx.listener(|this,_,window,cx|this.export_dialog("png",window,cx))))
               .child(button("export-pdf","PDF").on_click(cx.listener(|this,_,window,cx|this.export_dialog("pdf",window,cx))))
               .child(button("copy-fiches","Copy component fiches · Markdown").on_click(cx.listener(|this,_,_,_|this.client.send("export.markdown",json!({"nodeIds":this.selected}))))));
+        } else if self.tab == "Options" {
+            content = content.child(self.render_options(cx));
         } else if self.tab == "Tools" {
             content=content.child(div().p_3().child("Check a standalone source section or analyze the C17 graph. Graph diagnostics include the original entity, text section and line."))
              .child(div().flex().gap_2().p_3()
@@ -1358,8 +1462,7 @@ impl Render for Wirecraft {
                     div().id(i).p_2().mb_2().bg(rgb(0x3c2831)).cursor_pointer().on_click(cx.listener(move|this,_,window,cx|this.reveal_diagnostic(&diagnostic,window,cx))).child(label)
                 })).child(self.output.clone()));
         } else {
-            let config = json!({"mcpServers":{"wirecraft":{"url":format!("{}/mcp",self.endpoint),"headers":{"Authorization":format!("Bearer {}",self.token)}}}});
-            content=content.child(div().p_4().child("Local MCP server · owned by this desktop session")).child(div().p_4().child(format!("{}/mcp",self.endpoint))).child(button("copy-mcp","Copy MCP client configuration").on_click(move|_,_,cx|cx.write_to_clipboard(ClipboardItem::new_string(serde_json::to_string_pretty(&config).unwrap())))).child(div().p_4().child("Clients share this open design. Closing Wirecraft shuts down this server. The previous Threadworks server runs independently."));
+            content = content.child(self.render_mcp(cx));
         }
         div().key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(rgb(0x10161e)).text_color(rgb(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar)).child(content)).child(div().px_3().py_2().bg(rgb(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Scroll: pan · Ctrl scroll: zoom · Double click: enter/edit",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_menu(cx))
     }
@@ -1404,11 +1507,19 @@ fn main() -> anyhow::Result<()> {
         .and_then(|s| serde_json::from_slice(&s).ok())
         .unwrap_or_default();
     let settings = wirecraft_runtime::config::Settings::load(&state_dir.join("settings.json"))?;
-    let indent = settings.editor_indent_spaces;
+    let initial_settings = settings.clone();
     let (client, rx, worker) = Client::start(state_dir.clone(), settings, project);
     gpui::Application::new().run(move |cx| {
         gpui_component::init(cx);
-        Theme::change(ThemeMode::Dark, None, cx);
+        Theme::change(
+            if initial_settings.appearance.theme == "light" {
+                ThemeMode::Light
+            } else {
+                ThemeMode::Dark
+            },
+            None,
+            cx,
+        );
         cx.bind_keys([
             KeyBinding::new("ctrl-shift-p", CommandPalette, Some("Wirecraft")),
             KeyBinding::new("ctrl-p", ShowExport, Some("Wirecraft")),
@@ -1442,7 +1553,8 @@ fn main() -> anyhow::Result<()> {
             },
             move |window, cx| {
                 window.set_window_title("Wirecraft");
-                let view = cx.new(|cx| Wirecraft::new(client, rx, session, indent, window, cx));
+                let view =
+                    cx.new(|cx| Wirecraft::new(client, rx, session, initial_settings, window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             },
         )

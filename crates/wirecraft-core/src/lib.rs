@@ -8,3 +8,5 @@ pub mod c17;
 pub mod export;
 pub mod fragment;
 pub mod generation;
+
+pub mod drawing;

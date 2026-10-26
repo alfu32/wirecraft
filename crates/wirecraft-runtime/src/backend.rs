@@ -20,7 +20,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -42,6 +42,9 @@ pub struct Application {
     stop: watch::Sender<bool>,
     recovery: Option<PathBuf>,
     revision: Arc<AtomicU64>,
+    settings: Arc<Mutex<(crate::config::Settings, Option<PathBuf>)>>,
+    mcp_enabled: Arc<AtomicBool>,
+    access_log: Arc<Mutex<std::collections::VecDeque<Value>>>,
 }
 impl Application {
     pub fn new(service: Service, token: String, recovery: Option<PathBuf>) -> Self {
@@ -59,6 +62,29 @@ impl Application {
             token,
             stop,
             recovery,
+            settings: Arc::new(Mutex::new((crate::config::Settings::default(), None))),
+            mcp_enabled: Arc::new(AtomicBool::new(true)),
+            access_log: Arc::new(Mutex::new(std::collections::VecDeque::new())),
+        }
+    }
+    pub fn with_settings(self, path: Option<PathBuf>) -> Result<Self> {
+        let settings = if let Some(path) = &path {
+            crate::config::Settings::load(path)?
+        } else {
+            crate::config::Settings::default()
+        };
+        *self
+            .settings
+            .lock()
+            .map_err(|_| Error::new("internal", "Settings lock poisoned"))? = (settings, path);
+        Ok(self)
+    }
+    fn log_access(&self, method: &str, status: u16, elapsed: u128) {
+        if let Ok(mut log) = self.access_log.lock() {
+            if log.len() == 256 {
+                log.pop_front();
+            }
+            log.push_back(json!({"at":wirecraft_core::model::timestamp(),"method":method,"status":status,"elapsedMs":elapsed}));
         }
     }
     pub fn revision(&self) -> u64 {
@@ -70,6 +96,47 @@ impl Application {
         }
         let a = &r.arguments;
         match r.command.as_str() {
+            "settings.get" => {
+                return Ok(serde_json::to_value(
+                    &self
+                        .settings
+                        .lock()
+                        .map_err(|_| Error::new("internal", "Settings lock poisoned"))?
+                        .0,
+                )?);
+            }
+            "settings.replace" => {
+                let settings: crate::config::Settings = serde_json::from_value(a.clone())?;
+                settings.validate()?;
+                let state = self.settings.clone();
+                return tokio::task::spawn_blocking(move || {
+                    let mut state = state
+                        .lock()
+                        .map_err(|_| Error::new("internal", "Settings lock poisoned"))?;
+                    if let Some(path) = &state.1 {
+                        settings.save(path)?;
+                    }
+                    state.0 = settings;
+                    Ok(serde_json::to_value(&state.0)?)
+                })
+                .await
+                .map_err(|e| Error::new("internal", e.to_string()))?;
+            }
+            "mcp.status" => {
+                return Ok(
+                    json!({"enabled":self.mcp_enabled.load(Ordering::SeqCst),"log":self.access_log.lock().map_err(|_|Error::new("internal","Access log lock poisoned"))?.clone()}),
+                );
+            }
+            "mcp.set_enabled" => {
+                let enabled = a["enabled"]
+                    .as_bool()
+                    .ok_or_else(|| Error::new("invalid_input", "enabled must be boolean"))?;
+                self.mcp_enabled.store(enabled, Ordering::SeqCst);
+                return Ok(json!({"enabled":enabled}));
+            }
+            "system.health" => {
+                return Ok(json!({"name":"Wirecraft","status":"ok","revision":self.revision()}));
+            }
             "system.shutdown" => {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
@@ -371,6 +438,17 @@ async fn mcp_http(
     if !authorized(&app, &headers) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
+    if !app.mcp_enabled.load(Ordering::SeqCst) {
+        app.log_access("POST /mcp", 503, 0);
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(
+                json!({"error":{"code":"unavailable","message":"MCP is disabled by this session"}}),
+            ),
+        )
+            .into_response();
+    }
+    let started = std::time::Instant::now();
     let value =
         match body {
             Ok(Json(v)) => v,
@@ -379,10 +457,16 @@ async fn mcp_http(
             )
             .into_response(),
         };
-    match mcp::handle(&app, value).await {
+    let response = match mcp::handle(&app, value).await {
         Some(v) => Json(v).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
-    }
+    };
+    app.log_access(
+        "POST /mcp",
+        response.status().as_u16(),
+        started.elapsed().as_millis(),
+    );
+    response
 }
 async fn events(State(app): State<Application>, headers: HeaderMap) -> Response {
     if !authorized(&app, &headers) {

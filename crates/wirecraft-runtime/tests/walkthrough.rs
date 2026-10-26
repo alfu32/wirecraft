@@ -78,3 +78,93 @@ fn structural_matrix_is_relationship_union_not_parenthood() {
     assert_eq!(report["graphs"]["structural"]["edges"], 1);
     assert_eq!(report["graphs"]["containment"]["edges"], 2);
 }
+
+#[tokio::test]
+async fn settings_are_validated_persisted_and_mcp_can_stop_without_stopping_ui() {
+    use wirecraft_runtime::backend::Application;
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("settings.json");
+    let app = Application::new(
+        Service::new(Document::new("Controls"), None),
+        "walkthrough-secret-token".into(),
+        None,
+    )
+    .with_settings(Some(path.clone()))
+    .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let serving = app.clone();
+    let server = tokio::spawn(async move { serving.serve(listener).await.unwrap() });
+    let mut settings = app
+        .execute(Request::new("settings.get", json!({})))
+        .await
+        .unwrap();
+    settings["appearance"]["colors"]["canvasBackground"] = json!("#123456");
+    settings["editorIndentSpaces"] = json!(2);
+    app.execute(Request::new("settings.replace", settings.clone()))
+        .await
+        .unwrap();
+    assert_eq!(
+        wirecraft_runtime::config::Settings::load(&path)
+            .unwrap()
+            .editor_indent_spaces,
+        2
+    );
+    settings["appearance"]["colors"]["canvasBackground"] = json!("#oops");
+    assert!(
+        app.execute(Request::new("settings.replace", settings))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        wirecraft_runtime::config::Settings::load(&path)
+            .unwrap()
+            .appearance
+            .colors["canvasBackground"],
+        "#123456"
+    );
+    let http = reqwest::Client::new();
+    let url = format!("http://{addr}/mcp");
+    app.execute(Request::new("mcp.set_enabled", json!({"enabled":false})))
+        .await
+        .unwrap();
+    assert_eq!(
+        http.post(&url)
+            .bearer_auth("walkthrough-secret-token")
+            .json(&json!({"jsonrpc":"2.0","id":1,"method":"ping"}))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        503
+    );
+    assert_eq!(
+        app.execute(Request::new("session.snapshot", json!({})))
+            .await
+            .unwrap()["document"]["name"],
+        "Controls"
+    );
+    app.execute(Request::new("mcp.set_enabled", json!({"enabled":true})))
+        .await
+        .unwrap();
+    assert_eq!(
+        http.post(&url)
+            .bearer_auth("walkthrough-secret-token")
+            .json(&json!({"jsonrpc":"2.0","id":2,"method":"ping"}))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        200
+    );
+    let status = app
+        .execute(Request::new("mcp.status", json!({})))
+        .await
+        .unwrap();
+    assert_eq!(status["log"].as_array().unwrap().len(), 2);
+    assert!(!status.to_string().contains("walkthrough-secret-token"));
+    app.execute(Request::new("system.shutdown", json!({})))
+        .await
+        .unwrap();
+    server.await.unwrap();
+}

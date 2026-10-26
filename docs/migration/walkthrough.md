@@ -36,3 +36,11 @@ Each slice must remain runnable. Test meaningful mutations and failure cases thr
 Implemented menus and searchable command palette, native stroke icons, structured general/management/language/link inspector with explicit Apply and advanced JSON, six-lane Kanban/backlog with drag/drop and transactional status changes, read-only archetype preview plus explicit insertion, and virtual-row adjacency matrices with endpoint/findings navigation. Core report now separates structural relationship union from containment. Source column status names and null backlog behavior were checked in ProjectManagementPanel.kt.
 
 Checks: workspace tests passed (38 integration tests); strict clippy passed after collapsing a nested preview conditional; GPUI built and an owned temporary-state window launched/captured/closed successfully (`target/walkthrough-smoke/initial.png`). Full interactive board/editor regression remains the next acceptance gate. Options, sheet/detail fidelity and provider actions are still pending.
+
+### Canvas and local controls slice
+
+Expanded-composite projection now follows absolute child coordinates from the source data, hides collapsed descendants, and projects external links onto the visible boundary. The GPU canvas shows semantic roles, fields, port names/types and diagnostic markers; supports collapse toggles, resize commits, composite subtree moves and a visible selection rectangle. Spatial indexing remains in use. Routing tries bounded alternative corridors around terminal obstacles; this is still less capable than the source's full boundary/routing heuristics.
+
+Settings now have validated appearance/font/grid/color/wheel/provider values and an application-owned atomic settings store, shared HTTP service, staged Save/Cancel/defaults UI. MCP can be disabled independently of the UI API and has a bounded metadata-only access log. Tests verify actual HTTP 503/200 transitions, continued UI service operation, settings persistence/rejection, and composite projection.
+
+Checks: workspace tests passed (40 integration tests), strict clippy passed. Interactive resize/collapse/settings verification and export/provider work still pending.

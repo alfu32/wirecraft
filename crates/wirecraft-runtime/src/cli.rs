@@ -110,6 +110,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let mut port = 0u16;
     let mut token = uuid::Uuid::new_v4().to_string();
     let mut recovery = None;
+    let mut settings_path = None;
     while let Some(flag) = args.next() {
         let value = args
             .next()
@@ -123,6 +124,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
                 }
                 token = value
             }
+            "--settings" => settings_path = Some(PathBuf::from(value)),
             "--recovery" => recovery = Some(PathBuf::from(value)),
             _ => anyhow::bail!("Unknown option {flag}"),
         }
@@ -137,7 +139,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     if let Some(path) = &recovery {
         service.write_recovery(path)?;
     }
-    let app = Application::new(service, token.clone(), recovery);
+    let app = Application::new(service, token.clone(), recovery).with_settings(settings_path)?;
     if mode == "mcp-stdio" {
         mcp::stdio(&app).await?;
         return Ok(());
