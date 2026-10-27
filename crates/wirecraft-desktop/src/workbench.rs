@@ -836,6 +836,70 @@ impl Wirecraft {
                     },
                 ));
             }
+        } else if group == "Diagnostics" {
+            panel = panel.w(px(900.)).child(
+                button("recheck-compiler", "Check compilation again")
+                    .on_click(cx.listener(|this, _, _, cx| this.queue_compiler_check(cx))),
+            );
+            let issues = self.compiler_issues();
+            let mut list = div()
+                .id("compiler-diagnostics")
+                .h(px(530.))
+                .overflow_y_scroll();
+            if issues.is_empty() {
+                list = list.child(div().p_3().child(if self.compiler_inflight {
+                    "Checking generated source…"
+                } else {
+                    "No compiler errors or warnings."
+                }));
+            }
+            for (i, diagnostic) in issues.iter().enumerate() {
+                let location = &diagnostic["source"];
+                let name = location["nodeId"]
+                    .as_str()
+                    .map(|id| self.snapshot.document.qualified_name(id))
+                    .unwrap_or_else(|| "Compiler service".into());
+                let message = format!(
+                    "{}: {}",
+                    if diagnostic["severity"] == 1 {
+                        "Error"
+                    } else {
+                        "Warning"
+                    },
+                    diagnostic["message"].as_str().unwrap_or("")
+                );
+                let detail = format!(
+                    "{} · {} · {}:{}",
+                    name,
+                    location["section"].as_str().unwrap_or("source"),
+                    location["line"].as_u64().unwrap_or(1),
+                    location["column"].as_u64().unwrap_or(1)
+                );
+                let diagnostic = diagnostic.clone();
+                list = list.child(
+                    div()
+                        .id(i)
+                        .p_3()
+                        .border_b_1()
+                        .border_color(crate::chrome::color(0x40505c))
+                        .cursor_pointer()
+                        .hover(|s| s.bg(crate::chrome::color(0x293846)))
+                        .child(
+                            div()
+                                .text_color(crate::chrome::color(0xeab779))
+                                .child(message),
+                        )
+                        .child(div().text_xs().child(detail))
+                        .on_click(cx.listener(move |this, _, w, cx| {
+                            this.reveal_diagnostic(&diagnostic, w, cx);
+                            if !this.has_draft(cx) {
+                                this.menu = None;
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+            panel = panel.child(list);
         } else if let Some(category) = group.strip_prefix("Context:Archetypes") {
             panel = panel.child(button("context-back", "‹ Back").on_click(cx.listener(
                 |this, _, _, cx| {

@@ -1,0 +1,515 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "threadwork.get_design",
+        "title": "get design",
+        "description": "Get the complete open design as JSON.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.get_fragment",
+        "title": "get fragment",
+        "description": "Get a JSON fragment for an entity and optionally its descendants and links.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Entity ID"
+            },
+            "includeDescendants": {
+              "type": "boolean",
+              "description": "Include descendants",
+              "default": true
+            },
+            "includeLinks": {
+              "type": "boolean",
+              "description": "Include related links",
+              "default": true
+            }
+          },
+          "required": [
+            "nodeId"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.get_entity",
+        "title": "get entity",
+        "description": "Get one entity, its full attributes, and its qualified name.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Entity ID"
+            }
+          },
+          "required": [
+            "nodeId"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.list_entities",
+        "title": "list entities",
+        "description": "List entity summaries, optionally below a parent and filtered by kind.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "parentId": {
+              "type": "string",
+              "description": "Parent entity ID"
+            },
+            "kind": {
+              "type": "string",
+              "description": "Entity kind",
+              "enum": [
+                "Node",
+                "Processor",
+                "Link",
+                "Group",
+                "Type",
+                "Note"
+              ]
+            },
+            "recursive": {
+              "type": "boolean",
+              "description": "Include descendants",
+              "default": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.get_metadata",
+        "title": "get metadata",
+        "description": "Get document or entity metadata.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Entity ID"
+            }
+          },
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.list_users",
+        "title": "list users",
+        "description": "List users stored in the open model.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.list_technologies",
+        "title": "list technologies",
+        "description": "List compiler technologies available in this app instance.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.get_command_catalog",
+        "title": "get command catalog",
+        "description": "List desktop commands available to the agent.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.execute_command",
+        "title": "execute command",
+        "description": "Execute an enabled desktop command by ID.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "commandId": {
+              "type": "string",
+              "description": "Command ID"
+            }
+          },
+          "required": [
+            "commandId"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.create_entity",
+        "title": "create entity",
+        "description": "Create an entity under a parent; new entities inherit the parent's technology and file layout unless explicitly overridden.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Entity name"
+            },
+            "kind": {
+              "type": "string",
+              "description": "Entity kind",
+              "enum": [
+                "Node",
+                "Processor",
+                "Link",
+                "Group",
+                "Type",
+                "Note"
+              ],
+              "default": "Processor"
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent entity ID"
+            },
+            "attributes": {
+              "type": "object",
+              "description": "Initial entity patch",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.update_entity",
+        "title": "update entity",
+        "description": "Patch every editable entity attribute, including text, ports, type definitions, links, metadata, and plugin data.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Entity ID"
+            },
+            "patch": {
+              "type": "object",
+              "description": "Entity attributes to change",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "nodeId",
+            "patch"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.delete_entity",
+        "title": "delete entity",
+        "description": "Delete an entity and repository-managed descendants/links.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Entity ID"
+            }
+          },
+          "required": [
+            "nodeId"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.move_entity",
+        "title": "move entity",
+        "description": "Move an entity to another parent or to the document root.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Entity ID"
+            },
+            "parentId": {
+              "type": "string",
+              "description": "New parent entity ID"
+            }
+          },
+          "required": [
+            "nodeId"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.create_link",
+        "title": "create link",
+        "description": "Create a directed link, including self-links, between two entities.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Link name"
+            },
+            "sourceNodeId": {
+              "type": "string",
+              "description": "Source entity ID"
+            },
+            "sourcePortName": {
+              "type": "string",
+              "description": "Source port"
+            },
+            "targetNodeId": {
+              "type": "string",
+              "description": "Target entity ID"
+            },
+            "targetPortName": {
+              "type": "string",
+              "description": "Target port"
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Requested parent ID"
+            },
+            "link": {
+              "type": "object",
+              "description": "Additional LinkData fields",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "name",
+            "sourceNodeId",
+            "sourcePortName",
+            "targetNodeId",
+            "targetPortName"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.update_link",
+        "title": "update link",
+        "description": "Update LinkData for an existing link.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "Link entity ID"
+            },
+            "patch": {
+              "type": "object",
+              "description": "LinkData fields",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "nodeId",
+            "patch"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.set_document_metadata",
+        "title": "set document metadata",
+        "description": "Replace document metadata with the supplied string map.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "metadata": {
+              "type": "object",
+              "description": "String metadata map",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "metadata"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.register_user",
+        "title": "register user",
+        "description": "Store or refresh a model user, including provider fields, role, avatar, and refresh timestamp.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "user": {
+              "type": "object",
+              "description": "ModelUser",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "user"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.validate_design",
+        "title": "validate design",
+        "description": "Validate the current design and return diagnostics.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "threadwork.analyze_network",
+        "title": "analyze network",
+        "description": "Return quantitative counts for the current network.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      }
+    ],
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    },
+    "ttlMs": 0,
+    "cacheScope": "private"
+  }
+}

@@ -40,3 +40,11 @@ Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. 
 | Compiler coloring | photos 029–030; core/editor.rs, runtime/generated_analysis.rs, desktop/editor_tokens.rs | real clangd Unicode tokens, runtime, libs, members, buffers, seven generated files | native widget color inspection pending |
 | Scrollable context commands | photo 028; desktop/workbench.rs | workspace compilation | native menu traversal pending |
 | Pointer freeze | photos 031–033; vendor window_border.rs and desktop/interaction.rs | baseline five startup / three release cases pass; exact incident not reproduced | verify new capture/edge changes natively |
+
+| Additional workflow | Reference | Rust component | Verification / remaining gap |
+|---|---|---|---|
+| Completion identifier + signature | photo 039; JVM compiler-context suggestions | completion.rs, generated_analysis.rs | real clangd runtime/library signatures; final native rerun pending |
+| Function/struct hover + supplier | photo 040 | editor_hover.rs, editor.rs, generated_analysis.rs | real clangd Unicode/function/struct/library hover; native popup check pending |
+| Technical ports / reverse flow | photo 041 | shared port_glyphs, scene.rs, export.rs | outlined outputs, filled input arrows, channel:type labels; reverse links dashed |
+| Compiler warning/error count and list | photo 042 | compiler_issues.rs, workbench.rs | independent background check; Info excluded, clickable count/list/reveal; native check pending |
+| Live JVM contract refresh | baseline/jvm-live-2026-10-27 | runtime/tests/jvm_readonly_baseline.rs | counts, link contracts and structural validation match; safe reads only |

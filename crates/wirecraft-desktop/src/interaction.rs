@@ -353,7 +353,7 @@ impl Wirecraft {
         if event.button == MouseButton::Left {
             self.end_panel(event, window, cx);
         }
-        if self.pan_start.is_some()
+        if (self.pan_start.is_some() && event.button == MouseButton::Middle)
             || (event.button == MouseButton::Left
                 && (self.drag_start.is_some()
                     || self.resize_start.is_some()

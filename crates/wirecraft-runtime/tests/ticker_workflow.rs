@@ -378,6 +378,49 @@ async fn full_generated_ast_maps_semantic_tokens_into_unicode_body_and_stages_co
 }
 
 #[tokio::test]
+async fn generated_hover_reports_function_struct_and_injected_dependency_signatures() {
+    let d = reference();
+    let id = d
+        .nodes
+        .values()
+        .find(|n| n.name == "write_append_file")
+        .unwrap()
+        .id
+        .clone();
+    let app = Application::new(Service::new(d, None), "hover-fixture".into(), None);
+    let text = "/*🙂*/ Packet item = {0};\nprintf(\"%s\", argslib__option(\"file\"));";
+    for (symbol, expected) in [
+        ("Packet", "timestamp"),
+        ("printf", "printf"),
+        ("argslib__option", "Injected by dependency argslib"),
+    ] {
+        let offset = text.find(symbol).unwrap() + 2;
+        let result = app
+            .execute(Request::new(
+                "editor.hover",
+                json!({"nodeId":id,"section":"source","text":text,"offset":offset}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(result["identifier"], symbol);
+        assert!(
+            result["hover"]["contents"].to_string().contains(expected),
+            "{symbol}: {result}"
+        );
+        assert!(result["hover"].get("range").is_none());
+    }
+    let error = app
+        .execute(Request::new(
+            "editor.hover",
+            json!({"nodeId":id,"section":"source","text":"🙂","offset":1}),
+        ))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "invalid_input");
+    app.shutdown().await;
+}
+
+#[tokio::test]
 async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() {
     let d = reference();
     let id = d
@@ -404,6 +447,10 @@ async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() 
         (
             "semantic_tokens",
             json!({"nodeId":id,"section":"source","text":"Packet packet = {0}; packet.timestamp = NULL;"}),
+        ),
+        (
+            "hover",
+            json!({"nodeId":id,"section":"source","text":"Packet packet = {0};","offset":2}),
         ),
     ] {
         let value:Value=client.post(&url).bearer_auth("ticker-mcp-token").json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"wirecraft.workbench","arguments":{"operation":operation,"arguments":arguments}}})).send().await.unwrap().json().await.unwrap();

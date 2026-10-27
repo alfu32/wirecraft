@@ -1,6 +1,8 @@
 mod chrome;
 mod client;
+mod compiler_issues;
 mod completion;
+mod editor_hover;
 mod editor_tokens;
 mod fonts;
 mod icons;
@@ -139,6 +141,11 @@ struct Wirecraft {
     panel_drag: Option<(bool, f32, f32)>,
     archetypes: Vec<Value>,
     generated_diagnostics: Vec<Value>,
+    compiler_timer: Option<Task<()>>,
+    compiler_inflight: bool,
+    compiler_again: bool,
+    compiler_failure: Option<String>,
+    compiler_issue_cache: Vec<Value>,
     generated_revision: u64,
     inspector: Vec<workbench::FormField>,
     completion: Option<completion::Pending>,
@@ -295,6 +302,11 @@ impl Wirecraft {
             panel_drag: None,
             archetypes: vec![],
             generated_diagnostics: vec![],
+            compiler_timer: None,
+            compiler_inflight: false,
+            compiler_again: false,
+            compiler_failure: None,
+            compiler_issue_cache: vec![],
             generated_revision: 0,
             inspector,
             completion: None,
@@ -334,6 +346,7 @@ impl Wirecraft {
             archetype_selected: None,
             archetype_preview: None,
         };
+        this.attach_hover(cx);
         cx.spawn_in(window, async move |this, cx| {
             while let Ok(update) = rx.recv().await {
                 if this
@@ -386,6 +399,14 @@ impl Wirecraft {
                 commit,
                 command,
             } => {
+                if command.as_deref() == Some("editor.analyze_generated") {
+                    if message.starts_with("conflict:") || message.starts_with("stale_result:") {
+                        self.compiler_again = true;
+                    } else {
+                        self.compiler_failure = Some(message.clone());
+                    }
+                    self.compiler_finished(cx);
+                }
                 if command.as_deref() == Some("editor.tokens") {
                     self.tokens_failed(message, cx);
                     return;
@@ -542,6 +563,8 @@ impl Wirecraft {
                     cx.write_to_clipboard(ClipboardItem::new_string(text.to_string()));
                 }
                 if command == "editor.analyze_generated" {
+                    self.compiler_failure = None;
+                    self.compiler_finished(cx);
                     self.generated_revision = value["revision"].as_u64().unwrap_or(0);
                     self.generated_diagnostics =
                         value["diagnostics"].as_array().cloned().unwrap_or_default();
@@ -567,6 +590,8 @@ impl Wirecraft {
                 }
             }
             Update::Snapshot(snapshot) => {
+                let graph_changed = snapshot.document.id != self.snapshot.document.id
+                    || snapshot.revision != self.snapshot.revision;
                 let document_changed = (self.connected_document
                     && snapshot.document.id != self.snapshot.document.id)
                     || (!self.connected_document
@@ -582,6 +607,10 @@ impl Wirecraft {
                     self.editor_entity = None;
                 }
                 self.snapshot = Arc::new(*snapshot);
+                if graph_changed {
+                    self.compiler_failure = None;
+                    self.queue_compiler_check(cx);
+                }
                 if document_changed {
                     self.parent = self.snapshot.document.root_node_id.clone();
                     self.selected.clear();
@@ -679,6 +708,7 @@ impl Wirecraft {
                 }
             }
         }
+        self.refresh_compiler_issues();
         cx.notify();
     }
     fn rebuild(&mut self) {
@@ -1573,9 +1603,9 @@ impl Render for Wirecraft {
                 ]
             };
             let errors = self
-                .generated_diagnostics
+                .compiler_issues()
                 .iter()
-                .filter(|d| d["severity"] == 1)
+                .filter(|d| d["severity"] == 1 || d["severity"] == 2)
                 .filter_map(|d| d["source"]["nodeId"].as_str().map(str::to_string))
                 .collect::<BTreeSet<_>>();
             let moving = self.drag_ids.clone();
@@ -1734,7 +1764,7 @@ impl Render for Wirecraft {
         } else {
             content = content.child(self.render_mcp(cx));
         }
-        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
+        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
     }
 }
 fn main() -> anyhow::Result<()> {

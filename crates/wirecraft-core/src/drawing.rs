@@ -35,6 +35,38 @@ pub struct Edge {
     pub source: String,
     pub target: String,
 }
+/// Technical drawing port symbols follow the actual endpoint directions.
+pub fn port_glyphs(points: &[[f64; 2]]) -> (Vec<[f64; 2]>, Vec<[f64; 2]>) {
+    if points.len() < 2 {
+        return (vec![], vec![]);
+    }
+    let unit = |a: [f64; 2], b: [f64; 2]| {
+        let dx = b[0] - a[0];
+        let dy = b[1] - a[1];
+        let len = dx.hypot(dy).max(0.001);
+        [dx / len, dy / len]
+    };
+    let a = points[0];
+    let u = unit(a, points[1]);
+    let b = *points.last().unwrap();
+    let v = unit(points[points.len() - 2], b);
+    (
+        vec![
+            a,
+            [a[0] + u[0] * 8. - u[1] * 4., a[1] + u[1] * 8. + u[0] * 4.],
+            [a[0] + u[0] * 14., a[1] + u[1] * 14.],
+            [a[0] + u[0] * 8. + u[1] * 4., a[1] + u[1] * 8. - u[0] * 4.],
+            a,
+        ],
+        vec![
+            b,
+            [b[0] - v[0] * 14. - v[1] * 5., b[1] - v[1] * 14. + v[0] * 5.],
+            [b[0] - v[0] * 10., b[1] - v[1] * 10.],
+            [b[0] - v[0] * 14. + v[1] * 5., b[1] - v[1] * 14. - v[0] * 5.],
+            b,
+        ],
+    )
+}
 #[derive(Clone)]
 pub struct Annotation {
     pub owner: String,
@@ -148,10 +180,11 @@ impl Drawing {
                         .diagnostics
                         .iter()
                         .filter(|v| {
-                            v["severity"] == 1
-                                || v["severity"]
-                                    .as_str()
-                                    .is_some_and(|s| s.eq_ignore_ascii_case("error"))
+                            matches!(v["severity"].as_u64(), Some(1 | 2))
+                                || v["severity"].as_str().is_some_and(|s| {
+                                    s.eq_ignore_ascii_case("error")
+                                        || s.eq_ignore_ascii_case("warning")
+                                })
                         })
                         .count(),
                 },
@@ -219,11 +252,16 @@ impl Drawing {
                     route_error: None,
                     source_label: format!(
                         "{}{}{}",
-                        l.source_port_name,
+                        n.name,
                         if type_name.is_empty() { "" } else { ":" },
                         type_name
                     ),
-                    target_label: l.target_port_name.clone(),
+                    target_label: format!(
+                        "{}{}{}",
+                        n.name,
+                        if type_name.is_empty() { "" } else { ":" },
+                        type_name
+                    ),
                     points: vec![],
                     crossings: vec![],
                     relation: relation(d, n),

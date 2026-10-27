@@ -463,7 +463,7 @@ impl Scene {
             }
         }
         for id in &visible {
-            if let Some((name, _)) = self.links.get(id) {
+            if self.links.contains_key(id) {
                 let edge = &self.drawing.edges[id];
                 if let Some(error) = &edge.route_error {
                     let r = self.drawing.shapes[&edge.source].rect;
@@ -506,21 +506,15 @@ impl Scene {
                         }
                     }
                 }
-                if let Some(end) = points.last() {
-                    let prev = points[points.len() - 2];
-                    let dx = end[0] - prev[0];
-                    let dy = end[1] - prev[1];
-                    let length = dx.hypot(dy).max(0.001);
-                    let (ux, uy) = (dx / length, dy / length);
-                    builder.move_to(screen([
-                        end[0] - ux * 8. - uy * 4.,
-                        end[1] - uy * 8. + ux * 4.,
-                    ]));
-                    builder.line_to(screen(*end));
-                    builder.line_to(screen([
-                        end[0] - ux * 8. + uy * 4.,
-                        end[1] - uy * 8. - ux * 4.,
-                    ]));
+                if let Ok(path) = builder.build() {
+                    window.paint_path(
+                        path,
+                        rgb(if selected.contains(id) {
+                            self.appearance.color("selection", 0x70d5c6)
+                        } else {
+                            self.appearance.color(edge.color_key, 0x9cb5c8)
+                        }),
+                    );
                 }
                 for p in &edge.crossings {
                     if let Some(s) = points.windows(2).find(|s| {
@@ -563,52 +557,53 @@ impl Scene {
                         }
                     }
                 }
-                if let Ok(path) = builder.build() {
-                    window.paint_path(
-                        path,
-                        rgb(if selected.contains(id) {
-                            self.appearance.color("selection", 0x70d5c6)
-                        } else {
-                            self.appearance.color(edge.color_key, 0x9cb5c8)
-                        }),
-                    );
-                }
-                if view.zoom >= 0.35 {
-                    let edge = &self.drawing.edges[id];
-                    for (p, label_text) in [
-                        (points.first(), &edge.source_label),
-                        (points.last(), &edge.target_label),
-                    ] {
-                        if let Some(p) = p {
-                            let pos = screen(*p);
-                            window.paint_quad(quad(
-                                Bounds::new(pos - point(px(3.), px(3.)), size(px(6.), px(6.))),
-                                px(3.),
-                                rgb(self.color(0x70d5c6)),
-                                px(0.),
-                                rgb(self.color(0x70d5c6)),
-                                BorderStyle::Solid,
-                            ));
-                            self.label(
-                                label_text,
-                                pos + point(px(6.), px(-13.)),
-                                (9. * view.zoom as f32).max(5.),
-                                0x70bdb3,
-                                window,
-                                cx,
-                            );
-                        }
+                let color = if selected.contains(id) {
+                    self.appearance.color("selection", 0x70d5c6)
+                } else {
+                    self.appearance.color(edge.color_key, 0xd0d5db)
+                };
+                let (output, input) = wirecraft_core::drawing::port_glyphs(points);
+                let mut symbol = PathBuilder::stroke(px(1.2));
+                for (i, p) in output.iter().enumerate() {
+                    if i == 0 {
+                        symbol.move_to(screen(*p));
+                    } else {
+                        symbol.line_to(screen(*p));
                     }
                 }
-                if let Some(p) = points.get(1) {
-                    self.label(
-                        name,
-                        screen([p[0] + 4., p[1] - 20.]),
-                        (10. * view.zoom as f32).max(5.),
-                        0x8fabbf,
-                        window,
-                        cx,
-                    );
+                if let Ok(path) = symbol.build() {
+                    window.paint_path(path, rgb(color));
+                }
+                let mut symbol = PathBuilder::fill();
+                for (i, p) in input.iter().enumerate() {
+                    if i == 0 {
+                        symbol.move_to(screen(*p));
+                    } else {
+                        symbol.line_to(screen(*p));
+                    }
+                }
+                if !input.is_empty() {
+                    symbol.close();
+                }
+                if let Ok(path) = symbol.build() {
+                    window.paint_path(path, rgb(color));
+                }
+                if view.zoom >= 0.35 && points.len() >= 2 {
+                    for (index, adjacent, label) in [
+                        (0, 1, &edge.source_label),
+                        (points.len() - 1, points.len() - 2, &edge.target_label),
+                    ] {
+                        let p = points[index];
+                        let q = points[adjacent];
+                        self.port_label(
+                            label,
+                            screen(p),
+                            q[0] >= p[0],
+                            (9. * view.zoom as f32).max(5.),
+                            window,
+                            cx,
+                        );
+                    }
                 }
             }
         }
@@ -792,7 +787,7 @@ impl Scene {
         };
         window.paint_quad(quad(
             rect,
-            px(4.),
+            px(0.),
             rgb(self.color(fill_color)),
             px(if active { 2. } else { 1. }),
             rgb(self.color(if active { 0x70d5c6 } else { stroke })),
@@ -873,19 +868,62 @@ impl Scene {
             ));
         }
         if shape.diagnostics > 0 || code_error {
+            let diameter = (14. * view.zoom as f32).max(8.);
+            let origin = rect.top_right() - point(px(diameter + 4.), px(-4.));
             window.paint_quad(quad(
-                Bounds::new(
-                    rect.top_right() - point(px(12.), px(-4.)),
-                    size(px(8.), px(8.)),
-                ),
-                px(4.),
-                rgb(0xe37272),
+                Bounds::new(origin, size(px(diameter), px(diameter))),
+                px(diameter / 2.),
+                rgb(0xd94f54),
                 px(0.),
-                rgb(0xe37272),
+                rgb(0xd94f54),
                 BorderStyle::Solid,
             ));
+            self.label(
+                "!",
+                origin + point(px(diameter * 0.36), px(-1.)),
+                diameter * 0.8,
+                0xffffff,
+                window,
+                cx,
+            );
         }
     }
+    fn port_label(
+        &self,
+        text: &str,
+        anchor: Point<Pixels>,
+        right: bool,
+        font_size: f32,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let split = text.rfind(':').unwrap_or(text.len());
+        let name_len = if split < text.len() { split + 1 } else { split };
+        let run = |len, color| TextRun {
+            len,
+            font: font(self.appearance.designer_font.clone()),
+            color: rgb(self.color(color)).into(),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+        };
+        let runs = [
+            run(name_len, 0xd0d5db),
+            run(text.len() - name_len, 0x58c6a4),
+        ];
+        let line =
+            window
+                .text_system()
+                .shape_line(text.to_string().into(), px(font_size), &runs, None);
+        let x = if right { px(9.) } else { -line.width - px(9.) };
+        let _ = line.paint(
+            anchor + point(x, px(-font_size - 5.)),
+            px(font_size + 5.),
+            window,
+            cx,
+        );
+    }
+
     fn label(
         &self,
         text: &str,

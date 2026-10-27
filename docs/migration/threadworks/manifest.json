@@ -340,5 +340,41 @@
     "sha256": "4da11527cdd484cb0c9825993ab5b9632b2151e6f465b66b910c6bb4313d5ba0",
     "feature": "Routing regression",
     "observed": "Old dogleg routing overlaps channels; missing composite port alignment."
+  },
+  {
+    "sequence": 39,
+    "original": "codex-clipboard-ZiOx4h.png",
+    "file": "039-jvm-completion-identifiers-and-signatures.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "e66da930ff5ac0527d9acac037d7bb6e95c3de72ed456f5f7e07fce147b46455",
+    "feature": "Completion signatures",
+    "observed": "Two columns show identifiers and callable/type declarations in socket_accept body context."
+  },
+  {
+    "sequence": 40,
+    "original": "codex-clipboard-th1Alr.png",
+    "file": "040-jvm-hover-injected-library-function-signature.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "37b0a17b5a0d924ed53e5c8d870a315e033b15722c75fa53d19c0ee414da9628",
+    "feature": "Hover signatures",
+    "observed": "Hover identifies the injecting base_lib dependency and shows int fclose(FILE *stream)."
+  },
+  {
+    "sequence": 41,
+    "original": "codex-clipboard-CP56xN.png",
+    "file": "041-jvm-technical-port-arrows-and-reverse-flow.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "68f8d33b6e2e93105beb96aa284b73d58ba6c941d270ceafd1d04c0e72804f55",
+    "feature": "Technical drawing",
+    "observed": "Sharp technical boxes, outlined source ports, filled destination arrows, named typed reverse-flow dashed channels."
+  },
+  {
+    "sequence": 42,
+    "original": "codex-clipboard-98Pteo.png",
+    "file": "042-jvm-clickable-compiler-issue-count-and-list.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "b3cc156f077c04f0e6b02fd93ac26922c31a57795999ba9f8088e192b0eb7474",
+    "feature": "Compiler issues",
+    "observed": "Red box badge represents errors OR warnings; status issue count opens the compilation diagnostics list."
   }
 ]

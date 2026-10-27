@@ -13,6 +13,10 @@ pub struct Client {
     pub sender: mpsc::Sender<Message>,
 }
 pub enum Message {
+    Query {
+        request: Request,
+        reply: async_channel::Sender<Result<Value, String>>,
+    },
     Execute(Request),
     Commit(Request),
     SaveUi(Value),
@@ -223,6 +227,26 @@ fn worker(
     let mut analyses: Vec<std::thread::JoinHandle<()>> = vec![];
     loop {
         match rx.recv_timeout(Duration::from_millis(300)) {
+            Ok(Message::Query { request, reply }) => {
+                analyses.retain(|job| !job.is_finished());
+                if analyses.len() >= 3 {
+                    let _ = reply.send_blocking(Err("Compiler intelligence is busy".into()));
+                    continue;
+                }
+                let client = backend.client.clone();
+                let endpoint = backend.endpoint.clone();
+                let token = backend.token.clone();
+                analyses.push(
+                    std::thread::Builder::new()
+                        .name("wirecraft-editor-query".into())
+                        .spawn(move || {
+                            let result = call_at(&client, &endpoint, &token, &request)
+                                .map(|(value, _)| value)
+                                .map_err(|e| e.to_string());
+                            let _ = reply.send_blocking(result);
+                        })?,
+                );
+            }
             Ok(message @ (Message::Execute(_) | Message::Commit(_))) => {
                 let (mut request, commit) = match message {
                     Message::Execute(r) => (r, false),
@@ -230,7 +254,14 @@ fn worker(
                     _ => unreachable!(),
                 };
                 let command = request.command.clone();
-                if command == "editor.tokens" {
+                if ["editor.tokens", "editor.analyze_generated"].contains(&command.as_str()) {
+                    if command == "editor.analyze_generated" {
+                        request.arguments["executable"] =
+                            json!(std::env::var("WIRECRAFT_CLANGD").unwrap_or_else(|_| {
+                                intelligence.settings.clangd.executable.clone()
+                            }));
+                        request.arguments["args"] = json!(intelligence.settings.clangd.args);
+                    }
                     // Automatic coloring must not hold up draft persistence,
                     // commits or pointer commands while clangd parses a body.
                     // The UI admits one token request at a time; replies retain

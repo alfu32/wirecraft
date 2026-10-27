@@ -1,0 +1,29 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {},
+      "resources": {
+        "listChanged": false
+      },
+      "prompts": {
+        "listChanged": false
+      }
+    },
+    "serverInfo": {
+      "name": "threadwork",
+      "title": "Threadwork",
+      "version": "2.6.7"
+    },
+    "instructions": "Threadwork is a desktop topology-first IDE and compiler framework.\nIt models projects as entities, processing nodes, types, libraries, composites, and directed links.\nThe open document is the source of truth. Read before editing, use entity IDs rather than names, and use the repository tools for mutations so parent/child and link references remain synchronized.\nthreadwork.get_design returns the complete JSON model. threadwork.get_fragment returns a JSON slice for one entity and optionally its descendants and related links.\nUse threadwork.list_technologies before assigning compiler technology. Use threadwork.validate_design after structural changes.\nNew entities inherit parent technology and file layout: omit technology and fileLayoutStrategyId unless an explicit override is intended; the stored layout sentinel is 'none'.\nRead threadwork://agent-guide first: it is the machine-facing Threadwork design manifesto plus the complete workflow, mutation semantics, topology conventions, C/library rules, layout guidance, and persistence behavior.\nThe desktop command catalog is available through threadwork.get_command_catalog and commands can be invoked with threadwork.execute_command when the command is enabled.\nAvailable technologies:\n- c-compiler: c/c-native (C17 Compiler)\n- generic-flow-design: any/compiler-template-set (Pebble Template Set Compiler)\n- go-compiler: go/go (Go Compiler)\n- multi-tech: any/file-export (multi-tech)\n- multi-tech: any/multi-tech (multi-tech)\n- naive-kotlin: kotlin/kotlin-jvm (Naive Kotlin/JVM Compiler)\n- nodejs-compiler: javascript/nodejs (Node.js CommonJS Compiler)\n- php-compiler: php/php (PHP Compiler)\n- quickjs-compiler: javascript/quickjs (QuickJS JavaScript Compiler)\n",
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    }
+  }
+}

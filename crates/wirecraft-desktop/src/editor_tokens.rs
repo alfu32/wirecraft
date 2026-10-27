@@ -96,11 +96,13 @@ impl Wirecraft {
             && self.section == t.section
             && self.editor.read(cx).value().as_ref() == t.text
         {
-            self.generated_revision = self.snapshot.revision;
-            self.generated_diagnostics =
-                value["diagnostics"].as_array().cloned().unwrap_or_default();
-            for diagnostic in &mut self.generated_diagnostics {
-                diagnostic["positionEncoding"] = value["serverPositionEncoding"].clone();
+            if value["diagnosticsCurrent"] == true {
+                self.generated_revision = self.snapshot.revision;
+                self.generated_diagnostics =
+                    value["diagnostics"].as_array().cloned().unwrap_or_default();
+                for diagnostic in &mut self.generated_diagnostics {
+                    diagnostic["positionEncoding"] = value["serverPositionEncoding"].clone();
+                }
             }
             let light = self.options.saved.appearance.theme == "light";
             let spans = value["tokens"]

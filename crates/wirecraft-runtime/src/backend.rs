@@ -173,7 +173,7 @@ impl Application {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
             }
-            "editor.context" | "editor.complete" | "editor.tokens" => {
+            "editor.context" | "editor.complete" | "editor.tokens" | "editor.hover" => {
                 let node = required(a, "nodeId")?.to_string();
                 let section = a["section"].as_str().unwrap_or("source").to_string();
                 let draft = a["text"].as_str().map(str::to_string);
@@ -222,6 +222,9 @@ impl Application {
                 let executable =
                     std::env::var("WIRECRAFT_CLANGD").unwrap_or(settings.clangd.executable);
                 let _lifecycle = self.lifecycle.lock().await;
+                if *self.stop.borrow() {
+                    return Err(Error::new("unavailable", "Application is shutting down"));
+                }
                 let mut editor = self.editor.lock().await;
                 if editor.as_ref().is_some_and(|s| !s.alive())
                     && let Some(old) = editor.take()
@@ -242,7 +245,10 @@ impl Application {
                     );
                 }
                 let session = editor.as_ref().unwrap();
-                let mut result = if r.command == "editor.tokens" {
+                drop(_lifecycle);
+                let mut result = if r.command == "editor.hover" {
+                    session.hover(&context, &text, offset).await?
+                } else if r.command == "editor.tokens" {
                     session.semantic_tokens(&context, &text).await?
                 } else {
                     session.complete(&context, &text, offset).await?
@@ -273,6 +279,12 @@ impl Application {
                     let s = service
                         .lock()
                         .map_err(|_| Error::new("internal", "Project lock poisoned"))?;
+                    if r.expected_revision.is_some_and(|v| v != s.revision) {
+                        return Err(Error::new(
+                            "conflict",
+                            "Generated analysis revision changed",
+                        ));
+                    }
                     Ok::<_, Error>((
                         wirecraft_core::c17::C17::generate(
                             &s.document,
@@ -284,6 +296,9 @@ impl Application {
                 .await
                 .map_err(|e| Error::new("internal", e.to_string()))??;
                 let _lifecycle = self.lifecycle.lock().await;
+                if *self.stop.borrow() {
+                    return Err(Error::new("unavailable", "Application is shutting down"));
+                }
                 let mut generated = self.generated.lock().await;
                 if let Some(session) = generated.as_mut() {
                     session.update(project).await?;
@@ -302,6 +317,7 @@ impl Application {
                         .await?,
                     );
                 }
+                drop(_lifecycle);
                 let mut result = generated.as_ref().unwrap().diagnostics().await?;
                 if self.revision() != revision {
                     return Err(Error::new(
@@ -481,6 +497,7 @@ impl Application {
         .map_err(|e| Error::new("internal", e.to_string()))?
     }
     pub async fn shutdown(&self) {
+        let _ = self.stop.send(true);
         let _lifecycle = self.lifecycle.lock().await;
         if let Some(session) = self.lsp.lock().await.take() {
             session.shutdown().await;

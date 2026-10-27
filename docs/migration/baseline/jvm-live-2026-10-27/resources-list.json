@@ -1,0 +1,42 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resources": [
+      {
+        "uri": "threadwork://instructions",
+        "name": "Threadwork instructions",
+        "mimeType": "text/plain"
+      },
+      {
+        "uri": "threadwork://agent-guide",
+        "name": "Threadwork MCP agent guide",
+        "mimeType": "text/markdown"
+      },
+      {
+        "uri": "threadwork://technologies",
+        "name": "Available compiler technologies",
+        "mimeType": "application/json"
+      },
+      {
+        "uri": "threadwork://commands",
+        "name": "Desktop command catalog",
+        "mimeType": "application/json"
+      },
+      {
+        "uri": "threadwork://design",
+        "name": "Current Threadwork design",
+        "mimeType": "application/json"
+      }
+    ],
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "threadwork",
+        "version": "2.6.7"
+      }
+    },
+    "ttlMs": 0,
+    "cacheScope": "private"
+  }
+}

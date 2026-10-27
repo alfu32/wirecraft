@@ -278,6 +278,56 @@ async fn stage_project(
 }
 
 impl GeneratedAnalysis {
+    pub async fn hover(
+        &self,
+        context: &wirecraft_core::editor::BodyContext,
+        text: &str,
+        offset: usize,
+    ) -> Result<Value> {
+        use crate::lsp::{offset as byte_offset, position};
+        let local = position(text, offset, "utf-32")?;
+        let line =
+            context.source.generated_start_line - 1 + local["line"].as_u64().unwrap() as usize;
+        let column =
+            context.source.generated_column_offset + local["character"].as_u64().unwrap() as usize;
+        let generated = byte_offset(&self.file.content, line, column, "utf-32")?;
+        let mut hover=self.session.request("textDocument/hover",json!({"textDocument":{"uri":self.uri},"position":position(&self.file.content,generated,&self.session.encoding)?})).await?;
+        // The widget already knows the hovered word's exact UTF-8 range. LSP's
+        // generated range must never be interpreted as an authored body range.
+        if let Some(object) = hover.as_object_mut() {
+            object.remove("range");
+        }
+        let start = text[..offset]
+            .char_indices()
+            .rev()
+            .take_while(|(_, c)| c.is_alphanumeric() || *c == '_')
+            .last()
+            .map_or(offset, |(i, _)| i);
+        let end = offset
+            + text[offset..]
+                .find(|c: char| !c.is_alphanumeric() && c != '_')
+                .unwrap_or(text.len() - offset);
+        let identifier = &text[start..end];
+        if let Some(symbol) = context
+            .symbols
+            .iter()
+            .find(|s| s["label"].as_str() == Some(identifier))
+        {
+            let signature = symbol["detail"].as_str().unwrap_or("");
+            let provenance = symbol["documentation"].as_str().unwrap_or("");
+            // Library aliases are function pointers in generated C. Show the
+            // callable signature plus its model dependency, not an anonymous
+            // pointer type whose provenance has been lost.
+            hover = json!({"contents":{"kind":"markdown","value":format!("```c\n{signature}\n```\n\n{provenance}")}});
+        }
+        if let Some(signature) = context.type_signatures.get(identifier) {
+            hover =
+                json!({"contents":{"kind":"markdown","value":format!("```c\n{signature}\n```")}});
+        }
+        Ok(
+            json!({"hover":hover,"identifier":identifier,"version":self.version,"pid":self.session.pid()}),
+        )
+    }
     pub async fn semantic_tokens(
         &self,
         context: &wirecraft_core::editor::BodyContext,
@@ -391,9 +441,17 @@ impl GeneratedAnalysis {
                 .collect::<Vec<_>>();
             tokens.push(json!({"startByte":start,"endByte":end,"kind":kind,"modifiers":flags,"range":{"start":{"line":local_line,"character":a},"end":{"line":local_line,"character":b}}}));
         }
-        let diagnostics = self.diagnostics().await?;
+        // Do not wait for a separate diagnostics publication while holding the
+        // editor session. Automatic compilation owns that wait independently.
+        let published = self.session.diagnostics();
+        let current = published[&self.uri]["version"] == self.version;
+        let diagnostics = if current {
+            self.diagnostics().await?["diagnostics"].clone()
+        } else {
+            Value::Null
+        };
         Ok(
-            json!({"tokens":tokens,"diagnostics":diagnostics["diagnostics"],"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"version":self.version,"pid":self.session.pid(),"generatedBytes":self.file.content.len(),"generatedFiles":self.staged.len()}),
+            json!({"tokens":tokens,"diagnostics":diagnostics,"diagnosticsCurrent":current,"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"version":self.version,"pid":self.session.pid(),"generatedBytes":self.file.content.len(),"generatedFiles":self.staged.len()}),
         )
     }
 }

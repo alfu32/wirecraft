@@ -167,7 +167,10 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
             "ErrorHandler" => ("#fff2f2", "#bd5555"),
             _ => ("#f4f7fa", "#334e68"),
         };
-        write!(out,"<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"3\" fill=\"{fill}\" stroke=\"{stroke}\" {}/><text x=\"{}\" y=\"{}\" font-size=\"14\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"10\">{}</text>",r.x,r.y,r.width,r.height,if s.composite&&s.expanded{"stroke-dasharray=\"8 4\""}else{""},r.x+8.,r.y+20.,escape(&format!("{} {}",n.name,n.name_detail)),r.x+8.,r.y+37.,escape(&s.role)).unwrap();
+        write!(out,"<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"0\" fill=\"{fill}\" stroke=\"{stroke}\" {}/><text x=\"{}\" y=\"{}\" font-size=\"14\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"10\">{}</text>",r.x,r.y,r.width,r.height,if s.composite&&s.expanded{"stroke-dasharray=\"8 4\""}else{""},r.x+8.,r.y+20.,escape(&format!("{} {}",n.name,n.name_detail)),r.x+8.,r.y+37.,escape(&s.role)).unwrap();
+        if s.diagnostics > 0 {
+            write!(out,"<circle cx=\"{}\" cy=\"{}\" r=\"7\" fill=\"#d94f54\"/><text x=\"{}\" y=\"{}\" fill=\"white\" text-anchor=\"middle\" font-size=\"10\">!</text>",r.x+r.width-11.,r.y+11.,r.x+r.width-11.,r.y+14.).unwrap();
+        }
         for (i, field) in s.fields.iter().enumerate() {
             if 52. + i as f64 * 15. > r.height {
                 break;
@@ -200,7 +203,7 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
             Some(crate::analysis::Relation::TypeUsage) => "#00897b",
             _ => "#334e68",
         };
-        write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" {} marker-end=\"url(#arrow)\"/>",if edge.dashed{"stroke-dasharray=\"8 5\""}else{""}).unwrap();
+        write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" {}/>",if edge.dashed{"stroke-dasharray=\"8 5\""}else{""}).unwrap();
         for p in &edge.crossings {
             if let Some(s) = edge
                 .points
@@ -216,12 +219,38 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
                 write!(out,"<path d=\"M{} {}L{} {}\" stroke=\"white\" stroke-width=\"6\"/><path class=\"channel-bridge\" d=\"M{} {}C{} {},{} {},{} {}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\"/>",a[0],a[1],b[0],b[1],a[0],a[1],a[0]-uy*9.,a[1]+ux*9.,b[0]-uy*9.,b[1]+ux*9.,b[0],b[1]).unwrap();
             }
         }
-        for (p, text) in [
-            (edge.points.first(), &edge.source_label),
-            (edge.points.last(), &edge.target_label),
-        ] {
-            if let Some(p) = p {
-                write!(out,"<circle cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"9\">{}</text>",p[0],p[1],p[0]+5.,p[1]-6.,escape(text)).unwrap();
+        let (output, input) = crate::drawing::port_glyphs(&edge.points);
+        for (class, points, filled) in [("output-port", output, false), ("input-port", input, true)]
+        {
+            if points.is_empty() {
+                continue;
+            }
+            let points = points
+                .iter()
+                .map(|p| format!("{},{}", p[0], p[1]))
+                .collect::<Vec<_>>()
+                .join(" ");
+            write!(
+                out,
+                "<polygon class=\"{class}\" points=\"{points}\" stroke=\"{color}\" fill=\"{}\"/>",
+                if filled { color } else { "white" }
+            )
+            .unwrap();
+        }
+        if edge.points.len() >= 2 {
+            for (i, j, text) in [
+                (0, 1, &edge.source_label),
+                (
+                    edge.points.len() - 1,
+                    edge.points.len() - 2,
+                    &edge.target_label,
+                ),
+            ] {
+                let p = edge.points[i];
+                let right = edge.points[j][0] >= p[0];
+                let split = text.rfind(':').unwrap_or(text.len());
+                let name_len = if split < text.len() { split + 1 } else { split };
+                write!(out,"<text x=\"{}\" y=\"{}\" font-size=\"9\" text-anchor=\"{}\"><tspan fill=\"#334e68\">{}</tspan><tspan fill=\"#00897b\">{}</tspan></text>",p[0]+if right{16.}else{-16.},p[1]-6.,if right{"start"}else{"end"},escape(&text[..name_len]),escape(&text[name_len..])).unwrap();
             }
         }
     }

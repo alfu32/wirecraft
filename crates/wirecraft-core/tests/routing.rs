@@ -136,7 +136,8 @@ fn nearer_side_ports_follow_angular_order_and_detour_around_obstacles() {
 }
 
 #[test]
-fn dependency_callouts_are_separate_from_data_routes_and_error_dots_exclude_warnings() {
+fn dependency_callouts_are_separate_from_data_routes_and_issue_dots_include_warnings_and_exclude_info()
+ {
     let d = wirecraft_core::store::load(
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/migration/threadworks/example-c.orch"),
@@ -185,11 +186,8 @@ fn dependency_callouts_are_separate_from_data_routes_and_error_dots_exclude_warn
     assert_routes(&drawing);
     let mut d = Document::new("diagnostics");
     let id = box_at(&mut d, "root", "Body", 0., 0.);
-    d.nodes.get_mut(&id).unwrap().diagnostics = vec![
-        json!({"severity":"Warning"}),
-        json!({"severity":"Info"}),
-        json!({"severity":2}),
-    ];
+    d.nodes.get_mut(&id).unwrap().diagnostics =
+        vec![json!({"severity":"Info"}), json!({"severity":3})];
     assert_eq!(Drawing::new(&d, "root").shapes[&id].diagnostics, 0);
     d.nodes
         .get_mut(&id)
@@ -197,6 +195,12 @@ fn dependency_callouts_are_separate_from_data_routes_and_error_dots_exclude_warn
         .diagnostics
         .push(json!({"severity":"Error","textSection":"Source"}));
     assert_eq!(Drawing::new(&d, "root").shapes[&id].diagnostics, 1);
+    d.nodes
+        .get_mut(&id)
+        .unwrap()
+        .diagnostics
+        .extend([json!({"severity":"Warning"}), json!({"severity":2})]);
+    assert_eq!(Drawing::new(&d, "root").shapes[&id].diagnostics, 3);
 }
 
 #[test]

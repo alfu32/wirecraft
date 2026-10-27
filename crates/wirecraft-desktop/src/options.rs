@@ -206,6 +206,7 @@ impl Wirecraft {
                 }
             })
             .detach();
+            self.attach_hover(cx);
             self.token_ticket = None;
             self.queue_tokens(cx);
             Theme::global_mut(cx).mono_font_family = settings.appearance.editor_font.clone().into();

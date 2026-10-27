@@ -6,13 +6,14 @@ use crate::{
     generation::{GeneratedProject, SourceMap, VirtualFile},
 };
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 pub struct BodyContext {
     pub file: VirtualFile,
     pub companions: Vec<VirtualFile>,
     pub source: SourceMap,
     pub header: String,
     pub symbols: Vec<Value>,
+    pub type_signatures: BTreeMap<String, String>,
     pub excluded_library_prefixes: BTreeSet<String>,
 }
 impl BodyContext {
@@ -136,7 +137,25 @@ pub fn body_context(
     }) {
         excluded_library_prefixes.remove(&format!("{}__", crate::c17::identifier(&n.name)));
     }
+    let mut type_signatures = BTreeMap::new();
+    for node in candidate
+        .nodes
+        .values()
+        .filter(|n| n.kind == crate::NodeKind::Type)
+    {
+        let start = format!("typedef struct {} {{", node.name);
+        let end = format!("}} {};", node.name);
+        if let Some(a) = file.content.find(&start)
+            && let Some(b) = file.content[a..].find(&end)
+        {
+            type_signatures.insert(
+                node.name.clone(),
+                file.content[a..a + b + end.len()].to_string(),
+            );
+        }
+    }
     Ok(BodyContext {
+        type_signatures,
         file,
         companions: files.collect(),
         source,

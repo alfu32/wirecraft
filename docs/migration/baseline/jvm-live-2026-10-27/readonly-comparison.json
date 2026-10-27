@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-27",
+  "endpoint": "http://127.0.0.1:8765/mcp",
+  "server": {
+    "name": "threadwork",
+    "title": "Threadwork",
+    "version": "2.6.7"
+  },
+  "safeReadOnly": true,
+  "toolCount": 19,
+  "commandCount": 37,
+  "analysis": {
+    "entities": 12,
+    "links": 10,
+    "types": 3,
+    "composites": 2,
+    "ports": 13,
+    "users": 1,
+    "projectName": "WebServer"
+  },
+  "validation": {
+    "valid": true,
+    "diagnostics": []
+  },
+  "links": [
+    {
+      "name": "awitResponseLoop",
+      "id": "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+      "source": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "target": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "single-file"
+    },
+    {
+      "name": "base_lib -> socket_accept",
+      "id": "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+      "source": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+      "target": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "interactionKind": "lib",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "none"
+    },
+    {
+      "name": "request",
+      "id": "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+      "source": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "target": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "response",
+      "id": "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+      "source": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+      "target": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "routeApiUserDetailsRequest",
+      "id": "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+      "source": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+      "target": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "routeApiUserDetailsResponse",
+      "id": "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+      "source": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+      "target": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "routeHomeAboutRequest",
+      "id": "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+      "source": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+      "target": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "routeHomeAboutResponse",
+      "id": "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+      "source": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+      "target": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "routeHomeVersionRequest",
+      "id": "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+      "source": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+      "target": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "name": "routeHomeVersionResponse",
+      "id": "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+      "source": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+      "target": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+      "interactionKind": "data",
+      "transportKind": "in-process",
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    }
+  ],
+  "limitation": "MCP exposes model and commands, not mouse state, routing geometry, editor popups or hover rendering. Source and photos establish those UI behaviors. No command execution or mutation was sent."
+}
