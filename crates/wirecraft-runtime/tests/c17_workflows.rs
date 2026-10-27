@@ -774,6 +774,12 @@ fn webserver_example_serves_routes_fallbacks_and_shuts_down_after_its_limit() {
     assert!(missing.starts_with("HTTP/1.1 404") && missing.ends_with("404 Not Found: /missing\n"));
     let post = exchange("POST /home/version HTTP/1.1\r\nContent-Length: 3\r\n\r\nabc");
     assert!(post.starts_with("HTTP/1.1 405") && post.contains("Allow: GET, HEAD\r\n"));
+    // Rejected before entering the network, with unread bytes still queued: the reply must survive.
+    let oversized = exchange(&format!(
+        "GET / HTTP/1.1\r\nX: {}\r\n\r\n",
+        "a".repeat(9000)
+    ));
+    assert!(oversized.starts_with("HTTP/1.1 431"), "{oversized}");
     let head = exchange("HEAD /home/version HTTP/1.1\r\n\r\n");
     assert!(
         head.contains("Content-Length: 32\r\n") && head.ends_with("\r\n\r\n"),
