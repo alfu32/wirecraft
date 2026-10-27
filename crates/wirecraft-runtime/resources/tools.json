@@ -719,7 +719,7 @@
     },
     {
       "name": "wirecraft.build",
-      "description": "Start, inspect or cancel an external build using executable/argv/cwd, independent of editor diagnostics.",
+      "description": "Start, inspect or cancel an external build. start takes executable, args (arguments after the program name), cwd and optional timeoutSeconds; get/cancel take id. Independent of editor diagnostics.",
       "inputSchema": {
         "type": "object",
         "properties": {
