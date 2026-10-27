@@ -65,11 +65,11 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
   assert 'threadwork_runner__shutdown_request' in json.dumps(hovered['hover'])
   call('/api',{'command':'system.shutdown','arguments':{}});app.wait(timeout=10);assert app.returncode==0
   assert json.loads(subprocess.check_output([str(backend),'validate',str(project)],text=True))['nodes']==2
-  suites={'desktop':'desktop_smoke.py','walkthrough':'walkthrough_smoke.py','editor':'editor_smoke.py','canvas':'canvas_smoke.py','startup':'startup_smoke.py','gesture':'gesture_release_smoke.py','followup':'followup_smoke.py'}
+  suites={'desktop':'desktop_smoke.py','walkthrough':'walkthrough_smoke.py','editor':'editor_smoke.py','canvas':'canvas_smoke.py','startup':'startup_smoke.py','gesture':'gesture_release_smoke.py','followup':'followup_smoke.py','draft':'draft_smoke.py'}
   for option,script in suites.items():
    if '--'+option in sys.argv[2:]:
     env=os.environ.copy();env['WIRECRAFT_SMOKE_BINARY']=str(desktop)
     subprocess.run([sys.executable,str(root/'scripts'/script)],env=env,check=True)
-  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'workbenchMcp':True,'nativeC17Graph':True,'generatedClangd':True,'semanticTokensAndHover':True,'installedStartup':'--startup' in sys.argv[2:],'installedGesture':'--gesture' in sys.argv[2:],'installedFollowup':'--followup' in sys.argv[2:],'installedDesktop':'--desktop' in sys.argv[2:],'installedWalkthrough':'--walkthrough' in sys.argv[2:],'installedEditor':'--editor' in sys.argv[2:],'installedCanvas':'--canvas' in sys.argv[2:]}))
+  print(json.dumps({'package':'passed','archive':str(archive),'installedBackend':True,'mcpTools':len(tools),'pdfExport':True,'workbenchMcp':True,'nativeC17Graph':True,'generatedClangd':True,'semanticTokensAndHover':True,'installedDraft':'--draft' in sys.argv[2:],'installedStartup':'--startup' in sys.argv[2:],'installedGesture':'--gesture' in sys.argv[2:],'installedFollowup':'--followup' in sys.argv[2:],'installedDesktop':'--desktop' in sys.argv[2:],'installedWalkthrough':'--walkthrough' in sys.argv[2:],'installedEditor':'--editor' in sys.argv[2:],'installedCanvas':'--canvas' in sys.argv[2:]}))
  finally:
   if app.poll() is None:app.terminate();app.wait(timeout=10)

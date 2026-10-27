@@ -58,3 +58,12 @@ Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. 
 | Go, Node.js, Kotlin, PHP, QuickJS graph generation | respective compiler classes + StructuredCompiler traversal in compiler-api/CompilerApi.kt | core compiler; runtime `template_compilers` real subprocess tests | Producer → typed FIFO → consumer → shutdown; Go/QuickJS single, Node/PHP single and filesystem, Kotlin single/source-set checked. All capability variants, collections, boundary channels and mixed-language aggregation remain partial/pending |
 | Catalog and compiler-from-overrides export | GenericCompiler / CompilerCompiler; Photo 009 | shared compiler.templates/compiler.export/compile.project; CLI + MCP contracts; desktop Generate | Portable bundle export/reuse and custom project/static files work. JVM class ABI replaced by data; C execution of bundles/overrides pending |
 | Inspector technology/layout selection | source technology and layout menus | GPUI dropdown choices; canonical layout identifiers with old Wirecraft aliases accepted | All restored technology choices available; Generate executed Node.js once; full native picker automation/bundle-picker completion unverified (see 0.6.0 evidence) |
+
+
+## 0.6.1 routing and recovered inspector edits
+
+| Workflow | Source contract | Verification | Scope / remaining difference |
+|---|---|---|---|
+| Native long diagonal route selection | GraphCanvas bestRouteBetween/routeCandidates/routeCost | Nine generated JVM goldens; all-quadrant shortest octilinear drawing/SVG checks; diagonal fallback/overlap tests | Original candidate/Euclidean scoring restored for reference cases. Hard box/channel rejection, f64 precision and bounded fallback remain deliberate extensions; exhaustive pixel parity is not claimed |
+| Composite channels and technical callouts | GraphCanvas boundary anchors and annotations | Existing WebServer/ticker no-box-entry/no-overlap; six separated boundary ports with horizontal stubs | Retained during diagonal correction |
+| Inspector rename commit and draft recovery | Inspector applyOnCommit at ThreadworkDesktopApp.kt:7933 | Read-only live name-only draft evidence; owned native Enter/blur, restart/body Apply in Designer, recovered-name Discard and tree pick | Name commits on Enter/blur; persistent Apply/Discard/Show editor avoids hidden guards in Designer. Real drafts and conflict checks retained; earlier unexplained startup/pointer incidents are not assigned this cause without evidence |

@@ -372,6 +372,37 @@ impl Wirecraft {
             })
             .detach();
         }
+        cx.subscribe_in(
+            &this.name,
+            window,
+            |this, _, event: &InputEvent, window, cx| {
+                if matches!(event, InputEvent::PressEnter { .. } | InputEvent::Blur)
+                    && this.name.read(cx).value().as_ref() != this.base_name
+                    && !this.editor_request_pending
+                {
+                    this.apply(&Apply, window, cx);
+                }
+            },
+        )
+        .detach();
+        for field in &this.inspector {
+            let path = field.path;
+            cx.subscribe_in(
+                &field.input,
+                window,
+                move |this, _, event: &InputEvent, window, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. })
+                        && this.inspector.iter().any(|f| {
+                            f.path == path && f.input.read(cx).value().as_ref() != f.baseline
+                        })
+                        && !this.editor_request_pending
+                    {
+                        this.apply(&Apply, window, cx);
+                    }
+                },
+            )
+            .detach();
+        }
         cx.observe_window_activation(window, |this, window, cx| {
             if !window.is_window_active() {
                 this.cancel_pointer_gesture(cx);
@@ -1782,7 +1813,59 @@ impl Render for Wirecraft {
         } else {
             content = content.child(self.render_mcp(cx));
         }
-        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
+        let draft_notice =
+            (self.has_draft(cx) || self.editor_request_pending).then(|| {
+                let name = self
+                    .editor_entity
+                    .as_ref()
+                    .and_then(|id| self.snapshot.document.nodes.get(id))
+                    .map(|n| n.name.as_str())
+                    .unwrap_or("entity");
+                div()
+                    .id("editor-draft-notice")
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .px_3()
+                    .py_2()
+                    .bg(crate::chrome::color(0x443a22))
+                    .child(div().flex_1().min_w_0().truncate().child(
+                        if self.editor_request_pending {
+                            format!("Applying edits to {name}…")
+                        } else {
+                            format!(
+                                "Unapplied edits to {name} — apply or discard to change selection"
+                            )
+                        },
+                    ))
+                    .child(
+                        button("apply-retained-draft", "Apply · Ctrl Enter")
+                            .on_click(cx.listener(|this, _, w, cx| this.apply(&Apply, w, cx))),
+                    )
+                    .child(
+                        button("discard-retained-draft", "Discard edits").on_click(cx.listener(
+                            |this, _, w, cx| {
+                                if !this.editor_request_pending {
+                                    this.pending_draft = None;
+                                    this.load_editor(w, cx);
+                                    this.persist_ui(cx);
+                                    this.status = "Editor edits discarded".into();
+                                    cx.notify();
+                                }
+                            },
+                        )),
+                    )
+                    .child(
+                        button("show-retained-draft", "Show editor").on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.tab = "Editor".into();
+                                this.persist_ui(cx);
+                                cx.notify();
+                            },
+                        )),
+                    )
+            });
+        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).children(draft_notice).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
     }
 }
 fn main() -> anyhow::Result<()> {
