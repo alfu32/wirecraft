@@ -421,6 +421,55 @@ async fn generated_hover_reports_function_struct_and_injected_dependency_signatu
 }
 
 #[tokio::test]
+async fn editor_ast_resolves_real_companion_header_types_and_functions() {
+    use wirecraft_core::{Link, NodeKind};
+    let mut d = Document::new("header-context");
+    d.patch("root",&json!({"technology":{"languageId":"c","technologyId":"c-native"},"fileLayoutStrategyId":"single-file"})).unwrap();
+    let library = d.create("root", "base_lib", NodeKind::Processor).unwrap();
+    d.patch(
+        &library,
+        &json!({"text":{"source":"#include \"helper.h\""}}),
+    )
+    .unwrap();
+    let body = d.create("root", "consumer", NodeKind::Processor).unwrap();
+    d.create_link(
+        "base",
+        Link {
+            source_node_id: library,
+            target_node_id: body.clone(),
+            interaction_kind: "lib".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let header = d.create("root", "helper.h", NodeKind::Processor).unwrap();
+    d.patch(&header,&json!({"technology":{"languageId":"plain","technologyId":"file-export"},"text":{"source":"typedef struct Companion { int field; } Companion;\nstatic inline int helper(int value) { return value + 1; }"}})).unwrap();
+    let app = Application::new(Service::new(d, None), "companion-header".into(), None);
+    let text = "Companion value = {.field = helper(1)};";
+    let result = app
+        .execute(Request::new(
+            "editor.tokens",
+            json!({"nodeId":body,"section":"source","text":text}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result["generatedFiles"], 2);
+    assert!(result["tokens"].as_array().unwrap().iter().any(|t| {
+        let a = t["startByte"].as_u64().unwrap() as usize;
+        let b = t["endByte"].as_u64().unwrap() as usize;
+        &text[a..b] == "helper" && t["kind"] == "function"
+    }));
+    let hover=app.execute(Request::new("editor.hover",json!({"nodeId":body,"section":"source","text":text,"offset":text.find("helper").unwrap()+2}))).await.unwrap();
+    assert!(
+        hover["hover"]["contents"]
+            .to_string()
+            .contains("int helper"),
+        "{hover}"
+    );
+    app.shutdown().await;
+}
+
+#[tokio::test]
 async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() {
     let d = reference();
     let id = d

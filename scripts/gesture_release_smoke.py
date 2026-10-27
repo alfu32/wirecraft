@@ -72,6 +72,18 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   # Client shadows can be included or excluded from the WM's initial bounds.
   # Set a deterministic content size before using content-relative coordinates.
   dx,dy=content_inset();xd('windowsize','--sync',window,1400+2*dx,900+2*dy);time.sleep(.4)
+ def cursor_signature():
+  import ctypes
+  class Cursor(ctypes.Structure):
+   _fields_=[('x',ctypes.c_short),('y',ctypes.c_short),('width',ctypes.c_ushort),('height',ctypes.c_ushort),('xhot',ctypes.c_ushort),('yhot',ctypes.c_ushort),('serial',ctypes.c_ulong),('pixels',ctypes.POINTER(ctypes.c_ulong)),('atom',ctypes.c_ulong),('name',ctypes.c_char_p)]
+  x11=ctypes.CDLL('libX11.so.6');fixes=ctypes.CDLL('libXfixes.so.3')
+  x11.XOpenDisplay.argtypes=[ctypes.c_char_p];x11.XOpenDisplay.restype=ctypes.c_void_p
+  x11.XCloseDisplay.argtypes=[ctypes.c_void_p];x11.XFree.argtypes=[ctypes.c_void_p]
+  fixes.XFixesGetCursorImage.argtypes=[ctypes.c_void_p];fixes.XFixesGetCursorImage.restype=ctypes.POINTER(Cursor)
+  display=x11.XOpenDisplay(env.get('DISPLAY','').encode());assert display
+  cursor=fixes.XFixesGetCursorImage(display);assert cursor
+  value=cursor.contents;signature=(value.width,value.height,value.xhot,value.yhot,tuple(value.pixels[i]&0xffffffff for i in range(value.width*value.height)))
+  x11.XFree(cursor);x11.XCloseDisplay(display);return signature
  def selected():return set(ui()['selected_ids'])
  def point(x,y):
   v=ui()['viewport'];return (round(ui()['sidebar_width']+5+v['x']+x*v['zoom']),round(172+v['y']+y*v['zoom']))
@@ -93,6 +105,12 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   assert color.upper() in hist.upper(),(color,rect,hist[:100])
  try:
   launch();shot('editor-before-switch');click(65,102);wait(lambda:ui()['tab']=='Designer');command('Zoom Extents')
+  xd('mousemove','--window',window,850,400);time.sleep(.2);arrow=cursor_signature()
+  xd('mousemove','--window',window,1405,400);time.sleep(.2);edge=cursor_signature();assert edge!=arrow,'Resize gutter did not use its own cursor'
+  # Force repaint with the pointer over the gutter. A full-window resize hitbox
+  # previously retained this cursor over all content after the pointer returned.
+  api('threadwork.update_entity',{'nodeId':'root','patch':{'metadata':{'owned_cursor_probe':'1'}}});time.sleep(.7)
+  xd('mousemove','--window',window,850,400);time.sleep(.2);assert cursor_signature()==arrow,'Resize cursor leaked into content'
   for attempt in range(3):
    before=document()['nodes'][packets]['layout'].copy();start=point(before['x']+45,before['y']+35)
    drag(start,(1250,300));wait(lambda:document()['nodes'][packets]['layout']!=before)
@@ -105,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
    command('Undo');wait(lambda:document()['nodes'][packets]['layout']==before)
    click(165,102);wait(lambda:ui()['tab']=='Editor');click(65,102);wait(lambda:ui()['tab']=='Designer')
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0
-  print(json.dumps({'releaseAfterEditorSwitch':'passed','repetitions':3,'noHoverMovementAfterRelease':True,'noPhantomDraft':True,'treeResponsive':True,'artifacts':str(ARTIFACT)}))
+  print(json.dumps({'releaseAfterEditorSwitch':'passed','repetitions':3,'noHoverMovementAfterRelease':True,'noPhantomDraft':True,'treeResponsive':True,'edgeResizeCursorReturnsToArrow':True,'artifacts':str(ARTIFACT)}))
  finally:
   if app is not None and app.poll() is None:
    if window is not None:subprocess.run(['import','-window',window,str(ARTIFACT/'interaction-failure.png')],env=env,capture_output=True)

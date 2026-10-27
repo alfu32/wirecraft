@@ -161,6 +161,8 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   def inspector_inputs():
    tables=(ui().get('draft') or {}).get('tables',{});key='metadata' if tables.get('metadata') else 'types'
    for _ in range(10):
+    # Capture after clearing hover; a hovered Add button has a different fill.
+    xd('mousemove','--window',window,900,300);time.sleep(.15)
     path=shot('inspector-fields-detection');fields=inspector_regions(False,path);buttons=inspector_regions(True,path)
     if not tables.get(key):return fields
     target=buttons[-2 if key=='metadata' else -3][1]-30

@@ -98,6 +98,13 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   histogram=subprocess.check_output(['convert',str(colors),'-crop',f'520x550+{420+dx}+{300+dy}','-format','%c','histogram:info:'],text=True)
   for color in ['#72D4EB','#DF83E6','#9CDBB4']:
    assert color in histogram.upper(),f'Missing semantic color {color}'
+  xd('mousemove','--window',window,500,465);time.sleep(1);shot('hover-struct')
+  xd('mousemove','--window',window,516,645);time.sleep(1);shot('hover-injected-function')
+  diagnostics=api('editor.generated_diagnostics')['diagnostics']
+  mapped=[d for d in diagnostics if d.get('severity') in [1,2] and d.get('source',{}).get('nodeId')]
+  assert mapped
+  click(1300,880);time.sleep(.5);shot('compiler-issue-list')
+  click(600,185);wait(lambda:ui()['tab']=='Editor' and ui()['selected']==mapped[0]['source']['nodeId'])
   click(65,102);wait(lambda:ui()['tab']=='Designer');command('Zoom Extents');shot('dependency-callouts')
   menu_zoom=ui()['viewport']['zoom']
   xd('mousemove','--window',window,850,380);xd('click',3);time.sleep(.4);shot('context-top')
@@ -119,11 +126,12 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   (state/'recovery.json').unlink(missing_ok=True)
   (state/'ui.json').write_text(json.dumps({'document_id':webserver['id'],'parent':'root','tab':'Designer','selected':router,'selected_ids':[router],'sidebar_width':300,'viewport':{'x':40,'y':40,'zoom':1}}))
   launch();command('Zoom Extents');shot('webserver-routed-channels')
+  xd('mousemove','--window',window,1030,650);xd('click','--repeat',3,'--delay',100,4);time.sleep(.4);shot('webserver-routing-detail')
   web=api('export.preview',{'kind':'plan','options':{'format':'Auto'},'overview':True})
   assert web['svg'].count('class="composite-port"')==6
   assert 'routing-error' not in web['svg']
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0
-  print(json.dumps({'semanticColors':'passed','contextMenuScrollAndNestedInsert':'passed','dependencyCallouts':'captured','planOverview':'passed','webserverCompositeRouting':'passed','artifacts':str(ARTIFACT)}))
+  print(json.dumps({'semanticColors':'passed','contextMenuScrollAndNestedInsert':'passed','dependencyCallouts':'captured','planOverview':'passed','webserverCompositeRouting':'passed','compilerIssueReveal':'passed','hoverPopups':'captured','artifacts':str(ARTIFACT)}))
  finally:
   if app is not None and app.poll() is None:
    if window is not None:subprocess.run(['import','-window',window,str(ARTIFACT/'interaction-failure.png')],env=env,capture_output=True)
