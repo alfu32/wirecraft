@@ -313,8 +313,8 @@ impl C17 {
             );
         }
         emit_types(document, &scope, &mut out)?;
-        for id in &libraries {
-            let n = document.node(id)?;
+        for id in library_order(&libraries, &capabilities) {
+            let n = document.node(&id)?;
             out.authored(n, "source", &n.text.source, "");
         }
         // One exporter struct and one shared instance per library that is depended upon;
@@ -520,6 +520,38 @@ fn arguments(
         });
     }
     Ok(args)
+}
+/// Libraries in dependency order: a library linked into another library is emitted first,
+/// so its includes and declarations precede their use. Ties and cycles keep ID order.
+fn library_order(libraries: &BTreeSet<String>, capabilities: &[&Node]) -> Vec<String> {
+    let providers = |id: &str| {
+        capabilities
+            .iter()
+            .filter_map(|n| n.link.as_ref())
+            .filter(|l| l.target_node_id == id && libraries.contains(&l.source_node_id))
+            .map(|l| l.source_node_id.clone())
+            .collect::<BTreeSet<_>>()
+    };
+    let mut ordered = vec![];
+    let mut visiting = BTreeSet::new();
+    fn visit(
+        id: &str,
+        providers: &dyn Fn(&str) -> BTreeSet<String>,
+        visiting: &mut BTreeSet<String>,
+        ordered: &mut Vec<String>,
+    ) {
+        if ordered.iter().any(|o| o == id) || !visiting.insert(id.to_string()) {
+            return;
+        }
+        for provider in providers(id) {
+            visit(&provider, providers, visiting, ordered);
+        }
+        ordered.push(id.to_string());
+    }
+    for id in libraries {
+        visit(id, &providers, &mut visiting, &mut ordered);
+    }
+    ordered
 }
 fn parameters(args: &[Argument]) -> String {
     format!(
@@ -881,7 +913,13 @@ pub(crate) fn library_members(library: &Node) -> Vec<LibraryMember> {
             ][..],
         ),
     ] {
-        if source.contains(header) {
+        // Match the directive itself: `<sys/time.h>` must not imply `<time.h>`.
+        let directive = regex::Regex::new(&format!(
+            r#"(?m)^\s*#\s*include\s*[<"]{}[>"]"#,
+            regex::escape(header)
+        ))
+        .unwrap();
+        if directive.is_match(source) {
             for (result, name, parameters) in functions {
                 add(result, name, parameters);
             }

@@ -628,3 +628,160 @@ if (!done) { printf("first %d\n", math->maximum(2, 4)); done = 1; }"#,
     let (_, output) = build_run(d).await;
     assert_eq!(output, "first 4\nsecond 7\n");
 }
+
+#[test]
+fn libraries_are_emitted_after_the_libraries_they_depend_on() {
+    let mut d = project();
+    // ID order would place "a_http" before "z_base"; the library link must win.
+    let http = processor(
+        &mut d,
+        "a_http_lib",
+        "static int http_ready(void) { return EAGAIN_LIKE; }",
+    );
+    let base = processor(
+        &mut d,
+        "z_base_lib",
+        "#include <errno.h>\n#define EAGAIN_LIKE 11",
+    );
+    let link = d
+        .create_link(
+            "base",
+            Link {
+                source_node_id: base,
+                target_node_id: http.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    d.patch(&link, &json!({"link":{"interactionKind":"lib"}}))
+        .unwrap();
+    let worker = processor(&mut d, "worker", "(void)0;");
+    let used = d
+        .create_link(
+            "http",
+            Link {
+                source_node_id: http,
+                target_node_id: worker,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    d.patch(&used, &json!({"link":{"interactionKind":"lib"}}))
+        .unwrap();
+    let unit = C17::generate(&d, "root").unwrap().files[0].content.clone();
+    assert!(unit.find("#define EAGAIN_LIKE").unwrap() < unit.find("http_ready(void)").unwrap());
+}
+
+#[test]
+fn standard_header_members_follow_exact_include_directives() {
+    let mut d = project();
+    // <sys/time.h> and a comment mentioning time.h must not add time/localtime_r/strftime.
+    let library = processor(
+        &mut d,
+        "lib_clock",
+        "/* see time.h */\n#include <sys/time.h>\nint ticks(void) { return 1; }",
+    );
+    let worker = processor(&mut d, "worker", "(void)clock->ticks();");
+    let link = d
+        .create_link(
+            "clock",
+            Link {
+                source_node_id: library.clone(),
+                target_node_id: worker,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    d.patch(&link, &json!({"link":{"interactionKind":"lib"}}))
+        .unwrap();
+    let unit = C17::generate(&d, "root").unwrap().files[0].content.clone();
+    assert!(unit.contains("int (*ticks)(void);"));
+    assert!(!unit.contains("(*time)") && !unit.contains("(*strftime)"));
+    d.patch(
+        &library,
+        &json!({"text":{"source":"#include <time.h>\nint ticks(void) { return 1; }"}}),
+    )
+    .unwrap();
+    let unit = C17::generate(&d, "root").unwrap().files[0].content.clone();
+    assert!(unit.contains("(*strftime)"));
+}
+
+/// The bundled WebServer example compiles under strict C17 and serves its specified routes.
+#[test]
+fn webserver_example_serves_routes_fallbacks_and_shuts_down_after_its_limit() {
+    use std::io::{Read, Write};
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/webserver.orch");
+    let d = wirecraft_core::store::load(&path).unwrap();
+    let unit = C17::generate(&d, "root").unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join(&unit.files[0].path);
+    std::fs::write(&source, &unit.files[0].content).unwrap();
+    let exe = temp.path().join("webserver");
+    let built = std::process::Command::new("clang")
+        .args(["-std=c17", "-Wall", "-Wextra", "-pedantic", "-Werror"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&exe)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let mut server = std::process::Command::new(&exe)
+        .env("WEBSERVER_PORT", port.to_string())
+        .env("WEBSERVER_MAX_REQUESTS", "5")
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let exchange = |raw: &str| {
+        for _ in 0..100 {
+            if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) {
+                stream.write_all(raw.as_bytes()).unwrap();
+                let mut reply = String::new();
+                stream.read_to_string(&mut reply).unwrap();
+                return reply;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        panic!("server did not accept connections");
+    };
+    let about = exchange("GET /home/about?x=1 HTTP/1.1\r\nHost: test\r\n\r\n");
+    assert!(about.starts_with("HTTP/1.1 200 OK\r\n"), "{about}");
+    assert!(about.contains("Content-Length: 90\r\n") && about.ends_with("Wirecraft model.\n"));
+    let user = exchange("GET /api/user HTTP/1.1\r\n\r\n");
+    assert!(
+        user.contains("Content-Type: application/json\r\n") && user.contains("\"Ada Lovelace\"")
+    );
+    let missing = exchange("GET /missing HTTP/1.1\r\n\r\n");
+    assert!(missing.starts_with("HTTP/1.1 404") && missing.ends_with("404 Not Found: /missing\n"));
+    let post = exchange("POST /home/version HTTP/1.1\r\nContent-Length: 3\r\n\r\nabc");
+    assert!(post.starts_with("HTTP/1.1 405") && post.contains("Allow: GET, HEAD\r\n"));
+    let head = exchange("HEAD /home/version HTTP/1.1\r\n\r\n");
+    assert!(
+        head.contains("Content-Length: 32\r\n") && head.ends_with("\r\n\r\n"),
+        "{head}"
+    );
+    let status = server.wait().unwrap();
+    let mut log = String::new();
+    server
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_string(&mut log)
+        .unwrap();
+    assert!(status.success(), "{log}");
+    assert_eq!(
+        log.lines().filter(|l| l.starts_with("req-")).count(),
+        5,
+        "{log}"
+    );
+    assert!(log.contains("req-4 POST /home/version 405 "), "{log}");
+}
