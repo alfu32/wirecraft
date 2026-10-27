@@ -42,3 +42,5 @@ C bundles can be inspected/exported, but execution returns `unsupported` until C
 
 
 Manual desktop verification: open `examples/nodejs.orch` in an isolated `--state-dir`, choose Generate Project, select a new output path and run `node OUTPUT/hello_nodejs.js`. Then choose Export Compiler from Model Overrides, select another new directory and use its JSON bundle through the CLI example above. Check inspector Technology choices without changing a live project. One native Generate/execution succeeded here; repeated full dialog automation did not pass because GNOME's Wayland picker is outside X11 automation and a private GTK portal was intermittent. Native bundle-picker completion remains unverified; the corresponding real CLI/API/MCP path passed.
+
+The optimized Linux archive was unpacked into a temporary directory and all five `examples/` programs compiled/executed there, followed by Node bundle export/reuse. Installation includes those examples under `share/doc/wirecraft/examples`. The unchanged Go/PHP reference runtimes still print their shutdown-drain trace messages; these are retained behavior, unlike the earlier C17 opt-in trace correction.

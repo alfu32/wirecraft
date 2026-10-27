@@ -16,6 +16,36 @@
         "WIRECRAFT_TEST_PHP": "/tmp/wirecraft-toolchains/php",
         "WIRECRAFT_TEST_QJS": "/tmp/wirecraft-toolchains/quickjs-2026-06-04/qjs"
       }
+    },
+    "installedPackage": {
+      "package": "passed",
+      "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.6.0-linux-x86_64.tar.gz",
+      "installedBackend": true,
+      "mcpTools": 37,
+      "pdfExport": true,
+      "workbenchMcp": true,
+      "nativeC17Graph": true,
+      "generatedClangd": true,
+      "semanticTokensAndHover": true,
+      "installedStartup": false,
+      "installedGesture": false,
+      "installedFollowup": false,
+      "installedDesktop": false,
+      "installedWalkthrough": false,
+      "installedEditor": false,
+      "installedCanvas": false
+    },
+    "installedLanguages": {
+      "passed": [
+        "go",
+        "nodejs",
+        "kotlin",
+        "php",
+        "quickjs",
+        "portableBundleReuse"
+      ],
+      "workingDirectory": "isolated temporary directory outside checkout",
+      "details": "installed-languages.json"
     }
   },
   "realTools": {
@@ -48,5 +78,9 @@
     "Full capability/collection/layout parity",
     "Broader generated-body editor adapters and inline intelligence",
     "Windows/macOS packaging and clean-image installation"
-  ]
+  ],
+  "releaseBinarySha256": {
+    "wirecraft": "5b2a09671472833ac21128524efb4585aa56d20a77666628cbbc98c2f5f64c45",
+    "wirecraft-desktop": "2d573b8e8731f16c353ce8ffe98e7977a01fdc8a0fa1056cd350f21ee9599495"
+  }
 }

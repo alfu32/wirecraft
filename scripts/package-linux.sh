@@ -20,6 +20,7 @@ install -m644 vendor/gpui-component/LICENSE-APACHE "$stage/$package/share/doc/wi
 install -m644 vendor/gpui-component/WIRECRAFT-PATCH.md "$stage/$package/share/doc/wirecraft/gpui-component-patches.md"
 install -m644 README.md "$stage/$package/share/doc/wirecraft/"
 cp -R docs/migration "$stage/$package/share/doc/wirecraft/"
+cp -R examples "$stage/$package/share/doc/wirecraft/"
 install -m755 scripts/install-linux.sh "$stage/$package/install.sh"
 tar -C "$stage" -czf "dist/$package.tar.gz" "$package"
 (cd dist && sha256sum "$package.tar.gz") > "dist/$package.tar.gz.sha256"
