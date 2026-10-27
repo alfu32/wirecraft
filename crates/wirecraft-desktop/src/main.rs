@@ -166,6 +166,8 @@ struct Wirecraft {
     submitted_revision: Option<u64>,
     menu: Option<String>,
     context_origin: Option<Point<Pixels>>,
+    /// Window-space bounds of menubar labels, measured during paint, for dropdown anchoring.
+    menu_anchors: Rc<std::cell::RefCell<std::collections::BTreeMap<&'static str, Bounds<Pixels>>>>,
     query: Entity<InputState>,
     palette_index: usize,
     palette_scroll: ScrollHandle,
@@ -329,6 +331,7 @@ impl Wirecraft {
             submitted_revision: None,
             menu: None,
             context_origin: None,
+            menu_anchors: Rc::default(),
             query,
             palette_index: 0,
             palette_scroll: ScrollHandle::new(),
@@ -1425,10 +1428,10 @@ impl Wirecraft {
 }
 /// Marks the current mode or an enabled toggle with the accent fill.
 fn active(button: Stateful<Div>, on: bool) -> Stateful<Div> {
+    // `button` already owns the hover style; GPUI panics if a second one is set.
     button.when(on, |b| {
         b.bg(crate::chrome::color(0x255452))
             .text_color(crate::chrome::color(0x70d5c6))
-            .hover(|s| s.bg(crate::chrome::color(0x257e81)))
     })
 }
 fn button(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Stateful<Div> {
