@@ -474,7 +474,8 @@ impl Wirecraft {
                 }
                 if (command == "threadwork.update_entity" || command == "file.commit_and_save")
                     && commit
-                    && value["entity"]["id"].as_str() == self.selected.first().map(String::as_str)
+                    && let Some(id) = value["entity"]["id"].as_str()
+                    && self.selected.first().map(String::as_str) == Some(id)
                 {
                     self.base_name = value["entity"]["name"].as_str().unwrap_or("").into();
                     self.base_text = value["entity"]["text"][&self.section]
@@ -495,7 +496,9 @@ impl Wirecraft {
                         "diagnostics",
                         "statusChanges",
                     ] {
-                        props.as_object_mut().unwrap().remove(k);
+                        if let Some(props) = props.as_object_mut() {
+                            props.remove(k);
+                        }
                     }
                     if value["entity"]["id"] == self.snapshot.document.root_node_id {
                         props["masterRevision"] = value
