@@ -2,20 +2,33 @@
 
 Status: specification, not implemented. This is a Wirecraft extension beyond the Threadworks 2.6.7 baseline.
 
-A design becomes a reusable component by linking some of its entities to the **Exterior**, the outside world. Another design uses it by placing a **Reference** to it and linking to the ports the Exterior links publish. Links keep encoding their ports. Nothing is a port unless a link makes it one, and every link keeps both endpoints.
+A design becomes a reusable component by linking some of its entities to the **Exterior**, the outside world, drawn as circles. Another design uses it by placing a **Reference** to it and linking to the ports the Exterior links publish. Links keep encoding their ports. Nothing is a port unless a link makes it one, and every link keeps both endpoints.
 
 ## Exterior
 
 An Exterior is a node of kind `Node` with `stereotype: "Exterior"`, placed directly under the design root.
 
-- **One logical entity, many placements.** Every Exterior node in a design stands for the same outside world. Several placements let each port's link stay short, like off-page connectors in a schematic. Each placement has its own layout. No identifier links the placements: in this version a design has exactly one exterior.
-- **Published ports.** A link from an entity to an Exterior publishes an **output port**. A link from an Exterior to an entity publishes an **input port**. The port's name is the link's name, and its type is the link's type.
+- **One logical entity, one placement per port.** Every Exterior node in a design stands for the same outside world, like an off-page connector in a schematic. No identifier links the placements: in this version a design has exactly one exterior.
+- **Exactly one link per placement.** Each placement is the endpoint of exactly one link, and that link is the published port:
+  - A link from an entity to an Exterior publishes an **output port**.
+  - A link from an Exterior to an entity publishes an **input port**.
+
+  The port's name is the link's name, and its type is the link's type.
+- **Derived name.** An Exterior has no name of its own. Its name is derived from its link: `<link-name>In` for an input port (the Exterior is the link's source) and `<link-name>Out` for an output port (the Exterior is the link's target).
+  - The name is stored so that other tools and the Threadworks app see a meaningful name. Wirecraft rewrites it whenever the link is renamed or reversed.
+  - The inspector shows the name read-only; renaming is done on the link.
+  - A placement without a link has no name yet and is a validation error, so the canvas offers it only while a link is being drawn.
 - **Rules** (each is a validation error):
   - An Exterior has no source, initialization, tests or technology, and is never emitted or initialized.
   - It cannot be the endpoint of a library or dependency link, of a self-link, or of a link whose other end is also an Exterior.
-  - Port identity is name plus direction. It must be unique across all placements, and every Exterior link needs an explicit type.
+  - Derived names must be unique, so a design cannot publish two input ports (or two output ports) with the same name. Every Exterior link needs an explicit type.
   - An Exterior may appear only directly under the root. Composite boundaries keep their existing boundary ports.
-- **Drawing.** A compact glyph labelled `exterior`, with one routed port per link, using ordinary routing.
+- **Drawing.** An Exterior is a circle, not a box, so it reads as the open connection to the outside:
+  - **Size and stroke.** Diameter 28 world units with a heavier stroke than entity boxes. It stays clearly distinct from the small hollow via circles that mark unconnected crossings.
+  - **Cap.** The circle carries the port cap of the link end it hosts, on the rim facing its link, mirrored by side like any other port (see `core::drawing::port_glyphs`). An input Exterior shows the hollow output cap, because the link starts there. An output Exterior shows the filled, notched input cap, because the link ends there.
+  - **Direction mark.** Inside the circle, a chevron points along the flow: away from the link side for an output, toward it for an input. This keeps the direction readable when zoomed out, below the cap's legible size.
+  - **Label.** The derived name is drawn beside the circle, opposite the link side, together with the port type.
+  - **Routing.** The single link leaves the side facing its counterpart and is routed normally. Moving the circle around the counterpart flips the side and mirrors the cap.
 
 A design containing Exterior links is a **component**. It validates on its own, but it compiles to a program only through a Reference, because its output ports have nowhere to go. A future harness may bind Exterior ports to stdin/stdout or files so a component can run standalone. That harness is not part of this version.
 
@@ -74,8 +87,8 @@ Links inside the component:
 
 | Link | From → To | Role |
 | --- | --- | --- |
-| `request` | `socket_accept` → Exterior | **Output port** (ReqRep): accepted requests |
-| `response` | Exterior → `socket_respond` | **Input port** (ReqRep): completed responses, fan-in |
+| `request` | `socket_accept` → Exterior `requestOut` | **Output port** (ReqRep): accepted requests |
+| `response` | Exterior `responseIn` → `socket_respond` | **Input port** (ReqRep): completed responses, fan-in |
 | `rendered` | `socket_respond` → `socket_accept` | Responses with rendered headers (renamed from `response`) |
 | `awaitResponseLoop` | `socket_accept` → `socket_accept` | Pending requests, unchanged |
 | `platform`, `libhttp` | library links | Unchanged |
@@ -90,12 +103,12 @@ The consumer design, which is the current example minus the component, contains:
 
 The path is the same 5 hops as today: `socket_accept` → `router` → route → `socket_respond` → `socket_accept`.
 
-The standard WebServer design, offered as an archetype, is the component alone: `socket_accept`, `socket_respond`, their types and libraries, and two Exterior placements.
+The standard WebServer design, offered as an archetype, is the component alone: `socket_accept`, `socket_respond`, their types and libraries, and the two Exterior circles `requestOut` and `responseIn`.
 
 ## First implementation slice
 
 1. Model and validation for Exterior and Reference nodes, Reference link port checks, and diagnostics for missing or changed files.
-2. Drawing: the Exterior glyph, Reference boxes with projected ports, and port choice when a link is dropped.
+2. Drawing: the Exterior circle with its cap, direction chevron and derived label, Reference boxes with projected ports, and port choice when a link is dropped.
 3. Expansion in `wirecraft-core`, used by the C17 emitter first. Template compilers follow once their composite boundary channels are migrated.
 4. The WebServer split into `examples/webserver-component.orch` and `examples/webserver.orch` (consumer). The existing end-to-end HTTP test runs against the consumer.
 5. Pending after the slice: per-instance state, the standalone harness, a splitter archetype, and Exterior inside composites.
