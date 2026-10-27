@@ -1590,10 +1590,23 @@ impl Render for Wirecraft {
                                             cx.notify();
                                         }
                                     }))
-                                    .child(if composite {
-                                        if collapsed { "▸" } else { "▾" }
-                                    } else {
-                                        ""
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    // Boxed +/− expander for composites, as in classic trees.
+                                    .when(composite, |toggle| {
+                                        toggle.child(
+                                            div()
+                                                .size(px(11.))
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .border_1()
+                                                .border_color(crate::chrome::color(0x8a9aab))
+                                                .text_size(px(10.))
+                                                .line_height(px(10.))
+                                                .child(if collapsed { "+" } else { "−" }),
+                                        )
                                     }),
                             )
                             .child(icons::icon(if kind == wirecraft_core::NodeKind::Type {
