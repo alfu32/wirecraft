@@ -62,6 +62,9 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                 if name == "wirecraft.workbench" {
                     let operation = arguments["operation"].as_str().unwrap_or("");
                     let command = match operation {
+                        "compile_project" => "compile.project",
+                        "compiler_templates" => "compiler.templates",
+                        "export_compiler" => "compiler.export",
                         "editor_context" => "editor.context",
                         "complete" => "editor.complete",
                         "semantic_tokens" => "editor.tokens",

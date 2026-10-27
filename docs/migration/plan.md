@@ -32,3 +32,8 @@ The 0.4.0 checkpoint also includes compiler-context C17 Ctrl-Space completion, c
 ## Evidence-driven corrective slice (0.5.0)
 
 Before the next source-capability/compiler milestone, implement and verify photos 026–042: assembled technical sheets, all-command scrolling context menu and nested archetypes, grammar registration/full-program semantic colors, callable signatures and hover, dependency callouts, separated octilinear routes and composite ports, pointer release/window-edge hitboxes, and warning/error badges plus a clickable issue list. Acceptance includes the unchanged supplied ticker and an isolated WebServer topology, real clangd/MCP, native menu insertion/undo and typed editor interaction, and installed Linux package checks. The currently reachable JVM 2.6.7 MCP was consulted using read-only calls; advertised schemas and results are under baseline/jvm-live-2026-10-27. This supersedes the earlier connection-refused limitation without changing the original project.
+
+
+## Compiler/template restoration (0.6.0)
+
+The user's missing-language inventory takes precedence over the remaining C source-capability slice. Acceptance: embed and checksum all six original template sets; parse every Pebble asset; connect graph generation, template catalog and portable model-override export to CLI, desktop and MCP; execute isolated Go/Node/Kotlin/PHP/QuickJS producer/channel/consumer programs; verify both relevant file layouts, source maps, custom bundle round trips, unsafe paths and malformed templates. Keep broader parity explicit. Continue with C source capabilities/overrides, template composite boundary ports, aggregate mixed-language dispatch, remaining collections and generated-body editor adapters; do not equate asset import with full migration.

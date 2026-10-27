@@ -1,0 +1,29 @@
+{
+  "id": "wirecraft-example-nodejs",
+  "name": "hello-nodejs",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "hello_nodejs",
+      "kind": "Node",
+      "children": [
+        "worker"
+      ],
+      "technology": {
+        "languageId": "javascript",
+        "technologyId": "nodejs"
+      },
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "id": "worker",
+      "name": "print_once",
+      "kind": "Processor",
+      "parentId": "root",
+      "text": {
+        "source": "if (threadworkRunner.isRunning()) { console.log(\"Hello from Wirecraft Node.js\"); threadworkRunner.shutdownRequest(); }"
+      }
+    }
+  ]
+}

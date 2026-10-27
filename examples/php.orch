@@ -1,0 +1,29 @@
+{
+  "id": "wirecraft-example-php",
+  "name": "hello-php",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "hello_php",
+      "kind": "Node",
+      "children": [
+        "worker"
+      ],
+      "technology": {
+        "languageId": "php",
+        "technologyId": "php"
+      },
+      "fileLayoutStrategyId": "direct-file-system-homomorphism"
+    },
+    {
+      "id": "worker",
+      "name": "print_once",
+      "kind": "Processor",
+      "parentId": "root",
+      "text": {
+        "source": "if (threadwork_runner()->isRunning()) { echo \"Hello from Wirecraft PHP\\n\"; threadwork_runner()->shutdownRequest(); }"
+      }
+    }
+  ]
+}

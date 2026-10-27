@@ -245,6 +245,44 @@ impl Service {
                     Ok(json!({"scope":"document","metadata":self.document.metadata}))
                 };
             }
+            "compiler.templates" => {
+                return if let Some(id) = a["templateSet"].as_str() {
+                    Ok(serde_json::to_value(
+                        wirecraft_core::templates::TemplateSet::builtin(id)?,
+                    )?)
+                } else {
+                    Ok(wirecraft_core::templates::TemplateSet::catalog())
+                };
+            }
+            "compiler.export" => {
+                let bundle = wirecraft_core::compiler::export_bundle(
+                    &self.document,
+                    a["templateSet"].as_str(),
+                )?;
+                let project = wirecraft_core::generation::GeneratedProject {
+                    name: self.document.project_name().into(),
+                    capability: "portable-compiler-bundle".into(),
+                    files: vec![wirecraft_core::generation::VirtualFile {
+                        path: "compiler.wirecompiler.json".into(),
+                        content: serde_json::to_string_pretty(&bundle)?,
+                        binary_content: None,
+                        source_map: vec![],
+                    }],
+                };
+                if let Some(output) = a["outputDir"].as_str() {
+                    crate::generation::write(&project, Path::new(output))?;
+                }
+                return Ok(serde_json::to_value(project)?);
+            }
+            "compile.project" => {
+                let root = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
+                let options = serde_json::from_value(a.clone())?;
+                let project = wirecraft_core::compiler::generate(&self.document, root, options)?;
+                if let Some(output) = a["outputDir"].as_str() {
+                    crate::generation::write(&project, Path::new(output))?;
+                }
+                return Ok(serde_json::to_value(project)?);
+            }
             "compile.c17" => {
                 let root = a["nodeId"].as_str().unwrap_or(&self.document.root_node_id);
                 let project = wirecraft_core::c17::C17::generate(&self.document, root)?;
@@ -406,9 +444,22 @@ impl Service {
             }
             "analyze_network" => return Ok(self.document.network_counts()),
             "list_technologies" => {
-                return Ok(
-                    json!({"technologies":[{"compilerId":"c-compiler","compilerName":"C17 topology (data/error flow, types, library declarations)","languageId":"c","technologyId":"c-native"},{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"file-export"},{"compilerId":"multi-tech","compilerName":"Literal filesystem export (graph compilers pending)","languageId":"any","technologyId":"multi-tech"}],"languageServers":[{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}],"note":"C17 source/runnable capabilities and template overrides remain pending; other language graph compilers are pending. External build and LSP services are separate."}),
+                let mut catalog = wirecraft_core::templates::TemplateSet::catalog();
+                catalog["technologies"] = json!([
+                    {"compilerId":"c-compiler","compilerName":"C17 graph compiler","languageId":"c","technologyId":"c-native"},
+                    {"compilerId":"go-compiler","compilerName":"Go templates","languageId":"go","technologyId":"go"},
+                    {"compilerId":"naive-kotlin","compilerName":"Kotlin templates","languageId":"kotlin","technologyId":"kotlin-jvm"},
+                    {"compilerId":"nodejs-compiler","compilerName":"Node.js templates","languageId":"javascript","technologyId":"nodejs"},
+                    {"compilerId":"php-compiler","compilerName":"PHP templates","languageId":"php","technologyId":"php"},
+                    {"compilerId":"quickjs-compiler","compilerName":"QuickJS templates","languageId":"javascript","technologyId":"quickjs"},
+                    {"compilerId":"generic","compilerName":"Model-defined templates","languageId":"any","technologyId":"compiler-template-set"},
+                    {"compilerId":"multi-tech","compilerName":"Literal filesystem export","languageId":"any","technologyId":"file-export"},
+                    {"compilerId":"multi-tech","compilerName":"Literal filesystem export","languageId":"any","technologyId":"multi-tech"}]);
+                catalog["languageServers"] = json!([{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}]);
+                catalog["note"] = json!(
+                    "Template generation is separate from tool availability and editor intelligence. Representative Go/Node/Kotlin/PHP/QuickJS dataflows are tested; execution requires their external tools. C17 model-template overrides and source/runnable capabilities remain pending. See docs/migration/compiler-templates.md for verified scope."
                 );
+                return Ok(catalog);
             }
             "get_command_catalog" => return Ok(command_catalog()),
             "execute_command" => {

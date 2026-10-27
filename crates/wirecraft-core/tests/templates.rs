@@ -39,3 +39,25 @@ fn pebble_branches_legacy_placeholders_and_graph_overrides_are_preserved() {
     assert_eq!(set.roles["processor.declaration"], "custom {{node.name}}");
     assert!(templates::render("{% if x %}", &json!({})).is_err());
 }
+
+#[test]
+fn rendered_output_is_bounded_and_overrides_are_case_insensitive() {
+    assert!(templates::render("{{ 'x' * 17000000 }}", &json!({})).is_err());
+    let mut d = Document::new("case");
+    let id = d
+        .create("root", "@processor_declaration", NodeKind::Processor)
+        .unwrap();
+    d.patch(&id, &json!({"text":{"source":"case-insensitive"}}))
+        .unwrap();
+    let mut set = TemplateSet::builtin("go").unwrap();
+    set.overlay(&d).unwrap();
+    assert_eq!(set.roles["processor.declaration"], "case-insensitive");
+    for name in ["go", "nodejs", "kotlin", "php", "quickjs"] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("../../examples/{name}.orch"));
+        let d = wirecraft_core::store::load(&path).unwrap();
+        let generated =
+            wirecraft_core::compiler::generate(&d, &d.root_node_id, Default::default()).unwrap();
+        assert!(!generated.files.is_empty());
+    }
+}

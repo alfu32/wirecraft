@@ -1,0 +1,29 @@
+{
+  "id": "wirecraft-example-go",
+  "name": "hello-go",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "hello_go",
+      "kind": "Node",
+      "children": [
+        "worker"
+      ],
+      "technology": {
+        "languageId": "go",
+        "technologyId": "go"
+      },
+      "fileLayoutStrategyId": "single-file"
+    },
+    {
+      "id": "worker",
+      "name": "print_once",
+      "kind": "Processor",
+      "parentId": "root",
+      "text": {
+        "source": "if threadworkRunner.IsRunning() { fmt.Println(\"Hello from Wirecraft Go\"); threadworkRunner.ShutdownRequest() }"
+      }
+    }
+  ]
+}

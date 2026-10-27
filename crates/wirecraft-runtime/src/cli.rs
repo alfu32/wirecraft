@@ -4,13 +4,13 @@ use crate::{
     service::{Request, Service},
 };
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use wirecraft_core::{Document, store};
 pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let mode = args.next().unwrap_or_else(|| "help".into());
     if mode == "help" || mode == "--help" {
         println!(
-            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
+            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY [--template-set ID] [--layout ID] [--compiler BUNDLE.json]\nwirecraft templates [ID]\nwirecraft export-compiler PROJECT.orch OUTPUT_DIRECTORY [TEMPLATE_SET]\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
@@ -47,15 +47,53 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
         );
         let document = store::load(&source)?;
         let root = document.root_node_id.clone();
-        let project = if document.effective(&root, "technologyId") == "c-native" {
-            wirecraft_core::c17::C17::generate(&document, &root)?
-        } else {
-            wirecraft_core::generation::literal_files(&document, &root)?
-        };
+        let mut options = wirecraft_core::compiler::CompileOptions::default();
+        while let Some(flag) = args.next() {
+            let value = args
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("Missing value for {flag}"))?;
+            match flag.as_str() {
+                "--template-set" => options.template_set = Some(value),
+                "--layout" => options.layout = Some(value),
+                "--compiler" => {
+                    options.bundle = Some(serde_json::from_str(&std::fs::read_to_string(value)?)?)
+                }
+                _ => anyhow::bail!("Unknown compile option {flag}"),
+            }
+        }
+        let project = wirecraft_core::compiler::generate(&document, &root, options)?;
         crate::generation::write(&project, &output)?;
         println!(
             "{}",
             json!({"generated":true,"files":project.files.len(),"capability":project.capability,"outputDir":output})
+        );
+        return Ok(());
+    }
+    if mode == "templates" {
+        let value = if let Some(id) = args.next() {
+            serde_json::to_value(wirecraft_core::templates::TemplateSet::builtin(&id)?)?
+        } else {
+            wirecraft_core::templates::TemplateSet::catalog()
+        };
+        println!("{}", serde_json::to_string_pretty(&value)?);
+        return Ok(());
+    }
+    if mode == "export-compiler" {
+        let source = args
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Missing project path"))?;
+        let output = args
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Missing bundle output directory"))?;
+        let template_set = args.next();
+        let mut service = Service::new(store::load(Path::new(&source))?, None);
+        let value = service.execute(Request::new(
+            "compiler.export",
+            json!({"templateSet":template_set,"outputDir":output}),
+        ))?;
+        println!(
+            "{}",
+            json!({"generated":true,"capability":value["capability"],"outputDir":output})
         );
         return Ok(());
     }

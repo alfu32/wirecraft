@@ -235,6 +235,44 @@ impl TemplateSet {
     }
 }
 fn override_role(name: &str) -> String {
+    let normalized = name
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+    for subject in [
+        "node",
+        "processor",
+        "group",
+        "type",
+        "link",
+        "note",
+        "generator",
+        "transformer",
+        "sink",
+        "service-library",
+        "composite-worker",
+        "composite-error-handler",
+        "error-handler",
+        "test-suite",
+    ] {
+        for phase in [
+            "declaration",
+            "instantiation",
+            "hoisted-declaration",
+            "forward-declaration",
+        ] {
+            let key = format!("{subject}.{phase}");
+            if key
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric())
+                .collect::<String>()
+                == normalized
+            {
+                return key;
+            }
+        }
+    }
     let token = kebab(name);
     for (old, new) in [
         ("-hoisted-declaration", ".hoisted-declaration"),
@@ -259,6 +297,9 @@ fn override_role(name: &str) -> String {
         "project-name" => "project.name",
         "processor" => "processor.declaration",
         "node" => "node.declaration",
+        "group" => "group.declaration",
+        "type" => "type.declaration",
+        "note" => "note.declaration",
         "link" => "link.declaration",
         _ => &token,
     }

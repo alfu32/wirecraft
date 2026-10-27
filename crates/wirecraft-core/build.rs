@@ -25,7 +25,10 @@ fn main() {
         {
             text.push_str(&format!(
                 "({:?},include_str!({:?})),\n",
-                p.strip_prefix(root).unwrap().to_string_lossy(),
+                p.strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/"),
                 p.canonicalize().unwrap()
             ));
         }

@@ -284,7 +284,14 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "generate",
         group: "Generate",
-        label: "Generate C17 Project",
+        label: "Generate Project (effective technology)",
+        shortcut: "",
+        icon: "code",
+    },
+    Command {
+        id: "compiler-export",
+        group: "Generate",
+        label: "Export Compiler from Model Overrides…",
         shortcut: "",
         icon: "code",
     },
@@ -494,7 +501,8 @@ impl Wirecraft {
             "export" => self.show_export(&ShowExport, w, cx),
             "options" => self.show_options(&ShowOptions, w, cx),
             "palette" => self.palette(&CommandPalette, w, cx),
-            "generate" => self.artifact_dialog("c17", w, cx),
+            "generate" => self.artifact_dialog("project", w, cx),
+            "compiler-export" => self.artifact_dialog("compiler", w, cx),
             "files" => self.artifact_dialog("files", w, cx),
             "archetype" => self.artifact_dialog("archetype", w, cx),
             "mcp" => {

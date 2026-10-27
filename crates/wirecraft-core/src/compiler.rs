@@ -87,7 +87,29 @@ pub fn generate(d: &Document, root: &str, options: CompileOptions) -> Result<Gen
         .template_set
         .as_deref()
         .unwrap_or_else(|| template_set_id(&tech));
+    if options.bundle.as_ref().is_some_and(|b| b.id == "c") {
+        return Err(Error::new(
+            "unsupported",
+            "C template-bundle execution is pending; use the typed C17 compiler",
+        ));
+    }
     if options.bundle.is_none() && id == "c" {
+        if options
+            .layout
+            .as_deref()
+            .is_some_and(|l| l != "single-file")
+        {
+            return Err(Error::new("unsupported", "C17 supports single-file layout"));
+        }
+        if d.nodes
+            .values()
+            .any(|n| n.name.starts_with('@') && !n.name.eq_ignore_ascii_case("@StaticFile"))
+        {
+            return Err(Error::new(
+                "unsupported",
+                "C17 model-template overrides are pending; explicit C17 generation does not apply templates",
+            ));
+        }
         return crate::c17::C17::generate(d, root);
     }
     if options.bundle.is_none() && id == "literal" {
@@ -136,6 +158,45 @@ pub fn generate(d: &Document, root: &str, options: CompileOptions) -> Result<Gen
             source_map: vec![],
         });
     }
+    // Static companions bypass role rendering and remain files even in single-file graphs.
+    for id in d.descendants(root) {
+        let n = d.node(&id)?;
+        if n.name.eq_ignore_ascii_case("@StaticFile") || plan.set.static_files.contains(&n.name) {
+            let path = n
+                .metadata
+                .get("path")
+                .or_else(|| n.metadata.get("file"))
+                .cloned()
+                .unwrap_or_else(|| n.name.trim_start_matches('@').into());
+            let content = if n.text.source.is_empty() {
+                n.text.specification.clone()
+            } else {
+                n.text.source.clone()
+            };
+            let end = content.lines().count();
+            files.push(VirtualFile {
+                path,
+                content,
+                binary_content: n.binary_content.clone(),
+                source_map: if end == 0 {
+                    vec![]
+                } else {
+                    vec![SourceMap {
+                        node_id: n.id.clone(),
+                        section: if n.text.source.is_empty() {
+                            "specification".into()
+                        } else {
+                            "source".into()
+                        },
+                        generated_start_line: 1,
+                        generated_end_line: end,
+                        source_start_line: 1,
+                        generated_column_offset: 0,
+                    }]
+                },
+            });
+        }
+    }
     files.extend(crate::generation::file_exports(d, root)?);
     let mut paths = BTreeSet::new();
     let mut bytes = 0usize;
@@ -171,6 +232,12 @@ impl Plan<'_> {
                 value
             }
         });
+        // Accept identifiers emitted by earlier Wirecraft inspector versions.
+        let value = match value.as_str() {
+            "direct-filesystem" => "direct-file-system-homomorphism".into(),
+            "classified" => "classified-filesystem".into(),
+            _ => value,
+        };
         if ![
             "single-file",
             "direct-file-system-homomorphism",
@@ -206,6 +273,8 @@ impl Plan<'_> {
         let layout = self.layout(&n)?;
         let path = self.path(&n, &layout)?;
         let skipped = (n.name.starts_with('@') && !n.name.eq_ignore_ascii_case("@StaticFile"))
+            || self.set.static_files.contains(&n.name)
+            || n.name.eq_ignore_ascii_case("@StaticFile")
             || self.d.effective(id, "technologyId") == "file-export"
             || relation(self.d, &n) == Some(Relation::TypeUsage);
         if skipped {
@@ -222,6 +291,33 @@ impl Plan<'_> {
             };
             self.artifacts.insert(id.into(), artifact.clone());
             return Ok(artifact);
+        }
+        if !n.is_link()
+            && n.id != self.root
+            && n.kind != NodeKind::Note
+            && self.options.template_set.is_none()
+            && self.options.bundle.is_none()
+        {
+            let technology = self.d.effective(id, "technologyId");
+            if technology != self.set.technology {
+                return Err(Error::new(
+                    "unsupported",
+                    format!(
+                        "Mixed technology '{}' inside {} requires aggregate compiler delegation",
+                        technology, self.set.technology
+                    ),
+                ));
+            }
+        }
+        if let Some(link) = &n.link
+            && !capability(self.d, &n)
+            && (self.d.node(&link.source_node_id)?.parent_id != n.parent_id
+                || self.d.node(&link.target_node_id)?.parent_id != n.parent_id)
+        {
+            return Err(Error::new(
+                "unsupported",
+                "Template compiler composite boundary channels are not migrated yet",
+            ));
         }
         // Supplier products must be available before rendering capability links.
         if let Some(link) = &n.link
@@ -341,13 +437,6 @@ impl Plan<'_> {
         if self.set.id == "kotlin" && layout != "single-file" {
             declaration =
                 declaration.replacen("import generated.RuntimeContext", "import generated.*", 1);
-        }
-        if self.set.id == "generic" && n.name.eq_ignore_ascii_case("@StaticFile") {
-            declaration = if n.text.source.is_empty() {
-                n.text.specification.clone()
-            } else {
-                n.text.source.clone()
-            };
         }
         let mut files = vec![];
         if !n.is_link() && !declaration.trim().is_empty() {
@@ -522,11 +611,17 @@ impl Plan<'_> {
                 })
                 .collect::<Vec<_>>()
         };
-        let child_views = artifact_views(children);
+        let child_views = artifact_views(
+            &children
+                .iter()
+                .filter(|a| !a.declaration.is_empty())
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
         let link_views = artifact_views(links);
         let inline = children
             .iter()
-            .filter(|a| a.layout == "single-file")
+            .filter(|a| a.layout == "single-file" && !a.declaration.is_empty())
             .map(|a| a.declaration.as_str())
             .collect::<Vec<_>>()
             .join("\n\n");
@@ -686,29 +781,31 @@ impl Plan<'_> {
         for (i, line) in content.lines().enumerate() {
             let trim = line.trim();
             if let Some(rest) = trim.strip_prefix("// wirecraft-source:")
-                && let Some((token, phase)) = rest.rsplit_once(':') {
-                    if phase == "begin" {
-                        if let Some((id, section)) = token.rsplit_once(':') {
-                            pending = Some((
-                                id.to_string(),
-                                section.to_string(),
-                                i + 2,
-                                line.len() - line.trim_start().len(),
-                            ));
-                        }
-                    } else if phase == "end"
-                        && let Some((id, section, start, offset)) = pending.take()
-                            && start <= i {
-                                maps.push(SourceMap {
-                                    node_id: id,
-                                    section,
-                                    generated_start_line: start,
-                                    generated_end_line: i,
-                                    source_start_line: 1,
-                                    generated_column_offset: offset,
-                                });
-                            }
+                && let Some((token, phase)) = rest.rsplit_once(':')
+            {
+                if phase == "begin" {
+                    if let Some((id, section)) = token.rsplit_once(':') {
+                        pending = Some((
+                            id.to_string(),
+                            section.to_string(),
+                            i + 2,
+                            line.len() - line.trim_start().len(),
+                        ));
+                    }
+                } else if phase == "end"
+                    && let Some((id, section, start, offset)) = pending.take()
+                    && start <= i
+                {
+                    maps.push(SourceMap {
+                        node_id: id,
+                        section,
+                        generated_start_line: start,
+                        generated_end_line: i,
+                        source_start_line: 1,
+                        generated_column_offset: offset,
+                    });
                 }
+            }
         }
         maps
     }
@@ -771,10 +868,9 @@ fn relative(from: &str, to: &str, module: bool) -> String {
     let mut parts = vec![".."; from.len() - common];
     parts.extend_from_slice(&to[common..]);
     let mut value = parts.join("/");
-    if module
-        && let Some(i) = value.rfind('.') {
-            value.truncate(i);
-        }
+    if module && let Some(i) = value.rfind('.') {
+        value.truncate(i);
+    }
     if !value.starts_with('.') {
         value = format!("./{value}");
     }

@@ -1,0 +1,29 @@
+{
+  "id": "wirecraft-example-kotlin",
+  "name": "hello-kotlin",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "hello_kotlin",
+      "kind": "Node",
+      "children": [
+        "worker"
+      ],
+      "technology": {
+        "languageId": "kotlin",
+        "technologyId": "kotlin-jvm"
+      },
+      "fileLayoutStrategyId": "source-set"
+    },
+    {
+      "id": "worker",
+      "name": "print_once",
+      "kind": "Processor",
+      "parentId": "root",
+      "text": {
+        "source": "if (threadworkRunner.isRunning()) { println(\"Hello from Wirecraft Kotlin\"); threadworkRunner.shutdownRequest() }"
+      }
+    }
+  ]
+}

@@ -37,7 +37,7 @@ For headless stdio clients, use the built executable (stdout contains protocol o
 
 For HTTP, `wirecraft serve` prints one JSON readiness record containing `endpoint`, `mcp`, and `token`; send `Authorization: Bearer <token>` to `/mcp`, `/api`, or `/events`. The backend binds only `127.0.0.1`, defaults to an OS-selected port, rejects browser Origin requests, and leaves the old server alone. `/health` is a non-mutating liveness route. Explicit `--port` and `--token` are available; `--recovery FILE` opts into recovery storage.
 
-An API request is `{"command":"threadwork.get_design","arguments":{}}`. Mutations can add `"expectedRevision": 3` to reject stale updates. `/events` is an authenticated SSE stream; reconnecting clients must reload a snapshot after a resync event. `file.open`, `file.save`, `edit.undo`, `edit.redo` and document commands share this contract. Errors carry a stable code and message. MCP retains the original 19 tool schemas and adds 18 Wirecraft tools for project files, graph fragments, archetypes, reports, exports, literal/C17 generation, mapped graph diagnostics, LSP and build jobs. `wirecraft.workbench` exposes sheet/document previews and exports, clipboard prompts, settings, MCP controls and printers through the same services. Unavailable commands and graph compilers return explicit limitations.
+An API request is `{"command":"threadwork.get_design","arguments":{}}`. Mutations can add `"expectedRevision": 3` to reject stale updates. `/events` is an authenticated SSE stream; reconnecting clients must reload a snapshot after a resync event. `file.open`, `file.save`, `edit.undo`, `edit.redo` and document commands share this contract. Errors carry a stable code and message. MCP retains the original 19 tool schemas and adds 18 Wirecraft tools for project files, graph fragments, archetypes, reports, exports, graph-template/literal/C17 generation, mapped graph diagnostics, LSP and build jobs. `wirecraft.workbench` exposes sheet/document previews and exports, clipboard prompts, settings, MCP controls and printers through the same services. Unavailable commands and graph compilers return explicit limitations.
 
 ## Reusable workflows, reports and exports
 
@@ -49,9 +49,23 @@ AI Support copies source/specification/test prompts with component dossiers and 
 
 Literal filesystem generation supports `file-export` / `multi-tech` entities, text/binary files, relative `metadata.path` or `metadata.file`, hierarchy directories and origin maps. It rejects unmigrated language graph technologies and unsafe/colliding paths. The output directory must be new or empty; generation never merges into a nonempty user directory. `generate.files` optionally takes `nodeId` and `outputDir`; omitting the output returns the virtual files for inspection.
 
+## Compiler template sets
+
+**Generate → Generate Project (effective technology)** supports C17, Go, Kotlin, Node.js, PHP and QuickJS. Choose the language and technology in the inspector and Apply; inherited settings apply to descendants. Templates are embedded, so no source checkout is needed. [Compiler scope and compatibility](docs/migration/compiler-templates.md) distinguishes tested workflows from remaining parity.
+
+```sh
+cargo run -p wirecraft-runtime -- templates
+cargo run -p wirecraft-runtime -- compile examples/nodejs.orch /tmp/wirecraft-nodejs-example
+node /tmp/wirecraft-nodejs-example/hello_nodejs.js
+cargo run -p wirecraft-runtime -- export-compiler examples/nodejs.orch /tmp/wirecraft-nodejs-compiler
+cargo run -p wirecraft-runtime -- compile examples/nodejs.orch /tmp/wirecraft-custom-example --compiler /tmp/wirecraft-nodejs-compiler/compiler.wirecompiler.json
+```
+
+Five runnable graph examples are in `examples/`: Go (`go build`), Node.js (`node`), Kotlin (Kotlin 2.2.0/JVM 21 or the generated Gradle build), PHP (`php`), QuickJS (`qjs`). Install these external tools separately; Wirecraft does not execute bundled foreign binaries. Model `@…` overrides, project files and portable JSON compiler bundles work through the shared CLI/API/MCP service. The generated JVM compiler-class ABI is replaced by that portable data format. C17 still uses its typed Rust emitter; C template execution/source capabilities, aggregate mixed technologies, template composite boundary channels and wider collection/editor parity remain pending.
+
 ## C17 topology generation
 
-`Export → Generate C17 topology`, `compile.c17` through the application API, and MCP `wirecraft.compile_c17` invoke the same compiler. The existing CLI workflow is also available:
+`Generate → Generate Project (effective technology)`, `compile.c17` through the application API, and MCP `wirecraft.compile_c17` invoke the same compiler. The existing CLI workflow is also available:
 
 ```sh
 wirecraft compile project.orch /tmp/new-generated-directory
@@ -60,7 +74,7 @@ wirecraft desktop project.orch
 
 A C-owned graph uses `technologyId: c-native`, `languageId: c`, `single-file` layout. Nodes contain recurring C statements in Source and setup statements in Initialization. Service-library declarations contain complete translation-unit declarations/includes. Links supply typed buffers named from their link name; processing code uses `push(packet, &item)`, `pop(packet, &item)` and `threadwork_buffer_count(packet)`. Type entities emit structs; array expressions use the existing ThreadworkArray runtime value. Composite execution initializes children, runs children in hierarchy order, then transports one packet per owned data/error link. Library links expose prefixed function pointers. Modeled code requests shutdown with `threadwork_runner__shutdown_request(&threadwork_runner)`; generated code drains residual traffic and frees remaining buffers.
 
-The compiler emits one C17 translation unit and origin mappings. Tests compile and execute typed producer/consumer, nested composite/library and self-feedback fixtures with clang. Source capabilities, graph template overrides, parameterized collection types, aggregate mixed-language delegation and the other language graph compilers remain pending. C runnable capabilities remain unsupported, matching the original C17 restriction; no TCC integration is present.
+The compiler emits one C17 translation unit and origin mappings. Tests compile and execute typed producer/consumer, nested composite/library and self-feedback fixtures with clang. Source capabilities, graph template overrides, parameterized collection types, aggregate mixed-language delegation and complete broader-language parity remain pending. C runnable capabilities remain unsupported, matching the original C17 restriction; no TCC integration is present.
 
 Two deliberate runtime corrections: single-packet transport updates counts per packet and checks destination capacity for that packet; shutdown debug traces are opt-in on stderr with `-DWIRECRAFT_TRACE`. Self-links use explicit `<link>_in` / `<link>_out` body arguments, fixing the old duplicate generated parameter shape. These changes leave stored graph data intact.
 
@@ -119,8 +133,16 @@ Full integration verification also needs clang/clangd, uuid-dev, poppler-utils (
 
 Ctrl-Space in C17 Declaration/Instantiation bodies queries the generated compilation context through clangd, showing runtime APIs, connected buffers, injected library functions and members of local typed values. Suggestions show signatures and insert into the draft; Enter/Tab accept, arrows select, Escape dismisses. A read-only generated function header identifies the wrapper. Unicode edits and stale replies are checked. Linux windows include minimize/maximize/restore/close controls.
 
-Pending capabilities include remaining C17 capability/template features and Go/Kotlin/JS/PHP/QuickJS graph compiler parity, compiler-from-overrides export, broader-language inline completion and LSP navigation, OAuth identity, editable canvas paper overlays and exact legacy layout fidelity. Network AI and automatic layout optimization were unfinished in the source as well. JVM plugin ABI is incompatible; plugin data survives. See the parity matrix for exact scope and continuation.
+Pending capabilities include remaining C17 capability/template features and Go/Kotlin/JS/PHP/QuickJS graph compiler parity, broader-language inline completion and LSP navigation, OAuth identity, editable canvas paper overlays and exact legacy layout fidelity. Network AI and automatic layout optimization were unfinished in the source as well. JVM plugin ABI is incompatible; plugin data survives. See the parity matrix for exact scope and continuation.
 
 C editor Ctrl-Space suggestions show identifiers and signatures. Hover shows clangd function/type declarations, complete emitted struct definitions, and signatures/provenance of injected library functions. The backend/MCP workbench operations `semantic_tokens` and `hover` accept the same nodeId/section/text context (`offset` is UTF-8 bytes for hover). clangd receives the full generated C program, runtime, connected dependencies and companion files, with results remapped to the visible body. Syntax coloring remains available if clangd is missing.
+
+The compiler tests require Go and Node.js on PATH. Optional external Kotlin/PHP/QuickJS tests run with:
+
+```sh
+WIRECRAFT_TEST_KOTLINC=/path/to/kotlin-2.2.0/bin/kotlinc \
+WIRECRAFT_TEST_PHP=/path/to/php WIRECRAFT_TEST_QJS=/path/to/qjs \
+cargo test -p wirecraft-runtime --test template_compilers --locked -- --include-ignored
+```
 
 The corrective native suite can be run with `python3 scripts/followup_smoke.py`; startup and pointer-release/cursor checks use `scripts/startup_smoke.py` and `scripts/gesture_release_smoke.py`. All use owned processes and temporary fixtures/state. Installed verification accepts `python3 scripts/package_smoke.py dist/wirecraft-0.5.0-linux-x86_64.tar.gz --desktop --walkthrough --editor --canvas --startup --gesture --followup`. These native checks require the working X11/Vulkan display and briefly focus temporary windows.

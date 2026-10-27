@@ -1208,8 +1208,10 @@ impl Wirecraft {
                         }
                     } else {
                         this.client.send(
-                            if kind == "c17" {
-                                "compile.c17"
+                            if kind == "project" {
+                                "compile.project"
+                            } else if kind == "compiler" {
+                                "compiler.export"
                             } else {
                                 "generate.files"
                             },

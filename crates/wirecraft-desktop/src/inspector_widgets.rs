@@ -100,15 +100,29 @@ impl Wirecraft {
             return language(&field.input, cx);
         }
         let options = match path {
-            "/technology/technologyId" => {
-                list(&["c-native", "file-export", "multi-tech"], "Inherited")
-            }
+            "/technology/technologyId" => list(
+                &[
+                    "c-native",
+                    "go",
+                    "kotlin-jvm",
+                    "nodejs",
+                    "php",
+                    "quickjs",
+                    "compiler-template-set",
+                    "file-export",
+                    "multi-tech",
+                ],
+                "Inherited",
+            ),
             "/fileLayoutStrategyId" => vec![
                 ("none".into(), "Inherited".into()),
                 ("single-file".into(), "Single file".into()),
-                ("direct-filesystem".into(), "Filesystem".into()),
+                (
+                    "direct-file-system-homomorphism".into(),
+                    "Filesystem".into(),
+                ),
                 ("source-set".into(), "Source set".into()),
-                ("classified".into(), "Classified".into()),
+                ("classified-filesystem".into(), "Classified".into()),
             ],
             "/status" => list(
                 &[
