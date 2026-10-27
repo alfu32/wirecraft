@@ -2,6 +2,16 @@
 use super::*;
 use gpui_component::Sizable;
 use std::collections::BTreeMap;
+/// Menubar groups rendered as dropdowns anchored under their labels.
+pub(super) const MENUBAR: [&str; 7] = [
+    "File",
+    "Edit",
+    "Graph",
+    "Generate",
+    "MCP",
+    "AI Support",
+    "Help",
+];
 
 pub(super) fn property_changes(
     current: &str,
@@ -555,32 +565,55 @@ impl Wirecraft {
             .bg(crate::chrome::color(0x10161e))
             .border_b_1()
             .border_color(crate::chrome::color(0x29323d));
-        for label in [
-            "File",
-            "Edit",
-            "Graph",
-            "Generate",
-            "MCP",
-            "AI Support",
-            "Help",
-        ] {
+        for label in MENUBAR {
+            let anchors = self.menu_anchors.clone();
+            let open = self.menu.as_deref() == Some(label);
             bar = bar.child(
                 div()
                     .id(label)
+                    .relative()
                     .px_3()
                     .py_1()
                     .rounded_sm()
                     .cursor_pointer()
+                    .when(open, |b| b.bg(crate::chrome::color(0x29323d)))
                     .hover(|s| s.bg(crate::chrome::color(0x29323d)))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.menu = if this.menu.as_deref() == Some(label) {
-                            None
-                        } else {
-                            Some(label.into())
-                        };
-                        cx.notify();
+                    // Menus open on press; pressing the open menu's label closes it.
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.menu = if this.menu.as_deref() == Some(label) {
+                                None
+                            } else {
+                                Some(label.into())
+                            };
+                            cx.stop_propagation();
+                            cx.notify();
+                        }),
+                    )
+                    // While a menubar dropdown is open, hovering another label switches to it.
+                    .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                        if *hovered
+                            && this
+                                .menu
+                                .as_deref()
+                                .is_some_and(|m| m != label && MENUBAR.contains(&m))
+                        {
+                            this.menu = Some(label.into());
+                            cx.notify();
+                        }
                     }))
-                    .child(label),
+                    .child(label)
+                    .child(
+                        canvas(
+                            move |b, _, _| {
+                                anchors.borrow_mut().insert(label, b);
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .inset_0(),
+                    ),
             );
         }
         let bar = bar
@@ -613,6 +646,7 @@ impl Wirecraft {
     ) -> Option<AnyElement> {
         let group = self.menu.as_deref()?;
         let context_menu = group.starts_with("Context");
+        let dropdown = MENUBAR.contains(&group);
         let padding = gpui_component::window_paddings(window);
         let content_size = size(
             window.viewport_size().width - padding.left - padding.right,
@@ -662,20 +696,23 @@ impl Wirecraft {
                 cx.notify();
             }
         }));
-        panel = panel.child(
-            div()
-                .flex()
-                .items_center()
-                .p_2()
-                .child(div().flex_1().text_lg().child(group.to_string()))
-                .child(
-                    button("close-menu", "Close").on_click(cx.listener(|this, _, w, cx| {
-                        this.menu = None;
-                        this.focus.focus(w);
-                        cx.notify();
-                    })),
-                ),
-        );
+        panel = panel.when(dropdown, |p| p.w(px(320.)).p_1().rounded_md());
+        panel = panel.when(!dropdown, |panel| {
+            panel.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .p_2()
+                    .child(div().flex_1().text_lg().child(group.to_string()))
+                    .child(button("close-menu", "Close").on_click(cx.listener(
+                        |this, _, w, cx| {
+                            this.menu = None;
+                            this.focus.focus(w);
+                            cx.notify();
+                        },
+                    ))),
+            )
+        });
         if group == "Type reference" {
             let mut choices = [
                 ("string", "string"),
@@ -980,11 +1017,14 @@ impl Wirecraft {
             panel = panel.child(
                 div()
                     .id("command-list")
-                    .h(px(if context_menu {
-                        (f32::from(content_size.height) - 32.).min(650.) - 74.
-                    } else {
-                        550.
-                    }))
+                    .when(dropdown, |list| list.max_h(px(560.)))
+                    .when(!dropdown, |list| {
+                        list.h(px(if context_menu {
+                            (f32::from(content_size.height) - 32.).min(650.) - 74.
+                        } else {
+                            550.
+                        }))
+                    })
                     .flex_shrink_0()
                     .min_h_0()
                     .overflow_y_scroll()
@@ -1046,8 +1086,47 @@ impl Wirecraft {
                     }),
             );
         }
+        if dropdown {
+            // Left-aligned under its label, with no backdrop: the rest of the window stays
+            // interactive and a press outside closes the menu (label presses toggle it).
+            // Anchors are window coordinates; this view is inset by the client-side border.
+            let anchor = self
+                .menu_anchors
+                .borrow()
+                .get(group)
+                .copied()
+                .unwrap_or_default();
+            let bottom = f32::from(anchor.bottom() - padding.top);
+            let height = f32::from(content_size.height) - bottom - 8.;
+            let left = f32::from(anchor.left() - padding.left)
+                .min(f32::from(content_size.width) - 328.)
+                .max(4.);
+            let anchors = self.menu_anchors.clone();
+            return Some(
+                panel
+                    .absolute()
+                    .left(px(left))
+                    .top(px(bottom + 2.))
+                    .max_h(px(height.clamp(120., 650.)))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_mouse_down_out(cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                        if !anchors
+                            .borrow()
+                            .values()
+                            .any(|b| b.contains(&event.position))
+                        {
+                            this.menu = None;
+                            cx.notify();
+                        }
+                    }))
+                    .into_any_element(),
+            );
+        }
         if context_menu {
-            let origin = self.context_origin.unwrap_or(point(px(40.), px(100.)));
+            let origin = self
+                .context_origin
+                .map(|p| point(p.x - padding.left, p.y - padding.top))
+                .unwrap_or(point(px(40.), px(100.)));
             let bounds = content_size;
             let height = (f32::from(bounds.height) - 32.).min(650.);
             let left = f32::from(origin.x)
