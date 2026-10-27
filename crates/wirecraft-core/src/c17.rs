@@ -16,6 +16,20 @@ struct Wire {
     parent: String,
     ctype: String,
 }
+/// Typed source-capability facade, exposed only to the consuming entity.
+struct SourceCapability {
+    argument: String,
+    dependency: String,
+    capability_type: String,
+    provider: String,
+    target: String,
+}
+/// Generated function parameter: name, declared C type and caller expression.
+struct Argument {
+    name: String,
+    ctype: String,
+    value: String,
+}
 struct Emitter {
     source: String,
     maps: Vec<SourceMap>,
@@ -122,6 +136,7 @@ impl C17 {
         let mut allocated = BTreeSet::new();
         let mut payloads: BTreeMap<String, (String, String)> = BTreeMap::new();
         let mut capabilities = vec![];
+        let mut sources = BTreeMap::new();
         for id in &scope {
             let n = document.node(id)?;
             let Some(link) = &n.link else {
@@ -145,11 +160,70 @@ impl C17 {
                     capabilities.push(n);
                     continue;
                 }
-                Some(Relation::Source | Relation::Runnable) => {
+                Some(Relation::Runnable) => {
                     return Err(unsupported(
                         n,
-                        "Source/runnable capability code generation is pending",
+                        "C17 cannot expose a type-safe runtime-compiled runnable capability; use src or an explicit toolchain adapter",
                     ));
+                }
+                Some(Relation::Source) => {
+                    let provider = document.node(&link.source_node_id)?;
+                    if provider.is_link()
+                        || matches!(provider.kind, NodeKind::Type | NodeKind::Note)
+                    {
+                        return Err(unsupported(
+                            n,
+                            "Source capabilities must originate in an entity with a declaration",
+                        ));
+                    }
+                    if !executables.contains(&link.target_node_id) {
+                        return Err(unsupported(
+                            n,
+                            "Source capabilities must be consumed by an executable C entity",
+                        ));
+                    }
+                    let argument = identifier(&n.name);
+                    if reserved(&argument) {
+                        return Err(unsupported(n, "Link argument is a reserved C identifier"));
+                    }
+                    // Same index as the baseline dependency symbol: position among the
+                    // provider's outgoing library/source/runnable capability links.
+                    let position = provider
+                        .outgoing_links
+                        .iter()
+                        .filter(|id| {
+                            document.nodes.get(*id).is_some_and(|n| {
+                                matches!(
+                                    relation(document, n),
+                                    Some(
+                                        Relation::Dependency
+                                            | Relation::Source
+                                            | Relation::Runnable
+                                    )
+                                )
+                            })
+                        })
+                        .position(|id| id == &n.id)
+                        .unwrap_or(0)
+                        + 1;
+                    let mut dependency = format!("{argument}{position}");
+                    if !allocated.insert(dependency.clone()) {
+                        dependency = format!("{dependency}_{}", identifier(&n.id));
+                        allocated.insert(dependency.clone());
+                    }
+                    let mut capability_type = dependency.clone();
+                    capability_type[..1].make_ascii_uppercase();
+                    sources.insert(
+                        id.clone(),
+                        SourceCapability {
+                            argument,
+                            capability_type: format!("{capability_type}Capability"),
+                            dependency,
+                            provider: provider.id.clone(),
+                            target: link.target_node_id.clone(),
+                        },
+                    );
+                    continue;
                 }
                 _ => {}
             }
@@ -251,6 +325,18 @@ impl C17 {
                 }
             }
         }
+        for (id, capability) in &sources {
+            let n = document.node(id)?;
+            let provider = document.node(&capability.provider)?;
+            out.line(&format!(
+                "/* Source capability {} from {} */\ntypedef struct {cap} {{\n    const char *template_source;\n    char *(*getSource)(\n        const struct {cap} *capability,\n        const threadwork_build_parameter *parameters,\n        size_t parameter_count);\n}} {cap};\n\nstatic char *{dep}_get_source(\n    const {cap} *capability,\n    const threadwork_build_parameter *parameters,\n    size_t parameter_count)\n{{\n    return threadwork_materialize_source(capability->template_source, parameters, parameter_count);\n}}\n\nstatic {cap} {dep} = {{\n    .template_source = {literal},\n    .getSource = {dep}_get_source\n}};",
+                comment(&n.name),
+                comment(&provider.name),
+                cap = capability.capability_type,
+                dep = capability.dependency,
+                literal = string_literal(&provider.text.source),
+            ));
+        }
         for (id, wire) in &wires {
             let n = document.node(id)?;
             out.line(&format!("/* Transport {} */", comment(&n.name)));
@@ -263,7 +349,7 @@ impl C17 {
             out.line(&format!("static threadwork_error_t transport_{}(threadwork_buffer *a, threadwork_buffer *b) {{ return threadwork_buffer_transport(a,b); }}",wire.allocation));
         }
         for id in &executables {
-            let arguments = arguments(id, &wires)?;
+            let arguments = arguments(id, &wires, &sources)?;
             for phase in ["init", "run"] {
                 out.line(&format!(
                     "static threadwork_error_t tw_{phase}_{}({});",
@@ -275,22 +361,22 @@ impl C17 {
         // Bodies may be emitted in ID order because every generated function has a prototype.
         for id in &executables {
             let n = document.node(id)?;
-            let args = arguments(id, &wires)?;
+            let args = arguments(id, &wires, &sources)?;
             for (phase, section, text) in [
                 ("init", "initialization", &n.text.initialization),
                 ("run", "source", &n.text.source),
             ] {
                 out.line(&format!("/** Threadwork entity {} @phase {phase} */\nstatic threadwork_error_t tw_{phase}_{}({})\n{{\n    (void)context;",comment(&n.name),symbols[id],parameters(&args)));
-                for (argument, _) in &args {
-                    out.line(&format!("    (void){argument};"));
+                for argument in &args {
+                    out.line(&format!("    (void){};", argument.name));
                 }
                 out.authored(n, section, text, "    ");
                 for child in &n.children {
                     if executables.contains(child) {
-                        let child_args = arguments(child, &wires)?;
+                        let child_args = arguments(child, &wires, &sources)?;
                         let call_args = child_args
                             .iter()
-                            .map(|(_, buffer)| format!(", &{buffer}"))
+                            .map(|argument| format!(", {}", argument.value))
                             .collect::<String>();
                         out.line(&format!("    if (tw_{phase}_{}(context{call_args}) != THREADWORK_OK) return THREADWORK_ERROR;",symbols[child]));
                     }
@@ -303,10 +389,10 @@ impl C17 {
                 out.line("    return THREADWORK_OK;\n}");
             }
         }
-        let root_args = arguments(root, &wires)?;
+        let root_args = arguments(root, &wires, &sources)?;
         let root_args = root_args
             .iter()
-            .map(|(_, b)| format!(", &{b}"))
+            .map(|argument| format!(", {}", argument.value))
             .collect::<String>();
         out.line(&format!("int main(void) {{\n    threadwork_context context;\n    threadwork_error_t status=threadwork_runner__init(&threadwork_runner);\n    int running=1, recent_transit=0;\n    if(status!=THREADWORK_OK) return EXIT_FAILURE;\n    if(threadwork_context_init(&context)!=THREADWORK_OK) return EXIT_FAILURE;\n    status=threadwork_runner__install_shutdown_signal_handlers(&threadwork_runner);\n    if(status==THREADWORK_OK) status=tw_init_{symbol}(&context{root_args});\n    while(status==THREADWORK_OK) {{\n        status=threadwork_runner__is_running(&threadwork_runner,&running);\n        if(status!=THREADWORK_OK || !running) break;\n        status=tw_run_{symbol}(&context{root_args});\n    }}\n    if(status==THREADWORK_OK) {{\n        status=threadwork_runner__begin_shutdown_drain(&threadwork_runner,10U);\n        while(status==THREADWORK_OK) {{\n            status=threadwork_runner__has_recent_transit(&threadwork_runner,&recent_transit);\n            if(status!=THREADWORK_OK || !recent_transit) break;\n            status=tw_run_{symbol}(&context{root_args});\n        }}\n    }}",symbol=symbols[root]));
         for w in wires.values() {
@@ -339,7 +425,11 @@ impl C17 {
         })
     }
 }
-fn arguments(id: &str, wires: &BTreeMap<String, Wire>) -> Result<Vec<(String, String)>> {
+fn arguments(
+    id: &str,
+    wires: &BTreeMap<String, Wire>,
+    sources: &BTreeMap<String, SourceCapability>,
+) -> Result<Vec<Argument>> {
     let mut args = vec![];
     let mut used = BTreeSet::new();
     for w in wires.values() {
@@ -356,19 +446,66 @@ fn arguments(id: &str, wires: &BTreeMap<String, Wire>) -> Result<Vec<(String, St
                         format!("Duplicate C argument '{name}'; use distinct link names"),
                     ));
                 }
-                args.push((name, format!("{}_{}_port", w.allocation, side)));
+                args.push(Argument {
+                    name,
+                    ctype: "threadwork_buffer *".into(),
+                    value: format!("&{}_{}_port", w.allocation, side),
+                });
             }
         }
     }
+    // Only consumers receive a source capability; its provider keeps its own signature.
+    for capability in sources.values().filter(|c| c.target == id) {
+        if !used.insert(capability.argument.clone()) {
+            return Err(Error::new(
+                "invalid_input",
+                format!(
+                    "Duplicate C argument '{}'; use distinct link names",
+                    capability.argument
+                ),
+            ));
+        }
+        args.push(Argument {
+            name: capability.argument.clone(),
+            ctype: format!("{} *", capability.capability_type),
+            value: format!("&{}", capability.dependency),
+        });
+    }
     Ok(args)
 }
-fn parameters(args: &[(String, String)]) -> String {
+fn parameters(args: &[Argument]) -> String {
     format!(
         "threadwork_context *context{}",
         args.iter()
-            .map(|(name, _)| format!(", threadwork_buffer *{name}"))
+            .map(|argument| format!(", {}{}", argument.ctype, argument.name))
             .collect::<String>()
     )
+}
+/// Encodes authored text as adjacent C string literals, one per source line.
+/// `?` is escaped so trigraph sequences cannot alter the materialized source.
+fn string_literal(text: &str) -> String {
+    if text.is_empty() {
+        return "\"\"".into();
+    }
+    let mut pieces = vec![];
+    for line in text.split_inclusive('\n') {
+        let mut piece = String::from("\"");
+        for c in line.chars() {
+            match c {
+                '\\' => piece.push_str("\\\\"),
+                '"' => piece.push_str("\\\""),
+                '?' => piece.push_str("\\?"),
+                '\n' => piece.push_str("\\n"),
+                '\r' => piece.push_str("\\r"),
+                '\t' => piece.push_str("\\t"),
+                c if c.is_ascii_control() => piece.push_str(&format!("\\{:03o}", c as u32)),
+                c => piece.push(c),
+            }
+        }
+        piece.push('"');
+        pieces.push(piece);
+    }
+    pieces.join("\n        ")
 }
 fn emit_types(d: &Document, scope: &BTreeSet<String>, out: &mut Emitter) -> Result<()> {
     let types: BTreeSet<String> = scope

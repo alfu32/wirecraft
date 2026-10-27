@@ -6,7 +6,7 @@ The 90 original text resources are retained under `crates/wirecraft-core/resourc
 
 | Set | Stored language / technology | Source default | Current implementation |
 |---|---|---|---|
-| C | `c` / `c-native` | single-file | Existing typed Rust C17 emitter; source/runnable capabilities and C template overrides still pending |
+| C | `c` / `c-native` | single-file | Existing typed Rust C17 emitter with `src` capability facades; `run` capabilities are rejected as in the baseline; C template overrides still pending |
 | Go | `go` / `go` | single-file | Template graph assembly, runner, FIFO transports and source capability templates |
 | Kotlin | `kotlin` / `kotlin-jvm` | source-set | Single-file and file-based assembly; Gradle/runtime/entry point project files |
 | Node.js | `javascript` / `nodejs` | direct-file-system-homomorphism | Single/file-based CommonJS modules, runtime and package manifest |

@@ -352,3 +352,171 @@ fn cli_compile_preserves_the_original_project_and_emits_a_c_translation_unit() {
     assert_eq!(std::fs::read(&path).unwrap(), before);
     assert!(output.join("C_network.c").exists());
 }
+
+#[tokio::test]
+async fn source_capability_materializes_provider_declaration_for_its_consumer_only() {
+    let mut d = project();
+    let provider_source = "/* emit ${greeting}, \"quoted\" \\ ü?? ${greeting} */\n\t(void)0;";
+    let provider = processor(&mut d, "producer", provider_source);
+    let consumer = processor(
+        &mut d,
+        "consumer",
+        r#"static int materialized = 0;
+threadwork_build_parameter parameters[] = { { "greeting", "hello" } };
+if (materialized) return THREADWORK_OK;
+materialized = 1;
+char *product = producer_source->getSource(producer_source, parameters, 1U);
+if (product == NULL) return THREADWORK_ERROR;
+printf("%s\n", product);
+free(product);
+if (threadwork_runner__shutdown_request(&threadwork_runner) != THREADWORK_OK) return THREADWORK_ERROR;"#,
+    );
+    let link = d
+        .create_link(
+            "producer_source",
+            Link {
+                source_node_id: provider.clone(),
+                source_port_name: "source".into(),
+                target_node_id: consumer.clone(),
+                target_port_name: "builder".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    d.patch(&link, &json!({"link":{"interactionKind":"src"}}))
+        .unwrap();
+    let original = serde_json::to_value(&d).unwrap();
+
+    let generated = C17::generate(&d, "root").unwrap();
+    let unit = &generated.files[0].content;
+    assert!(unit.contains("typedef struct Producer_source1Capability {"));
+    assert!(unit.contains("static Producer_source1Capability producer_source1 = {"));
+    assert!(unit.contains("Producer_source1Capability *producer_source)"));
+    assert!(unit.contains("&producer_source1)"));
+    assert!(!unit.contains("producer_source1_a_port"));
+    let provider_header = unit
+        .lines()
+        .find(|l| l.starts_with("static threadwork_error_t tw_run_producer_"))
+        .unwrap();
+    assert!(!provider_header.contains("Capability"), "{provider_header}");
+    // Authored bodies keep their origin maps despite the extra declarations.
+    let mapped = generated.files[0]
+        .source_map
+        .iter()
+        .find(|m| m.node_id == consumer && m.section == "source")
+        .unwrap();
+    assert!(
+        unit.lines()
+            .nth(mapped.generated_start_line - 1)
+            .unwrap()
+            .contains("static int materialized = 0;")
+    );
+
+    let app = Application::new(Service::new(d.clone(), None), "fixture".into(), None);
+    let context = app
+        .execute(Request::new(
+            "editor.context",
+            json!({"nodeId":consumer,"section":"source"}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        context["header"]
+            .as_str()
+            .unwrap()
+            .contains("Producer_source1Capability *producer_source"),
+        "{context}"
+    );
+    assert!(
+        context["symbols"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["label"] == "producer_source"
+                && s["documentation"].as_str().unwrap().contains("producer"))
+    );
+    let text = "producer_source->getS";
+    let completion = app
+        .execute(Request::new(
+            "editor.complete",
+            json!({"nodeId":consumer,"section":"source","text":text,"offset":text.len(),"generation":3}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        completion["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["filterText"] == "getSource"
+                || i["label"].as_str().is_some_and(|l| l.contains("getSource"))),
+        "{completion}"
+    );
+    let text = "(void)producer_source;";
+    let hover = app
+        .execute(Request::new(
+            "editor.hover",
+            json!({"nodeId":consumer,"section":"source","text":text,"offset":text.find("producer_source").unwrap()+2}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        hover["hover"]["contents"]
+            .to_string()
+            .contains("Producer_source1Capability"),
+        "{hover}"
+    );
+    let broken = "char *p = producer_source->getSource(producer_source);\n(void)p;";
+    app.execute(Request::new(
+        "threadwork.update_entity",
+        json!({"nodeId":consumer,"patch":{"text":{"source":broken}}}),
+    ))
+    .await
+    .unwrap();
+    let analysis = app
+        .execute(Request::new("editor.analyze_generated", json!({})))
+        .await
+        .unwrap();
+    let diagnostic = analysis["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["severity"] == 1)
+        .expect("too few getSource arguments is reported");
+    assert_eq!(diagnostic["source"]["nodeId"], consumer);
+    assert_eq!(diagnostic["source"]["line"], 1);
+    app.shutdown().await;
+
+    let (_, output) = build_run(d.clone()).await;
+    assert_eq!(
+        output,
+        "/* emit hello, \"quoted\" \\ ü?? hello */\n\t(void)0;\n"
+    );
+    assert_eq!(serde_json::to_value(&d).unwrap(), original);
+}
+
+#[test]
+fn runnable_capabilities_are_rejected_with_the_baseline_reason() {
+    let mut d = project();
+    let a = processor(&mut d, "a", "");
+    let b = processor(&mut d, "b", "");
+    let link = d
+        .create_link(
+            "runner",
+            Link {
+                source_node_id: a,
+                target_node_id: b,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    d.patch(&link, &json!({"link":{"interactionKind":"run"}}))
+        .unwrap();
+    let error = C17::generate(&d, "root").err().unwrap();
+    assert_eq!(error.code, "unsupported");
+    assert!(
+        error.message.contains("runnable capability"),
+        "{}",
+        error.message
+    );
+}

@@ -101,6 +101,22 @@ pub fn body_context(
             }
             continue;
         }
+        if relation(&candidate, n) == Some(Relation::Source) {
+            if link.target_node_id == node_id {
+                let provider = candidate
+                    .nodes
+                    .get(&link.source_node_id)
+                    .map(|n| n.name.as_str())
+                    .unwrap_or(&link.source_node_id);
+                // The generated header is authoritative for the facade type name.
+                let ctype = regex::Regex::new(&format!(r"(\w+Capability) \*{name}\b"))
+                    .ok()
+                    .and_then(|r| r.captures(&header).map(|c| c[1].to_string()))
+                    .unwrap_or_else(|| "source capability".into());
+                symbols.push(json!({"label":name,"kind":6,"detail":format!("{ctype} *{name}; char *getSource(capability, parameters, parameter_count)"),"documentation":format!("Materializes the declaration of {provider}, replacing ${{name}} markers with threadwork_build_parameter values; the caller frees the result.")}));
+            }
+            continue;
+        }
         if !matches!(
             relation(&candidate, n),
             Some(Relation::Principal | Relation::Error)
