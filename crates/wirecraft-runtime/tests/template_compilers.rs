@@ -84,7 +84,7 @@ async fn real_go_and_node_generated_dataflows() {
     .await;
 }
 #[tokio::test]
-#[ignore = "requires Kotlin 2.2.0 and Java 21; set WIRECRAFT_TEST_KOTLINC"]
+#[ignore = "requires Kotlin 2.2+ and Java 21; kotlinc on PATH or WIRECRAFT_TEST_KOTLINC"]
 async fn real_kotlin_generated_dataflows() {
     workflows(&[("kotlin", "single-file"), ("kotlin", "source-set")]).await;
 }
@@ -218,7 +218,7 @@ async fn real_go_and_node_library_instances() {
     .await;
 }
 #[tokio::test]
-#[ignore = "requires Kotlin 2.2.0 and Java 21; set WIRECRAFT_TEST_KOTLINC"]
+#[ignore = "requires Kotlin 2.2+ and Java 21; kotlinc on PATH or WIRECRAFT_TEST_KOTLINC"]
 async fn real_kotlin_library_instances() {
     library_workflows(&[("kotlin", "single-file"), ("kotlin", "source-set")]).await;
 }

@@ -40,7 +40,7 @@ The 90 baseline templates stay byte-identical. The adaptation lives in `crates/w
 - `wirecraft export-compiler PROJECT.orch NEW_DIRECTORY nodejs` exports `compiler.wirecompiler.json`, including model overrides. Consume it with `wirecraft compile PROJECT.orch NEW_OUTPUT --compiler compiler.wirecompiler.json`.
 - API `compile.project`, `compiler.templates`, `compiler.export` expose the same services. `wirecraft.workbench` MCP operations are `compile_project`, `compiler_templates`, `export_compiler`, with the service parameters inside `arguments`. Existing `wirecraft.compile_c17` and literal-export contracts stay available.
 
-Generation never invokes downloaded tools. Build/run through the existing supervised external jobs or your shell: `go build`, `node path/to/root.js`, `kotlinc SOURCES -include-runtime -d app.jar` then `java -jar app.jar`, `php root.php`, or `qjs root.js`. Kotlin's retained Gradle template pins Kotlin 2.2.0 and JVM 21. Tests can select a standalone compiler using `WIRECRAFT_TEST_KOTLINC`; this does not change the user's SDK installation.
+Generation never invokes downloaded tools. Build/run through the existing supervised external jobs or your shell: `go build`, `node path/to/root.js`, `kotlinc SOURCES -include-runtime -d app.jar` then `java -jar app.jar`, `php root.php`, or `qjs root.js`. Kotlin's retained Gradle template pins Kotlin 2.2.0 and JVM 21. The Kotlin tests use `kotlinc` from PATH or `WIRECRAFT_TEST_KOTLINC`; they pass with Kotlin 2.2.0 and 2.4.21 on Java 21. Kotlin 1.9.0 fails on Java 21 (`ArrayDeque.addLast` resolves to JDK 21's sequenced-collection API) even for baseline output.
 
 ## Portable bundle and compatibility
 
