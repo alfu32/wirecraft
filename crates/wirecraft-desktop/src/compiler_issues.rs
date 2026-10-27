@@ -89,8 +89,13 @@ impl Wirecraft {
         }
     }
 }
-/// Whether the live C17 check owns this design's compiler diagnostics.
+/// Whether the live C17 check owns this design's compiler diagnostics. A component
+/// (a design with Exterior ports) generates only through a design that references it.
 fn c17_checked(d: &wirecraft_core::Document) -> bool {
     d.effective(&d.root_node_id, "languageId") == "c"
         && d.effective(&d.root_node_id, "technologyId") == "c-native"
+        && !d
+            .nodes
+            .values()
+            .any(wirecraft_core::components::is_exterior)
 }

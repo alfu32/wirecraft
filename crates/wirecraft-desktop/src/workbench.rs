@@ -278,6 +278,20 @@ const COMMANDS: &[Command] = &[
         icon: "link",
     },
     Command {
+        id: "reference",
+        group: "Graph",
+        label: "Insert Component Reference…",
+        shortcut: "",
+        icon: "node",
+    },
+    Command {
+        id: "update-reference",
+        group: "Graph",
+        label: "Update Component Reference",
+        shortcut: "",
+        icon: "node",
+    },
+    Command {
         id: "delete",
         group: "Graph",
         label: "Delete Selection",
@@ -508,6 +522,28 @@ impl Wirecraft {
             "link" => self.link_mode(&LinkMode, w, cx),
             "type" => self.mode = Mode::Type,
             "delete" => self.delete(&DeleteSelection, w, cx),
+            "reference" => self.reference_dialog(w, cx),
+            "update-reference" => {
+                let references: Vec<String> = self
+                    .selected
+                    .iter()
+                    .filter(|id| {
+                        self.snapshot
+                            .document
+                            .nodes
+                            .get(*id)
+                            .is_some_and(wirecraft_core::components::is_reference)
+                    })
+                    .cloned()
+                    .collect();
+                if references.is_empty() {
+                    self.status = "Select a component Reference to update".into();
+                }
+                for id in references {
+                    self.client
+                        .send("components.update_reference", json!({"nodeId":id}));
+                }
+            }
             "export" => self.show_export(&ShowExport, w, cx),
             "options" => self.show_options(&ShowOptions, w, cx),
             "palette" => self.palette(&CommandPalette, w, cx),

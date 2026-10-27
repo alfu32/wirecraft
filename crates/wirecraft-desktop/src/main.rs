@@ -103,6 +103,8 @@ struct Wirecraft {
     show_sheets: bool,
     sheet_contours: Vec<wirecraft_core::viewport::Rect>,
     link_source: Option<String>,
+    /// Link mode started on empty root canvas: the link will leave a new Exterior here.
+    exterior_source: Option<[f64; 2]>,
     tab: String,
     section: String,
     name: Entity<InputState>,
@@ -252,6 +254,7 @@ impl Wirecraft {
             show_sheets: false,
             sheet_contours: Vec::new(),
             link_source: None,
+            exterior_source: None,
             tab: if session.tab.is_empty() {
                 "Designer".into()
             } else {
@@ -1183,6 +1186,7 @@ impl Wirecraft {
         self.cancel_pointer_gesture(cx);
         self.mode = Mode::Select;
         self.link_source = None;
+        self.exterior_source = None;
         cx.notify();
     }
     fn node_mode(&mut self, _: &NodeMode, _: &mut Window, cx: &mut Context<Self>) {
@@ -1192,6 +1196,7 @@ impl Wirecraft {
     fn link_mode(&mut self, _: &LinkMode, _: &mut Window, cx: &mut Context<Self>) {
         self.mode = Mode::Link;
         self.link_source = None;
+        self.exterior_source = None;
         cx.notify();
     }
     fn fit(&mut self, _: &Fit, _: &mut Window, cx: &mut Context<Self>) {
@@ -1291,6 +1296,38 @@ impl Wirecraft {
                             json!({"nodeId":this.parent,"outputDir":path}),
                         );
                     }
+                });
+            }
+        })
+        .detach();
+    }
+    /// Place a Reference to another saved design; it must live in this design's directory.
+    fn reference_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.snapshot.path.is_none() {
+            self.status = "Save the design first: a reference path is relative to its file".into();
+            cx.notify();
+            return;
+        }
+        let prompt = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Reference a component design (.orch)".into()),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = prompt.await
+                && let Some(path) = paths.first()
+            {
+                let _ = this.update_in(cx, |this, _, _| {
+                    let b = this.bounds.get();
+                    let center = this.viewport.world([
+                        f64::from(f32::from(b.size.width)) / 2.,
+                        f64::from(f32::from(b.size.height)) / 2.,
+                    ]);
+                    this.client.send(
+                        "components.reference",
+                        json!({"path":path,"parentId":this.parent,"x":center[0],"y":center[1]}),
+                    )
                 });
             }
         })

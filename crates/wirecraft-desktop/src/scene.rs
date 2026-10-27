@@ -789,7 +789,12 @@ impl Scene {
                 px((r.height * view.zoom) as f32),
             ),
         );
+        if let Some(exterior) = &shape.exterior {
+            self.paint_exterior(exterior, shape, rect, active, view, window, cx);
+            return;
+        }
         let (fill_color, stroke) = match shape.role.as_str() {
+            "Reference" => (0x2c2541, 0xb08fe8),
             "Type" => (0x173b3a, 0x45baa8),
             "ServiceLibrary" => (0x292e43, 0x8893e4),
             "CompilerTemplate" => (0x4c3b17, 0xf0ad36),
@@ -903,6 +908,74 @@ impl Scene {
                 window,
                 cx,
             );
+        }
+    }
+    /// An Exterior: a heavy circle with a chevron along the flow and its derived name
+    /// beside it, away from the link. The link's port cap sits on the rim.
+    #[allow(clippy::too_many_arguments)]
+    fn paint_exterior(
+        &self,
+        exterior: &wirecraft_core::drawing::ExteriorView,
+        shape: &wirecraft_core::drawing::Shape,
+        rect: Bounds<Pixels>,
+        active: bool,
+        view: Viewport,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let diameter = rect.size.height;
+        let zoom = view.zoom as f32;
+        window.paint_quad(quad(
+            rect,
+            diameter / 2.,
+            rgb(self.color(0x16303f)),
+            px(if active { 4. } else { 2.5 } * zoom.clamp(0.5, 1.5)),
+            rgb(self.color(if active { 0x70d5c6 } else { 0x4fb3d9 })),
+            BorderStyle::Solid,
+        ));
+        // Output: packets arrive from the link side; input: they leave towards it.
+        let towards_right = exterior.output != exterior.link_right;
+        let sign = if towards_right { 1. } else { -1. };
+        let center = rect.center();
+        let arm = diameter * 0.16;
+        let mut chevron = PathBuilder::stroke(px((3. * zoom).max(1.5)));
+        chevron.move_to(center + point(-arm * 0.5 * sign, -arm));
+        chevron.line_to(center + point(arm * 0.5 * sign, px(0.)));
+        chevron.line_to(center + point(-arm * 0.5 * sign, arm));
+        if let Ok(path) = chevron.build() {
+            window.paint_path(path, rgb(self.color(0x9fd8f0)));
+        }
+        if view.zoom >= 0.2 {
+            let font_size = (13. * zoom).max(7.);
+            let label = if exterior.type_name.is_empty() {
+                shape.name.clone()
+            } else {
+                format!("{}: {}", shape.name, exterior.type_name)
+            };
+            let side = if exterior.link_right {
+                rect.left()
+            } else {
+                rect.right()
+            };
+            self.port_label(
+                &label,
+                point(side, center.y + px((font_size + 5.) / 2.)),
+                !exterior.link_right,
+                font_size,
+                window,
+                cx,
+            );
+        }
+        if shape.diagnostics > 0 {
+            let badge = px((14. * zoom).max(8.));
+            window.paint_quad(quad(
+                Bounds::new(rect.top_right() - point(badge, px(0.)), size(badge, badge)),
+                badge / 2.,
+                rgb(0xd94f54),
+                px(0.),
+                rgb(0xd94f54),
+                BorderStyle::Solid,
+            ));
         }
     }
     fn port_label(

@@ -74,12 +74,40 @@ impl Wirecraft {
                 self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"name":if self.mode==Mode::Type{"New type"}else{"New processor"},"kind":if self.mode==Mode::Type{"Type"}else{"Processor"},"attributes":{"layout":{"x":world[0],"y":world[1]}}}));
             }
             Mode::Link => {
-                if let Some(id) = hit {
-                    if let Some(source) = self.link_source.take() {
+                // Empty root canvas as an end of the link publishes a port: the link goes
+                // to (or comes from) a new Exterior placed there.
+                let at_root = self.parent == self.snapshot.document.root_node_id;
+                let x = world[0] - wirecraft_core::components::EXTERIOR_DIAMETER / 2.;
+                let y = world[1] - wirecraft_core::components::EXTERIOR_DIAMETER / 2.;
+                match (hit, self.link_source.take(), self.exterior_source.take()) {
+                    (Some(id), None, Some([x, y])) => {
+                        self.client.send(
+                            "components.publish",
+                            json!({"nodeId":id,"direction":"input","name":"port","x":x,"y":y}),
+                        );
+                    }
+                    (Some(id), Some(source), _) => {
                         self.client.send("threadwork.create_link",json!({"name":"packet","sourceNodeId":source,"targetNodeId":id,"sourcePortName":"out","targetPortName":"in"}));
-                    } else {
+                    }
+                    (Some(id), None, None) => {
                         self.link_source = Some(id);
-                        self.status = "Choose the target entity".into();
+                        self.status =
+                            "Choose the target entity, or empty canvas for an Exterior output"
+                                .into();
+                    }
+                    (None, Some(source), _) if at_root => {
+                        self.client.send(
+                            "components.publish",
+                            json!({"nodeId":source,"direction":"output","name":"port","x":x,"y":y}),
+                        );
+                    }
+                    (None, None, _) if at_root => {
+                        self.exterior_source = Some([x, y]);
+                        self.status = "Choose the entity that receives from the Exterior".into();
+                    }
+                    (None, source, _) => {
+                        self.link_source = source;
+                        self.status = "Exterior ports are published at the design root".into();
                     }
                 }
             }
