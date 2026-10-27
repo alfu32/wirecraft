@@ -1,0 +1,18 @@
+{# Processor initialization is distinct from recurring execution. #}<?php
+{{ initializerProvenanceComment }}
+function {{ initializerSymbol }}(array &$context{% for link in incomingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, mixed ${{ link.argumentSymbol }}{% endfor %}): void
+{
+{% if instantiation is not empty %}{{ instantiationIndent4 }}
+{% endif %}}
+
+{{ runProvenanceComment }}
+function {{ runSymbol }}(array &$context{% for link in incomingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, mixed ${{ link.argumentSymbol }}{% endfor %}): void
+{
+{% if declaration is not empty %}{{ declarationIndent4 }}
+{% else %}    // {{ name }} has no declaration text yet.
+{% endif %}}
+
+function {{ symbol }}(array &$context{% for link in incomingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, mixed ${{ link.argumentSymbol }}{% endfor %}): void
+{
+    {{ runSymbol }}($context{% for link in incomingDataLinks %}, ${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, ${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, ${{ link.argumentSymbol }}{% endfor %});
+}

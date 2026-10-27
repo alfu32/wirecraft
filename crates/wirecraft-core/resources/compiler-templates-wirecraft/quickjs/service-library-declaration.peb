@@ -1,0 +1,5 @@
+{# Wirecraft: library source at file scope, followed by its single shared instance. #}
+{{ nodeProvenanceComment }}
+{{ declaration }}
+
+{{ libraryInstance }}

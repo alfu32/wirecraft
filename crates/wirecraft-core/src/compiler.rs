@@ -559,9 +559,34 @@ impl Plan<'_> {
         let declared = self.d.nodes.get(&l.type_definition_id);
         let escaped = serde_json::to_string(source_product).unwrap();
         let escaped = &escaped[1..escaped.len() - 1];
-        Ok(
-            json!({"id":n.id,"name":n.name,"symbol":symbol,"variableName":n.name,"argumentSymbol":symbol,"allocationSymbol":allocation,"dependencySymbol":allocation,"capabilityTypeSymbol":format!("{}Capability",upper(&allocation)),"aPortSymbol":format!("{allocation}_a_port"),"bPortSymbol":format!("{allocation}_b_port"),"transportSymbol":format!("transport_{allocation}"),"typeName":ty,"typeSymbol":ty,"typeDefinitionId":l.type_definition_id,"typeDefinition":l.payload_definition,"payloadDefinition":l.payload_definition,"typeFields":declared.map(|n|self.fields(n)).unwrap_or_default(),"isCapability":cap,"isLibraryCapability":relation(self.d,n)==Some(Relation::Dependency),"isSourceCapability":relation(self.d,n)==Some(Relation::Source),"isRunnableCapability":relation(self.d,n)==Some(Relation::Runnable),"sourceNodeName":source.name,"sourceNodeSymbol":identifier(&source.name),"sourceNodeTypeSymbol":identifier(&source.name),"sourceRunSymbol":format!("run_{}",self.symbols[&source.id]),"sourceNodeDeclaration":source_product,"sourceNodeDeclarationDoubleQuoted":escaped,"sourceNodeDeclarationDollarEscaped":escaped.replace('$',"\\$"),"sourceNodeInstantiation":source.text.initialization,"libraryInstantiation":source.text.initialization,"sourceNodeId":source.id,"targetNodeId":target.id,"targetNodeName":target.name,"sourcePortName":l.source_port_name,"targetPortName":l.target_port_name,"transportKind":l.transport_kind,"interactionKind":l.interaction_kind}),
-        )
+        let mut descriptor = json!({"id":n.id,"name":n.name,"symbol":symbol,"variableName":n.name,"argumentSymbol":symbol,"allocationSymbol":allocation,"dependencySymbol":allocation,"capabilityTypeSymbol":format!("{}Capability",upper(&allocation)),"aPortSymbol":format!("{allocation}_a_port"),"bPortSymbol":format!("{allocation}_b_port"),"transportSymbol":format!("transport_{allocation}"),"typeName":ty,"typeSymbol":ty,"typeDefinitionId":l.type_definition_id,"typeDefinition":l.payload_definition,"payloadDefinition":l.payload_definition,"typeFields":declared.map(|n|self.fields(n)).unwrap_or_default(),"isCapability":cap,"isLibraryCapability":relation(self.d,n)==Some(Relation::Dependency),"isSourceCapability":relation(self.d,n)==Some(Relation::Source),"isRunnableCapability":relation(self.d,n)==Some(Relation::Runnable),"sourceNodeName":source.name,"sourceNodeSymbol":identifier(&source.name),"sourceNodeTypeSymbol":identifier(&source.name),"sourceRunSymbol":format!("run_{}",self.symbols[&source.id]),"sourceNodeDeclaration":source_product,"sourceNodeDeclarationDoubleQuoted":escaped,"sourceNodeDeclarationDollarEscaped":escaped.replace('$',"\\$"),"sourceNodeInstantiation":source.text.initialization,"libraryInstantiation":source.text.initialization,"sourceNodeId":source.id,"targetNodeId":target.id,"targetNodeName":target.name,"sourcePortName":l.source_port_name,"targetPortName":l.target_port_name,"transportKind":l.transport_kind,"interactionKind":l.interaction_kind});
+        if relation(self.d, n) == Some(Relation::Dependency) {
+            // Every link from a library lends the same shared instance; the link name is
+            // only the consumer's argument name (`argumentSymbol`).
+            let (ty, instance) = crate::libraries::symbols(source);
+            let mut lent = instance.clone();
+            if self.set.id == "nodejs"
+                && let Some(parent) = target
+                    .parent_id
+                    .as_deref()
+                    .and_then(|p| self.d.nodes.get(p))
+            {
+                // File-based modules reach the instance through the (cached) library module.
+                let caller = self.layout(parent)?;
+                let module = self.layout(source)?;
+                if caller != "single-file" || module != "single-file" {
+                    let from = self.path(parent, &caller)?;
+                    let to = self.path(source, &module)?;
+                    if from != to {
+                        lent = format!("require({:?}).{instance}", relative(&from, &to, true));
+                    }
+                }
+            }
+            descriptor["libraryTypeSymbol"] = json!(ty);
+            descriptor["libraryInstanceSymbol"] = json!(instance);
+            descriptor["dependencySymbol"] = json!(lent);
+        }
+        Ok(descriptor)
     }
     fn context(
         &self,
@@ -625,7 +650,19 @@ impl Plan<'_> {
             .map(|a| a.declaration.as_str())
             .collect::<Vec<_>>()
             .join("\n\n");
+        let library = (stereotype(self.d, n) == "ServiceLibrary").then(|| {
+            crate::libraries::instance(
+                &self.set.id,
+                n,
+                self.set.id == "nodejs" && layout != "single-file",
+            )
+        });
         let mut c = json!({"id":n.id,"name":n.name,"node":self.node_view(n),"self":self.node_view(n),"document":{"id":self.d.id,"name":self.d.project_name(),"rootNodeId":self.d.root_node_id},"options":{"projectName":self.d.project_name()},"metadata":n.metadata,"symbol":identifier(&n.name),"safeName":identifier(&n.name),"runSymbol":format!("run_{indexed}"),"initializerSymbol":format!("init_{indexed}"),"classFileSymbol":upper(&indexed),"isCompilationRoot":n.id==self.root,"isCapabilityOnlyProvider":!outgoing.is_empty()&&outgoing.iter().all(|l|l["isCapability"]==true),"language":self.set.language,"stereotype":stereotype(self.d,n),"layoutStrategy":{"id":layout},"primaryPath":path,"declaration":source,"instantiation":initialization,"declarationIndent2":indent(&source,2),"declarationIndent4":indent(&source,4),"instantiationIndent2":indent(&initialization,2),"instantiationIndent4":indent(&initialization,4),"typeFields":self.fields(n),"specification":n.text.specification,"tests":n.text.tests,"usageInstructions":n.text.ai_instructions,"childArtifacts":child_views,"inlineChildArtifacts":artifact_views(&children.iter().filter(|a|a.layout=="single-file").cloned().collect::<Vec<_>>()),"externalChildArtifacts":artifact_views(&children.iter().filter(|a|a.layout!="single-file").cloned().collect::<Vec<_>>()),"linkArtifacts":link_views,"childDeclarations":children.iter().map(|a|a.declaration.as_str()).collect::<Vec<_>>().join("\n\n"),"inlineChildDeclarations":inline,"inlineChildDeclarationsWithoutPhpTag":inline.replace("<?php", ""),"childInstantiations":children.iter().map(|a|a.initialization.as_str()).collect::<Vec<_>>().join("\n"),"linkDeclarations":links.iter().map(|a|a.declaration.as_str()).collect::<Vec<_>>().join("\n\n"),"linkInstantiations":links.iter().map(|a|a.initialization.as_str()).collect::<Vec<_>>().join("\n"),"nodeProvenanceComment":format!("// {} [{}]",n.name.replace(['\n','\r']," "),n.id),"initializerProvenanceComment":format!("// Initialize {}",n.name.replace(['\n','\r']," ")),"runProvenanceComment":format!("// Execute {}",n.name.replace(['\n','\r']," ")),"linkProvenanceComment":format!("// Link {}",n.name.replace(['\n','\r']," ")),"transportProvenanceComment":format!("// Transport {}",n.name.replace(['\n','\r']," ")),"safeProjectName":identifier(self.d.project_name()),"projectName":self.d.project_name()});
+        if let Some(library) = library {
+            c["libraryInstance"] = json!(library.code);
+            c["libraryInstanceSymbol"] = json!(library.instance_symbol);
+            c["libraryTypeSymbol"] = json!(library.type_symbol);
+        }
         for (name, values) in [
             ("incomingLinks", incoming.clone()),
             ("outgoingLinks", outgoing.clone()),

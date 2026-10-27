@@ -98,10 +98,150 @@ async fn real_php_and_quickjs_generated_dataflows() {
     ])
     .await;
 }
+/// Producer and consumer reach one library through differently named dependency links.
+fn library_graph(set: &str, layout: &str) -> Document {
+    let (library, emit, consume) = match set {
+        "go" => (
+            "func maximum(left int, right int) int {\n\tif left > right {\n\t\treturn left\n\t}\n\treturn right\n}",
+            "if threadworkRunner.IsRunning() { push(packet, numbers.maximum(39, 40)) }",
+            "var item int; if pop(packet, &item) { fmt.Println(\"RESULT\", math.maximum(item, 42)); threadworkRunner.ShutdownRequest() }",
+        ),
+        "nodejs" | "quickjs" => (
+            "function maximum(left, right) {\n  return left > right ? left : right;\n}",
+            "if(threadworkRunner.isRunning()) packet.push(numbers.maximum(39, 40));",
+            "if(packet.length) { console.log('RESULT', math.maximum(packet.shift(), 42)); threadworkRunner.shutdownRequest(); }",
+        ),
+        "kotlin" => (
+            "fun maximum(left: Double, right: Double): Double = if (left > right) left else right",
+            "if(threadworkRunner.isRunning()) packet.addLast(numbers.maximum(39.0, 40.0))",
+            "if(packet.isNotEmpty()) { println(\"RESULT ${math.maximum(packet.removeFirst(), 42.0)}\"); threadworkRunner.shutdownRequest() }",
+        ),
+        "php" => (
+            "function maximum($left, $right)\n{\n    return max($left, $right);\n}",
+            "if(threadwork_runner()->isRunning()) $packet[] = $numbers->maximum(39, 40);",
+            "if(count($packet)) { echo 'RESULT ' . $math->maximum(array_shift($packet), 42) . PHP_EOL; threadwork_runner()->shutdownRequest(); }",
+        ),
+        _ => unreachable!(),
+    };
+    let mut d = graph(set, layout);
+    let id = |d: &Document, name: &str| {
+        d.nodes
+            .values()
+            .find(|n| n.name == name)
+            .unwrap()
+            .id
+            .clone()
+    };
+    let (producer, consumer) = (id(&d, "producer"), id(&d, "consumer"));
+    d.patch(&producer, &json!({"text":{"source":emit}}))
+        .unwrap();
+    d.patch(&consumer, &json!({"text":{"source":consume}}))
+        .unwrap();
+    let lib = d.create("root", "lib_math", NodeKind::Processor).unwrap();
+    d.patch(&lib, &json!({"text":{"source":library}})).unwrap();
+    for (name, target) in [("numbers", &producer), ("math", &consumer)] {
+        let link = d
+            .create_link(
+                name,
+                Link {
+                    source_node_id: lib.clone(),
+                    source_port_name: "service".into(),
+                    target_node_id: target.clone(),
+                    target_port_name: name.into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        d.patch(&link, &json!({"link":{"interactionKind":"lib"}}))
+            .unwrap();
+    }
+    d
+}
+#[test]
+fn library_links_lend_one_shared_instance_named_by_each_link() {
+    for (set, layout) in [
+        ("go", "single-file"),
+        ("nodejs", "single-file"),
+        ("nodejs", "direct-file-system-homomorphism"),
+        ("kotlin", "single-file"),
+        ("kotlin", "source-set"),
+        ("php", "single-file"),
+        ("php", "direct-file-system-homomorphism"),
+        ("quickjs", "single-file"),
+    ] {
+        let project = compiler::generate(
+            &library_graph(set, layout),
+            "root",
+            CompileOptions::default(),
+        )
+        .unwrap();
+        let all = project
+            .files
+            .iter()
+            .map(|f| f.content.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let declaration = match set {
+            "go" => "var lib_math_library = &Lib_mathLibrary{",
+            "kotlin" => "val lib_math_library = Lib_mathLibrary",
+            "php" => "$lib_math_library = new class {",
+            _ => "const lib_math_library = Object.freeze({ maximum });",
+        };
+        assert_eq!(
+            all.matches(declaration).count(),
+            1,
+            "{set}/{layout}:\n{all}"
+        );
+        // No per-link library values or prefixed aliases remain.
+        for stale in ["numbers1", "math1", "numbers__", "math__"] {
+            assert!(!all.contains(stale), "{set}/{layout} still has {stale}");
+        }
+        let parameter = match set {
+            "go" => "math *Lib_mathLibrary",
+            "kotlin" => "math: Lib_mathLibrary",
+            "php" => "mixed $math",
+            _ => ", math)",
+        };
+        assert!(
+            all.contains(parameter),
+            "{set}/{layout} lacks {parameter}:\n{all}"
+        );
+    }
+}
+#[tokio::test]
+async fn real_go_and_node_library_instances() {
+    library_workflows(&[
+        ("go", "single-file"),
+        ("nodejs", "single-file"),
+        ("nodejs", "direct-file-system-homomorphism"),
+    ])
+    .await;
+}
+#[tokio::test]
+#[ignore = "requires Kotlin 2.2.0 and Java 21; set WIRECRAFT_TEST_KOTLINC"]
+async fn real_kotlin_library_instances() {
+    library_workflows(&[("kotlin", "single-file"), ("kotlin", "source-set")]).await;
+}
+#[tokio::test]
+#[ignore = "requires external PHP and QuickJS; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_QJS"]
+async fn real_php_and_quickjs_library_instances() {
+    library_workflows(&[
+        ("php", "single-file"),
+        ("php", "direct-file-system-homomorphism"),
+        ("quickjs", "single-file"),
+    ])
+    .await;
+}
+async fn library_workflows(cases: &[(&str, &str)]) {
+    run_cases(cases, library_graph).await;
+}
 async fn workflows(cases: &[(&str, &str)]) {
+    run_cases(cases, graph).await;
+}
+async fn run_cases(cases: &[(&str, &str)], build: fn(&str, &str) -> Document) {
     let jobs = Jobs::new(tokio::sync::broadcast::channel(64).0);
     for &(set, layout) in cases {
-        let d = graph(set, layout);
+        let d = build(set, layout);
         let project = compiler::generate(&d, "root", CompileOptions::default()).unwrap();
 
         let temp = tempfile::tempdir().unwrap();

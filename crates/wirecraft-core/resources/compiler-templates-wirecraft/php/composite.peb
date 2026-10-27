@@ -1,0 +1,28 @@
+{# A composite initializes descendants once, then executes and transports on each frame. #}
+{{ initializerProvenanceComment }}
+function {{ initializerSymbol }}(array &$context{% for link in incomingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, mixed ${{ link.argumentSymbol }}{% endfor %}): void
+{
+{% for child in childArtifacts %}{% for link in child.dependencyInjectionLinks %}    global ${{ link.dependencySymbol }};
+{% endfor %}{% endfor %}
+{% for linkArtifact in linkArtifacts %}{% if linkArtifact.link is not empty and not linkArtifact.link.isCapability %}    global ${{ linkArtifact.link.aPortSymbol }}, ${{ linkArtifact.link.bPortSymbol }};
+{% endif %}{% endfor %}
+{% if instantiation is not empty %}{{ instantiationIndent4 }}
+{% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}    {{ child.initializerSymbol }}($context{% for link in child.incomingDataLinks %}, ${{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, ${{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, ${{ link.dependencySymbol }}{% endfor %});
+{% endif %}{% endfor %}}
+
+{{ runProvenanceComment }}
+function {{ runSymbol }}(array &$context{% for link in incomingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, mixed ${{ link.argumentSymbol }}{% endfor %}): void
+{
+{% for child in childArtifacts %}{% for link in child.dependencyInjectionLinks %}    global ${{ link.dependencySymbol }};
+{% endfor %}{% endfor %}
+{% for linkArtifact in linkArtifacts %}{% if linkArtifact.link is not empty and not linkArtifact.link.isCapability %}    global ${{ linkArtifact.link.aPortSymbol }}, ${{ linkArtifact.link.bPortSymbol }};
+{% endif %}{% endfor %}
+{% if declaration is not empty %}{{ declarationIndent4 }}
+{% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}    {{ child.runSymbol }}($context{% for link in child.incomingDataLinks %}, ${{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, ${{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, ${{ link.dependencySymbol }}{% endfor %});
+{% endif %}{% endfor %}{% for linkArtifact in linkArtifacts %}{% if linkArtifact.instantiation is not empty and not linkArtifact.link.isCapability %}    {{ linkArtifact.instantiation }}
+{% endif %}{% endfor %}}
+
+function {{ symbol }}(array &$context{% for link in incomingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, array &${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, mixed ${{ link.argumentSymbol }}{% endfor %}): void
+{
+    {{ runSymbol }}($context{% for link in incomingDataLinks %}, ${{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, ${{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, ${{ link.argumentSymbol }}{% endfor %});
+}

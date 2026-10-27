@@ -520,3 +520,111 @@ fn runnable_capabilities_are_rejected_with_the_baseline_reason() {
         error.message
     );
 }
+
+#[tokio::test]
+async fn dependency_links_lend_one_library_instance_to_each_consumer_by_link_name() {
+    let mut d = project();
+    let library = processor(
+        &mut d,
+        "lib_math",
+        r#"#include <limits.h>
+static int clamp_value(int value) {
+    if (value > INT_MAX / 2) {
+        return INT_MAX / 2;
+    }
+    return value;
+}
+int maximum(int left, int right) {
+    return clamp_value(left > right ? left : right);
+}"#,
+    );
+    let first = processor(
+        &mut d,
+        "first",
+        r#"static int done = 0;
+if (!done) { printf("first %d\n", math->maximum(2, 4)); done = 1; }"#,
+    );
+    let group = d.create("root", "group", NodeKind::Processor).unwrap();
+    let second = d.create(&group, "second", NodeKind::Processor).unwrap();
+    d.patch(
+        &second,
+        &json!({"text":{"source":"static int done = 0;\nif (!done) { printf(\"second %d\\n\", numbers->maximum(7, 3)); done = 1; }\nif (threadwork_runner__shutdown_request(&threadwork_runner) != THREADWORK_OK) return THREADWORK_ERROR;"}}),
+    )
+    .unwrap();
+    for (name, target) in [("math", &first), ("numbers", &second)] {
+        let link = d
+            .create_link(
+                name,
+                Link {
+                    source_node_id: library.clone(),
+                    source_port_name: "service".into(),
+                    target_node_id: target.clone(),
+                    target_port_name: name.into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        d.patch(&link, &json!({"link":{"interactionKind":"lib"}}))
+            .unwrap();
+    }
+    let unit = C17::generate(&d, "root").unwrap().files[0].content.clone();
+    // One exporter and one instance for the library, regardless of the number of links.
+    assert_eq!(unit.matches("typedef struct Lib_mathLibrary {").count(), 1);
+    assert_eq!(
+        unit.matches("static const Lib_mathLibrary lib_math_library = {")
+            .count(),
+        1
+    );
+    assert!(unit.contains("    int (*maximum)(int left, int right);"));
+    assert!(unit.contains("    int (*clamp_value)(int value);"));
+    // Only file-scope declarations are exported, not statements inside bodies.
+    assert!(!unit.contains("(*return)") && !unit.contains("(*if)"));
+    assert!(unit.contains("const Lib_mathLibrary *math)"));
+    assert!(unit.contains("const Lib_mathLibrary *numbers)"));
+    assert!(unit.contains("&lib_math_library)"));
+    assert!(!unit.contains("math__maximum") && !unit.contains("numbers__maximum"));
+
+    let app = Application::new(Service::new(d.clone(), None), "fixture".into(), None);
+    let context = app
+        .execute(Request::new(
+            "editor.context",
+            json!({"nodeId":first,"section":"source"}),
+        ))
+        .await
+        .unwrap();
+    let symbol = context["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == "math")
+        .cloned()
+        .expect("library instance symbol");
+    assert_eq!(symbol["detail"], "const Lib_mathLibrary *math");
+    assert!(
+        symbol["documentation"]
+            .as_str()
+            .unwrap()
+            .contains("int maximum(int left, int right)")
+    );
+    let text = "math->max";
+    let completion = app
+        .execute(Request::new(
+            "editor.complete",
+            json!({"nodeId":first,"section":"source","text":text,"offset":text.len(),"generation":1}),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        completion["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["filterText"] == "maximum"
+                || i["label"].as_str().is_some_and(|l| l.contains("maximum"))),
+        "{completion}"
+    );
+    app.shutdown().await;
+
+    let (_, output) = build_run(d).await;
+    assert_eq!(output, "first 4\nsecond 7\n");
+}

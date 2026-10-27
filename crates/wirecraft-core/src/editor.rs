@@ -94,9 +94,20 @@ pub fn body_context(
         if relation(&candidate, n) == Some(Relation::Dependency) {
             if link.target_node_id != node_id {
                 excluded_library_prefixes.insert(format!("{name}__"));
-            } else {
-                for function in crate::c17::library_functions(&candidate, n)? {
-                    symbols.push(json!({"label":function.name,"kind":3,"detail":function.signature,"documentation":format!("Injected by dependency {}",n.name)}));
+            } else if let Some(library) = candidate.nodes.get(&link.source_node_id) {
+                let members = crate::c17::library_members(library)
+                    .iter()
+                    .map(|m| m.signature())
+                    .collect::<Vec<_>>();
+                symbols.push(json!({"label":name,"kind":6,"detail":format!("const {} *{name}",crate::c17::library_type(library)),"documentation":format!("Instance of library {} injected by dependency {}; call members with {name}->function(...).\n\n{}",library.name,n.name,members.join("\n"))}));
+                // Former prefixed aliases are offered only to bodies that still use them.
+                let body = &candidate.nodes[node_id];
+                if format!("{}\n{}", body.text.source, body.text.initialization)
+                    .contains(&format!("{name}__"))
+                {
+                    for function in crate::c17::library_functions(&candidate, n)? {
+                        symbols.push(json!({"label":function.name,"kind":3,"detail":function.signature,"documentation":format!("Injected by dependency {}",n.name)}));
+                    }
                 }
             }
             continue;

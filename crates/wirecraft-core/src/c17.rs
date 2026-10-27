@@ -317,13 +317,60 @@ impl C17 {
             let n = document.node(id)?;
             out.authored(n, "source", &n.text.source, "");
         }
+        // One exporter struct and one shared instance per library that is depended upon;
+        // each dependency link lends that instance to its consumer as a named argument.
+        let mut injected = vec![];
+        let mut exported = BTreeSet::new();
+        for n in &capabilities {
+            let link = n.link.as_ref().unwrap();
+            let library = document.node(&link.source_node_id)?;
+            // Library-to-library links share file scope; only executables receive instances.
+            if executables.contains(&link.target_node_id) {
+                if exported.insert(library.id.clone()) {
+                    out.line(&library_exporter(library));
+                }
+                let argument = identifier(&n.name);
+                if reserved(&argument) {
+                    return Err(unsupported(n, "Link argument is a reserved C identifier"));
+                }
+                injected.push((
+                    link.target_node_id.clone(),
+                    Argument {
+                        name: argument,
+                        ctype: format!("const {} *", library_type(library)),
+                        value: format!("&{}", library_instance(library)),
+                    },
+                ));
+            }
+        }
+        // Compatibility: bodies written for the former `link__function` aliases still compile.
+        let bodies = scope
+            .iter()
+            .filter_map(|id| document.nodes.get(id))
+            .filter(|n| !n.is_link())
+            .map(|n| format!("{}\n{}", n.text.source, n.text.initialization))
+            .collect::<Vec<_>>();
         let mut aliases = BTreeSet::new();
-        for n in capabilities {
+        for n in &capabilities {
+            let prefix = format!("{}__", identifier(&n.name));
+            if !bodies.iter().any(|body| body.contains(&prefix)) {
+                continue;
+            }
             for function in library_functions(document, n)? {
                 if aliases.insert(function.name) {
                     out.line(&function.declaration);
                 }
             }
+        }
+        for capability in sources.values() {
+            injected.push((
+                capability.target.clone(),
+                Argument {
+                    name: capability.argument.clone(),
+                    ctype: format!("{} *", capability.capability_type),
+                    value: format!("&{}", capability.dependency),
+                },
+            ));
         }
         for (id, capability) in &sources {
             let n = document.node(id)?;
@@ -349,7 +396,7 @@ impl C17 {
             out.line(&format!("static threadwork_error_t transport_{}(threadwork_buffer *a, threadwork_buffer *b) {{ return threadwork_buffer_transport(a,b); }}",wire.allocation));
         }
         for id in &executables {
-            let arguments = arguments(id, &wires, &sources)?;
+            let arguments = arguments(id, &wires, &injected)?;
             for phase in ["init", "run"] {
                 out.line(&format!(
                     "static threadwork_error_t tw_{phase}_{}({});",
@@ -361,7 +408,7 @@ impl C17 {
         // Bodies may be emitted in ID order because every generated function has a prototype.
         for id in &executables {
             let n = document.node(id)?;
-            let args = arguments(id, &wires, &sources)?;
+            let args = arguments(id, &wires, &injected)?;
             for (phase, section, text) in [
                 ("init", "initialization", &n.text.initialization),
                 ("run", "source", &n.text.source),
@@ -373,7 +420,7 @@ impl C17 {
                 out.authored(n, section, text, "    ");
                 for child in &n.children {
                     if executables.contains(child) {
-                        let child_args = arguments(child, &wires, &sources)?;
+                        let child_args = arguments(child, &wires, &injected)?;
                         let call_args = child_args
                             .iter()
                             .map(|argument| format!(", {}", argument.value))
@@ -389,7 +436,7 @@ impl C17 {
                 out.line("    return THREADWORK_OK;\n}");
             }
         }
-        let root_args = arguments(root, &wires, &sources)?;
+        let root_args = arguments(root, &wires, &injected)?;
         let root_args = root_args
             .iter()
             .map(|argument| format!(", {}", argument.value))
@@ -428,7 +475,7 @@ impl C17 {
 fn arguments(
     id: &str,
     wires: &BTreeMap<String, Wire>,
-    sources: &BTreeMap<String, SourceCapability>,
+    injected: &[(String, Argument)],
 ) -> Result<Vec<Argument>> {
     let mut args = vec![];
     let mut used = BTreeSet::new();
@@ -454,21 +501,22 @@ fn arguments(
             }
         }
     }
-    // Only consumers receive a source capability; its provider keeps its own signature.
-    for capability in sources.values().filter(|c| c.target == id) {
-        if !used.insert(capability.argument.clone()) {
+    // Only consumers receive library instances and source capabilities; providers keep
+    // their own signatures.
+    for (_, argument) in injected.iter().filter(|(target, _)| target == id) {
+        if !used.insert(argument.name.clone()) {
             return Err(Error::new(
                 "invalid_input",
                 format!(
                     "Duplicate C argument '{}'; use distinct link names",
-                    capability.argument
+                    argument.name
                 ),
             ));
         }
         args.push(Argument {
-            name: capability.argument.clone(),
-            ctype: format!("{} *", capability.capability_type),
-            value: format!("&{}", capability.dependency),
+            name: argument.name.clone(),
+            ctype: argument.ctype.clone(),
+            value: argument.value.clone(),
         });
     }
     Ok(args)
@@ -693,29 +741,103 @@ pub(crate) struct LibraryFunction {
     pub declaration: String,
     pub signature: String,
 }
-pub(crate) fn library_functions(document: &Document, n: &Node) -> Result<Vec<LibraryFunction>> {
-    let link = n
-        .link
-        .as_ref()
-        .ok_or_else(|| unsupported(n, "Library capability must be a link"))?;
-    let library = document.node(&link.source_node_id)?;
-    let prefix = identifier(&n.name);
-    let mut functions_out = Vec::new();
-    let mut aliases = BTreeSet::new();
+/// A function a C service library exports through its instance struct.
+pub(crate) struct LibraryMember {
+    pub name: String,
+    pub result: String,
+    pub parameters: String,
+}
+impl LibraryMember {
+    pub fn signature(&self) -> String {
+        format!("{} {}({})", self.result, self.name, self.parameters)
+    }
+}
+/// `lib_math` → `Lib_mathLibrary`, matching the capability type spelling.
+pub(crate) fn library_type(library: &Node) -> String {
+    let mut name = identifier(&library.name);
+    name[..1].make_ascii_uppercase();
+    format!("{name}Library")
+}
+/// The single shared instance of a library's exporter struct.
+pub(crate) fn library_instance(library: &Node) -> String {
+    format!("{}_library", identifier(&library.name))
+}
+/// Exporter struct and its one static instance, emitted after the library source.
+pub(crate) fn library_exporter(library: &Node) -> String {
+    let members = library_members(library);
+    let ty = library_type(library);
+    let mut text = format!(
+        "/* Library {} instance: dependency links lend it to consumers by link name. */\ntypedef struct {ty} {{",
+        comment(&library.name)
+    );
+    if members.is_empty() {
+        text.push_str("\n    unsigned char _wirecraft_empty;");
+    }
+    for m in &members {
+        text.push_str(&format!(
+            "\n    {} (*{})({});",
+            m.result, m.name, m.parameters
+        ));
+    }
+    text.push_str(&format!(
+        "\n}} {ty};\nstatic const {ty} {} = {{",
+        library_instance(library)
+    ));
+    if members.is_empty() {
+        text.push_str(" 0 ");
+    }
+    for m in &members {
+        text.push_str(&format!("\n    .{name} = {name},", name = m.name));
+    }
+    if !members.is_empty() {
+        text.push('\n');
+    }
+    text.push_str("};");
+    text
+}
+/// Top-level function declarations and definitions in a library, plus the supported
+/// standard-header functions it includes.
+pub(crate) fn library_members(library: &Node) -> Vec<LibraryMember> {
+    let source = &library.text.source;
+    // Brace depth at every byte, so only file-scope declarations are exported.
+    let mut depth = vec![0usize; source.len() + 1];
+    let mut level = 0usize;
+    for (i, b) in source.bytes().enumerate() {
+        depth[i] = level;
+        match b {
+            b'{' => level += 1,
+            b'}' => level = level.saturating_sub(1),
+            _ => {}
+        }
+    }
+    let mut members: Vec<LibraryMember> = vec![];
     let mut add = |result: &str, name: &str, parameters: &str| {
-        let alias = format!("{prefix}__{name}");
-        if aliases.insert(alias.clone()) {
-            functions_out.push(LibraryFunction {
-                name: alias.clone(),
-                declaration: format!("{result} (*{alias})({parameters}) = {name};"),
-                signature: format!("{result} {alias}({parameters})"),
+        if !members.iter().any(|m| m.name == name) {
+            members.push(LibraryMember {
+                name: name.into(),
+                result: result.into(),
+                parameters: parameters.into(),
             });
         }
     };
     let function_pattern=regex::Regex::new(r"(?m)(?:^|[;}])\s*((?:[A-Za-z_][A-Za-z0-9_]*\s+)+(?:\*+\s*)?)([A-Za-z_][A-Za-z0-9_]*)\s*\(([^;{}]*)\)\s*(?:\{|;)").unwrap();
-    for capture in function_pattern.captures_iter(&library.text.source) {
-        let result = capture[1]
-            .split_whitespace()
+    for capture in function_pattern.captures_iter(source) {
+        let whole = capture.get(0).unwrap();
+        if depth[capture.get(2).unwrap().start()] != 0
+            || whole.as_str().trim_start().starts_with('#')
+        {
+            continue;
+        }
+        let words = capture[1].split_whitespace().collect::<Vec<_>>();
+        if words
+            .iter()
+            .any(|w| ["return", "else", "typedef", "case", "goto", "sizeof", "do"].contains(w))
+            || ["if", "while", "for", "switch"].contains(&&capture[2])
+        {
+            continue;
+        }
+        let result = words
+            .into_iter()
             .filter(|w| !["static", "extern", "inline", "_Noreturn"].contains(w))
             .collect::<Vec<_>>()
             .join(" ");
@@ -759,12 +881,31 @@ pub(crate) fn library_functions(document: &Document, n: &Node) -> Result<Vec<Lib
             ][..],
         ),
     ] {
-        if library.text.source.contains(header) {
+        if source.contains(header) {
             for (result, name, parameters) in functions {
                 add(result, name, parameters);
             }
         }
     }
-
-    Ok(functions_out)
+    members
+}
+/// Legacy `link__function` aliases, emitted only for bodies that still use them.
+pub(crate) fn library_functions(document: &Document, n: &Node) -> Result<Vec<LibraryFunction>> {
+    let link = n
+        .link
+        .as_ref()
+        .ok_or_else(|| unsupported(n, "Library capability must be a link"))?;
+    let library = document.node(&link.source_node_id)?;
+    let prefix = identifier(&n.name);
+    Ok(library_members(library)
+        .into_iter()
+        .map(|m| {
+            let alias = format!("{prefix}__{}", m.name);
+            LibraryFunction {
+                declaration: format!("{} (*{alias})({}) = {};", m.result, m.parameters, m.name),
+                signature: format!("{} {alias}({})", m.result, m.parameters),
+                name: alias,
+            }
+        })
+        .collect())
 }
