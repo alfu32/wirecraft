@@ -338,3 +338,45 @@ fn routed_link_index_culls_empty_interiors_and_matches_segment_bounds() {
         vec!["perimeter"]
     );
 }
+
+#[test]
+fn sheet_world_contours_cover_the_drawing_and_follow_split_tiles() {
+    let mut d = Document::new("sheets");
+    for (i, name) in ["a", "b", "c"].iter().enumerate() {
+        let id = d.create("root", name, NodeKind::Processor).unwrap();
+        d.patch(
+            &id,
+            &json!({"layout":{"x":i as f64 * 900.,"y":i as f64 * 500.,"width":180.,"height":90.}}),
+        )
+        .unwrap();
+    }
+    let drawing = drawing::Drawing::new(&d, "root");
+    let single = sheets::plan(&d, "root", &sheets::SheetOptions::default()).unwrap();
+    assert_eq!(single.world_tiles.len(), 1);
+    let page = single.world_tiles[0];
+    for shape in drawing.shapes.values() {
+        let r = shape.rect;
+        assert!(
+            r.x >= page.x
+                && r.y >= page.y
+                && r.x + r.width <= page.x + page.width
+                && r.y + r.height <= page.y + page.height,
+            "shape outside contour"
+        );
+    }
+    let split = sheets::plan(
+        &d,
+        "root",
+        &sheets::SheetOptions {
+            format: "A4".into(),
+            split: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(split.world_tiles.len() > 1);
+    assert_eq!(split.world_tiles.len(), split.tiles.len());
+    // Neighbouring pages overlap by exactly the configured millimetres (4 world units/mm).
+    let step = split.world_tiles[1].x - split.world_tiles[0].x;
+    assert!((split.world_tiles[0].width - step - 5. * 4.).abs() < 1e-6);
+}

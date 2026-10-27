@@ -100,6 +100,8 @@ struct Wirecraft {
     parent: String,
     selected: BTreeSet<String>,
     mode: Mode,
+    show_sheets: bool,
+    sheet_contours: Vec<wirecraft_core::viewport::Rect>,
     link_source: Option<String>,
     tab: String,
     section: String,
@@ -245,6 +247,8 @@ impl Wirecraft {
                 session.selected_ids.into_iter().collect()
             },
             mode: Mode::Select,
+            show_sheets: false,
+            sheet_contours: Vec::new(),
             link_source: None,
             tab: if session.tab.is_empty() {
                 "Designer".into()
@@ -745,11 +749,27 @@ impl Wirecraft {
         self.refresh_compiler_issues();
         cx.notify();
     }
+    /// Recomputes page contours for the current parent; only while the overlay is shown.
+    fn refresh_sheets(&mut self) {
+        self.sheet_contours.clear();
+        if !self.show_sheets {
+            return;
+        }
+        match wirecraft_core::sheets::plan(
+            &self.snapshot.document,
+            &self.parent,
+            &self.export_settings.sheet,
+        ) {
+            Ok(plan) => self.sheet_contours = plan.world_tiles,
+            Err(error) => self.status = format!("Sheet contours unavailable: {}", error.message),
+        }
+    }
     fn rebuild(&mut self) {
         self.scene = Arc::new(
             scene::Scene::new(&self.snapshot.document, &self.parent)
                 .with_appearance(self.options.saved.appearance.clone()),
         );
+        self.refresh_sheets();
         self.tree.clear();
         let mut stack = vec![(self.snapshot.document.root_node_id.clone(), 0)];
         while let Some((id, depth)) = stack.pop() {
@@ -1403,6 +1423,14 @@ impl Wirecraft {
         self.client.send(command, json!({}));
     }
 }
+/// Marks the current mode or an enabled toggle with the accent fill.
+fn active(button: Stateful<Div>, on: bool) -> Stateful<Div> {
+    button.when(on, |b| {
+        b.bg(crate::chrome::color(0x255452))
+            .text_color(crate::chrome::color(0x70d5c6))
+            .hover(|s| s.bg(crate::chrome::color(0x257e81)))
+    })
+}
 fn button(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Stateful<Div> {
     let id: SharedString = id.into();
     let icon = icons::for_button(&id);
@@ -1666,6 +1694,7 @@ impl Render for Wirecraft {
                 .as_ref()
                 .map(|(_, _, r)| (*r, self.drag_delta));
             let selection = self.selection_start.zip(self.selection_end);
+            let sheets = self.sheet_contours.clone();
             let parent_name = self.snapshot.document.qualified_name(&self.parent);
             content = content
                 .child(
@@ -1673,27 +1702,39 @@ impl Render for Wirecraft {
                         .flex()
                         .gap_2()
                         .p_2()
-                        .child(button("select", "Select").on_click(
-                            cx.listener(|this, _, w, cx| this.select_mode(&SelectMode, w, cx)),
-                        ))
-                        .child(button("node", "Node").on_click(
-                            cx.listener(|this, _, w, cx| this.node_mode(&NodeMode, w, cx)),
-                        ))
                         .child(
-                            button("type", "Type").on_click(cx.listener(|this, _, _, cx| {
-                                this.mode = Mode::Type;
-                                cx.notify();
-                            })),
+                            active(button("select", "Select"), self.mode == Mode::Select).on_click(
+                                cx.listener(|this, _, w, cx| this.select_mode(&SelectMode, w, cx)),
+                            ),
                         )
-                        .child(button("link", "Link").on_click(
-                            cx.listener(|this, _, w, cx| this.link_mode(&LinkMode, w, cx)),
-                        ))
+                        .child(
+                            active(button("node", "Node"), self.mode == Mode::Node).on_click(
+                                cx.listener(|this, _, w, cx| this.node_mode(&NodeMode, w, cx)),
+                            ),
+                        )
+                        .child(
+                            active(button("type", "Type"), self.mode == Mode::Type).on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.mode = Mode::Type;
+                                    cx.notify();
+                                }),
+                            ),
+                        )
+                        .child(
+                            active(button("link", "Link"), self.mode == Mode::Link).on_click(
+                                cx.listener(|this, _, w, cx| this.link_mode(&LinkMode, w, cx)),
+                            ),
+                        )
                         .child(
                             button("fit", "Fit")
                                 .on_click(cx.listener(|this, _, w, cx| this.fit(&Fit, w, cx))),
                         )
-                        .child(button("sheet", "Sheet").on_click(
-                            cx.listener(|this, _, w, cx| this.show_export(&ShowExport, w, cx)),
+                        .child(active(button("sheet", "Sheet"), self.show_sheets).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.show_sheets = !this.show_sheets;
+                                this.refresh_sheets();
+                                cx.notify();
+                            }),
                         ))
                         .child(button("up", "Up").on_click(cx.listener(|this, _, _, cx| {
                             if let Some(p) =
@@ -1733,6 +1774,23 @@ impl Render for Wirecraft {
                                     scene.paint(
                                         b, view, &selected, &moving, drag, &errors, window, cx,
                                     );
+                                    for page in &sheets {
+                                        let p = view.screen([page.x, page.y]);
+                                        window.paint_quad(quad(
+                                            Bounds::new(
+                                                b.origin + point(px(p[0] as f32), px(p[1] as f32)),
+                                                size(
+                                                    px((page.width * view.zoom) as f32),
+                                                    px((page.height * view.zoom) as f32),
+                                                ),
+                                            ),
+                                            px(0.),
+                                            rgba(0x00000000),
+                                            px(1.),
+                                            crate::chrome::color(0x9bb0c3),
+                                            BorderStyle::Dashed,
+                                        ));
+                                    }
                                     if let Some((r, delta)) = resize {
                                         let p = view.screen([r.x, r.y]);
                                         window.paint_quad(quad(

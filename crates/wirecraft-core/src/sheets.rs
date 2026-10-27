@@ -36,6 +36,9 @@ pub struct SheetPlan {
     pub overview_width_mm: f64,
     pub overview_height_mm: f64,
     pub tiles: Vec<SheetTile>,
+    /// Page contours in canvas world units, in the same order as `tiles`.
+    #[serde(skip)]
+    pub world_tiles: Vec<crate::viewport::Rect>,
 }
 pub const FORMATS: &[&str] = &[
     "Auto",
@@ -184,6 +187,18 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
             &format!("height=\"{content_h}\""),
             1,
         );
+    // The nested drawing maps its viewBox origin to (x, y) mm at `unit_scale` world units per mm.
+    let view_box = diagram
+        .split("viewBox=\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .map(|s| {
+            s.split(' ')
+                .filter_map(|v| v.parse::<f64>().ok())
+                .collect::<Vec<_>>()
+        })
+        .filter(|v| v.len() == 4)
+        .unwrap_or_else(|| vec![0., 0., 1., 1.]);
     let tiles = (0..rows)
         .flat_map(|row| {
             (0..columns).map(move |column| SheetTile {
@@ -268,7 +283,17 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{total_w}mm\" height=\"{total_h}mm\" viewBox=\"0 0 {total_w} {total_h}\"><rect width=\"{total_w}\" height=\"{total_h}\" fill=\"white\"/>{composition}{contours}{alignment}</svg>"
     );
     let pages=tiles.iter().map(|tile|format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}mm\" height=\"{height}mm\" viewBox=\"{} {} {width} {height}\"><rect x=\"{}\" y=\"{}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/>{composition}{alignment}</svg>",tile.x_mm,tile.y_mm,tile.x_mm,tile.y_mm)).collect();
+    let world_tiles = tiles
+        .iter()
+        .map(|t| crate::viewport::Rect {
+            x: view_box[0] + (t.x_mm - x) * unit_scale,
+            y: view_box[1] + (t.y_mm - y) * unit_scale,
+            width: t.width_mm * unit_scale,
+            height: t.height_mm * unit_scale,
+        })
+        .collect();
     Ok(SheetPlan {
+        world_tiles,
         format: format.into(),
         width_mm: width,
         height_mm: height,
