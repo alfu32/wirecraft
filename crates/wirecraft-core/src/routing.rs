@@ -115,6 +115,37 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
         );
         paths.insert(id.clone(), (path, common));
     }
+    // Count the existing side occupancy before adding either feedback port.
+    // Provider/type callouts occupy the right side; dependency flagpoles are
+    // on top and do not contribute to either horizontal side.
+    let mut occupancy: BTreeMap<(String, bool), usize> = BTreeMap::new();
+    for p in &ports {
+        if drawing.edges[&p.edge].source != drawing.edges[&p.edge].target {
+            *occupancy.entry((p.owner.clone(), p.right)).or_default() += 1;
+        }
+    }
+    for a in drawing.annotations.values().filter(|a| !a.flag) {
+        *occupancy.entry((a.owner.clone(), true)).or_default() += 1;
+    }
+    for (id, (path, _)) in &paths {
+        let edge = &drawing.edges[id];
+        if edge.source != edge.target {
+            continue;
+        }
+        let left = occupancy
+            .get(&(edge.source.clone(), false))
+            .copied()
+            .unwrap_or(0);
+        let right = occupancy
+            .get(&(edge.source.clone(), true))
+            .copied()
+            .unwrap_or(0);
+        let side = right <= left;
+        for index in path {
+            ports[*index].right = side;
+        }
+        *occupancy.entry((edge.source.clone(), side)).or_default() += 2;
+    }
     let mut sides: BTreeMap<(String, bool), Vec<usize>> = BTreeMap::new();
     for (i, p) in ports.iter().enumerate() {
         sides.entry((p.owner.clone(), p.right)).or_default().push(i);
@@ -132,6 +163,17 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
                     |p: &Port| drawing.edges[&p.edge].source == drawing.edges[&p.edge].target;
                 is_self(&ports[*b])
                     .cmp(&is_self(&ports[*a]))
+                    .then_with(|| {
+                        if is_self(&ports[*a]) && is_self(&ports[*b]) {
+                            ports[*a].edge.cmp(&ports[*b].edge).then_with(|| {
+                                // Incoming above outgoing: a compact upward U
+                                // rather than a trip around the whole box.
+                                ports[*a].toward_target.cmp(&ports[*b].toward_target)
+                            })
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    })
                     .then_with(|| angle(&ports[*a]).total_cmp(&angle(&ports[*b])))
                     .then_with(|| ports[*a].edge.cmp(&ports[*b].edge))
             });
@@ -459,47 +501,40 @@ fn self_loop(
     occupied: &[(Point, Point)],
     bounds: Option<Rect>,
 ) -> Vec<Point> {
-    // Feedback owns the nearest local envelope before ordinary channels route.
-    // Grow only in small rings when a physical obstacle prevents that envelope.
-    let base = STUB + rank as f64 * GAP * std::f64::consts::SQRT_2;
+    // Both ports share the less crowded side. Keep the U between their
+    // heights and retain the long horizontal leads after chamfering.
+    let dir = if a[0] >= node.x + node.width / 2. {
+        1.
+    } else {
+        -1.
+    };
+    let side = if dir > 0. {
+        node.x + node.width
+    } else {
+        node.x
+    };
+    let base = OUTPUT_OFFSET + STUB + CHAMFER + rank as f64 * GAP * std::f64::consts::SQRT_2;
+    let own = expand(node, 8.);
+    let others = obstacles
+        .iter()
+        .copied()
+        .filter(|r| {
+            (r.x - own.x).abs()
+                + (r.y - own.y).abs()
+                + (r.width - own.width).abs()
+                + (r.height - own.height).abs()
+                > EPS
+        })
+        .collect::<Vec<_>>();
     let mut fallback = None;
     for ring in 0..=8 {
-        let clearance = base + f64::from(ring) * GAP;
-        let start = [a[0] + clearance, a[1]];
-        let end = [b[0] - clearance, b[1]];
-        let mut best = None;
-        for y in [node.y - clearance, node.y + node.height + clearance] {
-            let inner = chamfer(vec![start, [start[0], y], [end[0], y], end]);
-            let own = expand(node, 8.);
-            let others = obstacles
-                .iter()
-                .copied()
-                .filter(|r| {
-                    (r.x - own.x).abs()
-                        + (r.y - own.y).abs()
-                        + (r.width - own.width).abs()
-                        + (r.height - own.height).abs()
-                        > EPS
-                })
-                .collect::<Vec<_>>();
-            let mut path = vec![a];
-            path.extend_from_slice(&inner);
-            path.push(b);
-            simplify(&mut path);
-            let soft = soft_cost(&path, &others, occupied, bounds);
-            if fallback.as_ref().is_none_or(|(old, _)| soft < *old) {
-                fallback = Some((soft, path.clone()));
-            }
-            if route_cost(&inner, obstacles, occupied, bounds).is_none() {
-                continue;
-            }
-            if let Some(cost) = route_cost(&path, &others, occupied, bounds)
-                && best.as_ref().is_none_or(|(old, _)| cost < *old)
-            {
-                best = Some((cost, path));
-            }
+        let x = side + dir * (base + f64::from(ring) * GAP);
+        let path = chamfer(vec![a, [x, a[1]], [x, b[1]], b]);
+        let soft = soft_cost(&path, &others, occupied, bounds);
+        if fallback.as_ref().is_none_or(|(old, _)| soft < *old) {
+            fallback = Some((soft, path.clone()));
         }
-        if let Some((_, path)) = best {
+        if route_cost(&path, &others, occupied, bounds).is_some() {
             return path;
         }
     }

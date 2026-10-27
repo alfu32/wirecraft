@@ -70,3 +70,7 @@ Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. 
 | Priority feedback, original caps, longer leads and PCB vias | JVM self/port rules; latest user diagrams and best-effort request | Local feedback/port-priority, 46-unit leads, original cap coordinates, via/backside unit checks; native captures | Shared desktop/SVG geometry; no routing-error labels when a complete clear solution is unavailable |
 
 Final workspace verification: 88 tests passed with optional real toolchains, formatting and strict Clippy passed. Native and installed results: [0.6.1 evidence](evidence/v0.6.1/verification.json).
+
+## 0.6.2 same-side feedback
+
+User-specified local U replaces around-the-box self loops. Both ports use the less occupied side (right on ties), input above output, paired before ordinary channels. Tests cover all occupancy comparisons, multiple loops, provider boxes versus top flags, local no-box-entry/no-overlap geometry, and long leads. Native and release verification is recorded in status.md.

@@ -314,45 +314,110 @@ fn open_routes_choose_substantial_diagonals_in_all_quadrants_and_vector_exports(
 }
 
 #[test]
-fn feedback_reserves_tight_local_envelopes_and_first_ports_before_other_channels() {
-    let mut d = Document::new("Feedback priority");
-    let a = box_at(&mut d, "root", "A", 500., 300.);
-    let left = box_at(&mut d, "root", "Left", 0., 300.);
-    let right = box_at(&mut d, "root", "Right", 1100., 300.);
-    let feedback = wire(&mut d, &a, &a, "feedback");
-    d.nodes.get_mut(&feedback).unwrap().layout.y = 10000.;
-    let incoming = wire(&mut d, &left, &a, "incoming");
-    let outgoing = wire(&mut d, &a, &right, "outgoing");
-    let drawing = Drawing::new(&d, "root");
-    assert_routes(&drawing);
-    let edge = &drawing.edges[&feedback];
-    let r = drawing.shapes[&a].rect;
-    for p in &edge.points {
+fn feedback_uses_the_less_crowded_side_before_adding_both_ports_and_prefers_right_on_ties() {
+    for (left_count, right_count) in [(0, 0), (1, 0), (0, 1), (1, 1), (2, 1), (1, 2)] {
+        let mut d = Document::new("Same-side feedback");
+        let a = box_at(&mut d, "root", "A", 500., 300.);
+        let left = box_at(&mut d, "root", "Left", 0., 300.);
+        let right = box_at(&mut d, "root", "Right", 1100., 300.);
+        let feedback = wire(&mut d, &a, &a, "feedback");
+        d.nodes.get_mut(&feedback).unwrap().layout.y = 10000.;
+        for i in 0..left_count {
+            wire(&mut d, &left, &a, &format!("incoming{i}"));
+        }
+        for i in 0..right_count {
+            wire(&mut d, &a, &right, &format!("outgoing{i}"));
+        }
+        let drawing = Drawing::new(&d, "root");
+        assert_routes(&drawing);
+        let r = drawing.shapes[&a].rect;
+        let points = &drawing.edges[&feedback].points;
+        let on_right = right_count <= left_count;
+        let dir = if on_right { 1. } else { -1. };
+        let side = if on_right { r.x + r.width } else { r.x };
+        assert_eq!(points[0][0], side + dir * 20.);
+        assert_eq!(points.last().unwrap()[0], side);
         assert!(
-            p[0] >= r.x - 46. - 1e-6
-                && p[0] <= r.x + r.width + 66. + 1e-6
-                && p[1] >= r.y - 46. - 1e-6
-                && p[1] <= r.y + r.height + 46. + 1e-6,
-            "Feedback escaped its local envelope: {:?}",
-            edge.points
+            points[0][1] > points.last().unwrap()[1],
+            "Input must be above output"
+        );
+        for p in points {
+            assert!(
+                (p[0] - side) * dir >= -1e-6 && (p[0] - side) * dir <= 88. + 1e-6,
+                "Feedback escaped its side envelope: {points:?}"
+            );
+            assert!(p[1] >= points.last().unwrap()[1] && p[1] <= points[0][1]);
+        }
+        for p in [points[..2].to_vec(), points[points.len() - 2..].to_vec()] {
+            assert!((p[0][1] - p[1][1]).abs() < 1e-6);
+            assert!((p[0][0] - p[1][0]).abs() >= 46. - 1e-6);
+        }
+        // Feedback port pairs precede ordinary channels and remain adjacent.
+        for (id, edge) in &drawing.edges {
+            if id == &feedback {
+                continue;
+            }
+            for endpoint in [edge.points.first(), edge.points.last()]
+                .into_iter()
+                .flatten()
+            {
+                if (endpoint[0] - side).abs() < 21. {
+                    assert!(endpoint[1] > points[0][1]);
+                }
+            }
+        }
+        let svg = wirecraft_core::export::drawing_svg(&d, "root").unwrap();
+        assert!(svg.contains("class=\"output-port\""));
+    }
+}
+#[test]
+fn feedback_counts_right_provider_boxes_but_not_top_dependency_flags() {
+    for provider in [false, true] {
+        let mut d = Document::new("Capability occupancy");
+        let a = box_at(&mut d, "root", "A", 500., 300.);
+        let peer = box_at(&mut d, "root", "Peer", 1100., 300.);
+        d.create_link(
+            "capability",
+            Link {
+                source_node_id: if provider { a.clone() } else { peer.clone() },
+                target_node_id: if provider { peer } else { a.clone() },
+                interaction_kind: "lib".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let feedback = wire(&mut d, &a, &a, "feedback");
+        let drawing = Drawing::new(&d, "root");
+        assert_routes(&drawing);
+        let r = drawing.shapes[&a].rect;
+        assert_eq!(
+            drawing.edges[&feedback].points[0][0] > r.x + r.width,
+            !provider
         );
     }
-    assert!(edge.points[0][1] < drawing.edges[&outgoing].points[0][1]);
-    assert!(edge.points.last().unwrap()[1] < drawing.edges[&incoming].points.last().unwrap()[1]);
-    let second = wire(&mut d, &a, &a, "second-feedback");
+}
+#[test]
+fn successive_feedback_pairs_balance_occupancy_without_overlapping_channels() {
+    let mut d = Document::new("Feedback pairs");
+    let a = box_at(&mut d, "root", "A", 500., 300.);
+    let loops = (0..4)
+        .map(|i| wire(&mut d, &a, &a, &format!("feedback{i}")))
+        .collect::<Vec<_>>();
     let drawing = Drawing::new(&d, "root");
     assert_routes(&drawing);
-    for id in [&feedback, &second] {
-        for p in &drawing.edges[id].points {
-            assert!(
-                p[0] >= r.x - 61.
-                    && p[0] <= r.x + r.width + 81.
-                    && p[1] >= r.y - 61.
-                    && p[1] <= r.y + r.height + 61.,
-                "Nested feedback grew across the drawing: {:?}",
-                drawing.edges[id].points
-            );
-        }
+    let r = drawing.shapes[&a].rect;
+    let right = loops
+        .iter()
+        .filter(|id| drawing.edges[*id].points[0][0] > r.x + r.width)
+        .count();
+    assert_eq!(right, 2);
+    for id in &loops {
+        let p = &drawing.edges[id].points;
+        assert_eq!(
+            p[0][0] > r.x + r.width / 2.,
+            p.last().unwrap()[0] > r.x + r.width / 2.
+        );
+        assert!(p.iter().all(|v| v[1] >= r.y && v[1] <= r.y + r.height));
     }
 }
 #[test]

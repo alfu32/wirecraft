@@ -109,3 +109,7 @@ The 0.5.0 description above was an approximation: its search was orthogonal and 
 
 
 The user's follow-up to 0.6.1 sets the current fallback/display policy: self-links reserve compact local contours first, ports use the original hollow/filled five-point caps with 20-unit output offsets and 46-unit horizontal leads, and crossings use two hollow vias with gray polylines painted behind foreground traces. Clear routing remains preferred, but exhausted searches draw best effort instead of hiding links or showing routing-error labels. This supersedes the older visible-finding/bridge convention. See routing.md for source-derived goldens and deliberate differences.
+
+## 0.6.2 same-side feedback
+
+A feedback pair occupies the less crowded horizontal side before either port is counted, with right-side tie preference. Count visible side ports/provider boxes, exclude top flags, then include each placed pair for subsequent feedback links. Input above output stays adjacent and routes as a local external U, retaining original cap templates and long horizontal leads. Shared projection feeds both desktop and vector exports; no persistence/schema changes.

@@ -1,8 +1,12 @@
 # Current migration status
 
-Wirecraft **0.6.1** corrects native diagonal routing and recovered inspector edits, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
+Wirecraft **0.6.2** adds compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
-## Router and recovered-edit correction
+## Same-side feedback loops (0.6.2)
+
+Both self-link ports now share the side with fewer existing side ports, measured before adding either port; right wins ties. Provider/type callouts count on the right, while top dependency flags do not count. Subsequent feedback pairs include earlier pairs in their occupancy counts. Each pair stays adjacent, with input above output, and routes locally between those heights instead of around the box. Original endpoint symbols, 46-unit leads and priority over ordinary channels remain. Desktop and SVG/PDF use this shared geometry without changing project data.
+
+## Router and recovered-edit correction (0.6.1)
 
 The earlier router was H/V search with short diagonal cuts, not a faithful migration of the JVM route selection. Native diagonal candidates now use the original Euclidean length/bend/crossing rules; ten pure Kotlin route outputs and four original port templates match. A bounded eight-direction visibility search prefers clear routes; when none fits, best-effort geometry is drawn without routing-error labels, as requested. Self-links reserve compact local envelopes and first ports before other channels. Original hollow output/filled notched input caps, 46-unit horizontal stubs, and PCB-style hollow via pairs with gray backside connectors share desktop/vector geometry. Composite ports and dependency callouts remain intact. See [routing.md](routing.md) for deliberate differences, fixture provenance and checks.
 
