@@ -127,7 +127,7 @@ struct Wirecraft {
     reroute_epoch: u64,
     drag_scene: Option<(Arc<scene::Scene>, [f64; 2])>,
     move_pending: bool,
-    resize_start: Option<(String, [f64; 2], Rect)>,
+    resize_start: Option<(String, [f64; 2], Rect, interaction::Corner)>,
     selection_end: Option<[f64; 2]>,
     pan_start: Option<([f64; 2], Viewport)>,
     selection_start: Option<[f64; 2]>,
@@ -1705,10 +1705,18 @@ impl Render for Wirecraft {
                 .filter_map(|d| d["source"]["nodeId"].as_str().map(str::to_string))
                 .collect::<BTreeSet<_>>();
             let moving = self.drag_ids.clone();
-            let resize = self.resize_start.as_ref().map(|(id, _, r)| {
+            // Preview contour: the current box grown by each side's padding change.
+            let resize = self.resize_start.as_ref().map(|(id, _, r, corner)| {
                 let n = &self.snapshot.document.nodes[id];
-                let padding = interaction::padding_after_drag(n, self.drag_delta);
-                (*r, padding - wirecraft_core::drawing::composite_padding(n))
+                let new = interaction::padding_after_drag(n, *corner, self.drag_delta);
+                let old = wirecraft_core::drawing::composite_padding(n);
+                let (left, top) = (new.left - old.left, new.top - old.top);
+                Rect {
+                    x: r.x - left,
+                    y: r.y - top,
+                    width: r.width + left + new.right - old.right,
+                    height: r.height + top + new.bottom - old.bottom,
+                }
             });
             let selection = self.selection_start.zip(self.selection_end);
             let sheets = self.sheet_contours.clone();
@@ -1808,15 +1816,14 @@ impl Render for Wirecraft {
                                             BorderStyle::Dashed,
                                         ));
                                     }
-                                    if let Some((r, grow)) = resize {
-                                        // Padding preview: the contour grows on every side.
-                                        let p = view.screen([r.x - grow, r.y - grow]);
+                                    if let Some(r) = resize {
+                                        let p = view.screen([r.x, r.y]);
                                         window.paint_quad(quad(
                                             Bounds::new(
                                                 b.origin + point(px(p[0] as f32), px(p[1] as f32)),
                                                 size(
-                                                    px(((r.width + 2. * grow) * view.zoom) as f32),
-                                                    px(((r.height + 2. * grow) * view.zoom) as f32),
+                                                    px((r.width.max(0.) * view.zoom) as f32),
+                                                    px((r.height.max(0.) * view.zoom) as f32),
                                                 ),
                                             ),
                                             px(0.),

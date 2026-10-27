@@ -49,6 +49,25 @@ impl Wirecraft {
         }
         let world = self.viewport.world(local);
         let tolerance = 6. / self.viewport.zoom;
+        // Simple boxes size themselves; a selected expanded composite has four corner
+        // handles, each editing the padding of its two adjacent sides. Handles straddle
+        // the border, so they are tested before picking.
+        if self.mode == Mode::Select && !event.modifiers.shift && !event.modifiers.control {
+            let handle = self.selected.iter().find_map(|id| {
+                let shape = self.scene.drawing.shapes.get(id)?;
+                let n = self.snapshot.document.nodes.get(id)?;
+                if !(shape.composite && shape.expanded) || n.children.is_empty() {
+                    return None;
+                }
+                Corner::hit(shape.rect, world, 8. / self.viewport.zoom)
+                    .map(|corner| (id.clone(), shape.rect, corner))
+            });
+            if let Some((id, rect, corner)) = handle {
+                self.resize_start = Some((id, world, rect, corner));
+                cx.notify();
+                return;
+            }
+        }
         let hit = self.scene.pick(world, tolerance, self.mode == Mode::Select);
         match self.mode {
             Mode::Node | Mode::Type => {
@@ -83,18 +102,6 @@ impl Wirecraft {
                     self.load_editor(window, cx);
                     if let Some(shape) = self.scene.drawing.shapes.get(&id) {
                         let r = shape.rect;
-                        // Simple boxes size themselves; only an expanded composite's
-                        // handle remains, and it edits the free space around its children.
-                        if shape.composite
-                            && shape.expanded
-                            && !self.snapshot.document.nodes[&id].children.is_empty()
-                            && (world[0] - r.x - r.width).abs() < 10. / self.viewport.zoom
-                            && (world[1] - r.y - r.height).abs() < 10. / self.viewport.zoom
-                        {
-                            self.resize_start = Some((id, world, r));
-                            cx.notify();
-                            return;
-                        }
                         if shape.composite && world[0] < r.x + 28. && world[1] < r.y + 28. {
                             let expanded = !shape.expanded;
                             let layout = &self.snapshot.document.nodes[&id].layout;
@@ -142,7 +149,7 @@ impl Wirecraft {
             self.viewport.x = view.x + local[0] - start[0];
             self.viewport.y = view.y + local[1] - start[1];
             cx.notify();
-        } else if let Some((_, start, _)) = &self.resize_start {
+        } else if let Some((_, start, _, _)) = &self.resize_start {
             let world = self.viewport.world(local);
             self.drag_delta = [world[0] - start[0], world[1] - start[1]];
             cx.notify();
@@ -164,13 +171,13 @@ impl Wirecraft {
         }
     }
     fn up(&mut self, _: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some((id, _, _)) = self.resize_start.take() {
+        if let Some((id, _, _, corner)) = self.resize_start.take() {
             let n = &self.snapshot.document.nodes[&id];
-            let padding = padding_after_drag(n, self.drag_delta);
-            if (padding - wirecraft_core::drawing::composite_padding(n)).abs() > 0.5 {
+            let padding = padding_after_drag(n, corner, self.drag_delta);
+            if padding != wirecraft_core::drawing::composite_padding(n) {
                 self.client.send(
                     "threadwork.update_entity",
-                    json!({"nodeId":id,"patch":{"layout":{"padding":padding}}}),
+                    json!({"nodeId":id,"patch":{"layout":{"padding":padding.to_json()}}}),
                 );
             }
         } else if self.drag_start.take().is_some()
@@ -463,10 +470,155 @@ impl Wirecraft {
     }
 }
 
-/// Dragging the bottom-right handle outward grows the composite's padding on every side
-/// by the larger axis delta; dragging inward shrinks it, down to zero.
-pub(crate) fn padding_after_drag(n: &wirecraft_core::Node, delta: [f64; 2]) -> f64 {
-    (wirecraft_core::drawing::composite_padding(n) + delta[0].max(delta[1]))
-        .clamp(0., 2000.)
-        .round()
+/// A composite corner handle; it controls the padding of the two sides it joins.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Corner {
+    pub left: bool,
+    pub top: bool,
+}
+impl Corner {
+    pub(crate) const ALL: [Corner; 4] = [
+        Corner {
+            left: true,
+            top: true,
+        },
+        Corner {
+            left: false,
+            top: true,
+        },
+        Corner {
+            left: false,
+            top: false,
+        },
+        Corner {
+            left: true,
+            top: false,
+        },
+    ];
+    pub(crate) fn point(self, r: wirecraft_core::viewport::Rect) -> [f64; 2] {
+        [
+            if self.left { r.x } else { r.x + r.width },
+            if self.top { r.y } else { r.y + r.height },
+        ]
+    }
+    /// The corner whose square of half-size `tolerance` contains `world`. The square is
+    /// small enough to leave the collapse toggle beside the top-left corner usable.
+    pub(crate) fn hit(
+        r: wirecraft_core::viewport::Rect,
+        world: [f64; 2],
+        tolerance: f64,
+    ) -> Option<Self> {
+        Self::ALL.into_iter().find(|c| {
+            let p = c.point(r);
+            (world[0] - p[0]).abs() < tolerance && (world[1] - p[1]).abs() < tolerance
+        })
+    }
+}
+/// Dragging a corner outward grows the padding of its two sides by the delta on each
+/// axis; dragging inward shrinks them, down to zero. Other sides are unchanged.
+pub(crate) fn padding_after_drag(
+    n: &wirecraft_core::Node,
+    corner: Corner,
+    delta: [f64; 2],
+) -> wirecraft_core::drawing::Padding {
+    let mut padding = wirecraft_core::drawing::composite_padding(n);
+    let grow = |side: &mut f64, by: f64| {
+        *side = (*side + by)
+            .clamp(0., wirecraft_core::drawing::Padding::MAX)
+            .round();
+    };
+    if corner.left {
+        grow(&mut padding.left, -delta[0]);
+    } else {
+        grow(&mut padding.right, delta[0]);
+    }
+    if corner.top {
+        grow(&mut padding.top, -delta[1]);
+    } else {
+        grow(&mut padding.bottom, delta[1]);
+    }
+    padding
+}
+#[cfg(test)]
+mod tests {
+    use super::{Corner, padding_after_drag};
+    use serde_json::json;
+    use wirecraft_core::{Document, NodeKind, drawing::Padding, viewport::Rect};
+    #[test]
+    fn each_corner_edits_only_its_two_sides_and_clamps_at_zero() {
+        let mut d = Document::new("Padding");
+        let group = d.create("root", "Group", NodeKind::Group).unwrap();
+        d.patch(
+            &group,
+            &json!({"layout":{"padding":{"top":10.,"right":20.,"bottom":30.,"left":40.}}}),
+        )
+        .unwrap();
+        let n = &d.nodes[&group];
+        // Outward is up/left for the top-left corner and down/right for bottom-right.
+        let cases = [
+            (
+                Corner::ALL[0],
+                [-5., -6.],
+                Padding {
+                    top: 16.,
+                    right: 20.,
+                    bottom: 30.,
+                    left: 45.,
+                },
+            ),
+            (
+                Corner::ALL[1],
+                [5., -6.],
+                Padding {
+                    top: 16.,
+                    right: 25.,
+                    bottom: 30.,
+                    left: 40.,
+                },
+            ),
+            (
+                Corner::ALL[2],
+                [5., 6.],
+                Padding {
+                    top: 10.,
+                    right: 25.,
+                    bottom: 36.,
+                    left: 40.,
+                },
+            ),
+            (
+                Corner::ALL[3],
+                [-5., 6.],
+                Padding {
+                    top: 10.,
+                    right: 20.,
+                    bottom: 36.,
+                    left: 45.,
+                },
+            ),
+            (
+                Corner::ALL[2],
+                [-500., -500.],
+                Padding {
+                    top: 10.,
+                    right: 0.,
+                    bottom: 0.,
+                    left: 40.,
+                },
+            ),
+        ];
+        for (corner, delta, expected) in cases {
+            assert_eq!(padding_after_drag(n, corner, delta), expected, "{corner:?}");
+        }
+        let r = Rect {
+            x: 0.,
+            y: 0.,
+            width: 100.,
+            height: 50.,
+        };
+        assert_eq!(Corner::hit(r, [98., 3.], 8.), Some(Corner::ALL[1]));
+        assert_eq!(Corner::hit(r, [2., 47.], 8.), Some(Corner::ALL[3]));
+        // The collapse toggle beside the top-left corner is not a handle.
+        assert_eq!(Corner::hit(r, [14., 14.], 8.), None);
+    }
 }

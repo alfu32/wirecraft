@@ -870,15 +870,19 @@ impl Scene {
                 y += 15.;
             }
         }
-        // Only expanded composites keep a handle; it edits their padding.
+        // Only expanded composites keep handles: one per corner, editing its two sides.
         if active && shape.composite && shape.expanded {
-            window.paint_quad(fill(
-                Bounds::new(
-                    rect.bottom_right() - point(px(6.), px(6.)),
-                    size(px(6.), px(6.)),
-                ),
-                rgb(self.color(0x70d5c6)),
-            ));
+            for corner in [
+                rect.origin,
+                rect.top_right() - point(px(6.), px(0.)),
+                rect.bottom_right() - point(px(6.), px(6.)),
+                rect.bottom_left() - point(px(0.), px(6.)),
+            ] {
+                window.paint_quad(fill(
+                    Bounds::new(corner, size(px(6.), px(6.))),
+                    rgb(self.color(0x70d5c6)),
+                ));
+            }
         }
         if shape.diagnostics > 0 || code_error {
             let diameter = (14. * view.zoom as f32).max(8.);

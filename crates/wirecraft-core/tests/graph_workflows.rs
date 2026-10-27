@@ -206,8 +206,31 @@ fn composite_projection_keeps_absolute_children_and_collapses_boundary_links() {
         &json!({"layout":{"isExpanded":true,"padding":10.}}),
     )
     .unwrap();
+    // 0.8.0 stored one number for every side.
     let tight = Drawing::new(&d, "root");
     assert_eq!(tight.shapes[&composite].rect.x, child_rect.x - 10.);
+    d.patch(
+        &composite,
+        &json!({"layout":{"padding":{"top":5.,"right":30.,"bottom":7.,"left":100.}}}),
+    )
+    .unwrap();
+    let sides = Drawing::new(&d, "root").shapes[&composite].rect;
+    assert_eq!(sides.x, child_rect.x - 100.);
+    assert_eq!(sides.x + sides.width, child_rect.x + child_rect.width + 30.);
+    assert_eq!(sides.y, child_rect.y - 5. - 64.);
+    assert_eq!(
+        sides.y + sides.height,
+        child_rect.y + child_rect.height + 7.
+    );
+    // Missing sides fall back to the default.
+    d.patch(&composite, &json!({"layout":{"padding":{"left":0.}}}))
+        .unwrap();
+    let partial = Drawing::new(&d, "root").shapes[&composite].rect;
+    assert_eq!(partial.x, child_rect.x);
+    assert_eq!(
+        partial.x + partial.width,
+        child_rect.x + child_rect.width + drawing::COMPOSITE_PADDING
+    );
     let focused = Drawing::new(&d, &composite);
     assert!(focused.shapes.contains_key(&child));
     assert!(!focused.shapes.contains_key(&peer));

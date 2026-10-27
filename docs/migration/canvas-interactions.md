@@ -22,20 +22,20 @@ An unmodified press on an already-selected object defers replacement until relea
 
 Routing has an 80 ms quiet interval and one background projection at a time. Immediate pointer movement uses inexpensive endpoint feedback. Completed obstacle-avoiding routes retain their geometry at their computed offset; new movement applies a residual delta. Epoch/revision checks reject stale work, and preview positions remain subject to viewport culling. Panning leaves staged editor drafts intact; it never reloads the editor.
 
-## Box sizing and menus (0.8.0, user specification)
+## Box sizing and menus (0.8.0–0.9.0, user specification)
 
 | Element | Result |
 |---|---|
 | Simple box (processor, type, collapsed composite) | Width follows its title (name + name detail), role and language · technology lines, and type fields; height follows the busier lateral side at 24 units per port row plus a 12-unit inset at both ends, right-side callouts, and the text block. Minimum 120 × 70 |
-| Expanded composite | Encloses its visible children plus `layout.padding` on each side (default 64, wider than the 46-unit boundary stub) and a 64-unit header |
-| Resize handle | Shown only on a selected expanded composite with children; dragging it changes the padding on all sides by the larger axis delta, as one undoable patch. Simple boxes have no handle |
+| Expanded composite | Encloses its visible children plus per-side `layout.padding` `{top,right,bottom,left}` (default 64 each, wider than the 46-unit boundary stub) and a 64-unit header above the top padding |
+| Corner handles | A selected expanded composite with children has one handle per corner, tested before picking so it can straddle the border. Top-left edits top and left padding, top-right top and right, bottom-right bottom and right, bottom-left bottom and left; each side follows its axis delta (outward grows, minimum 0) as one undoable patch. Simple boxes have no handles |
 | Note | Keeps its stored size |
 | Align/distribute | Use these projected boxes; a composite moves with its whole subtree |
 | Menubar | Opens on press, left-aligned under its label, no backdrop; pressing the label again or outside closes it; hover switches menus while one is open |
 | Mode buttons / Sheet | The active mode is highlighted; Sheet toggles dashed page contours from the current export format, scale, split and overlap |
 | Entity tree | Composites show boxed `+` (collapsed) and `−` (expanded) |
 
-Sizing is a projection shared by canvas, hit-testing, routing and SVG/PDF export: stored `width`/`height`/`closed*`/`open*` values are left unchanged in `.orch` files. `padding` is stored as an extra layout key; the JVM store ignores unknown keys. Text widths are estimated at 0.6 × font size per character. When zoomed out, the canvas's 7px minimum label size can still make text extend past a box edge. `scripts/menu_smoke.py` (optionally `WIRECRAFT_SMOKE_FIXTURE=…`) checks menus, mode highlight, sheet contours, Fit and save without a selection natively.
+Sizing is a projection shared by canvas, hit-testing, routing and SVG/PDF export: stored `width`/`height`/`closed*`/`open*` values are left unchanged in `.orch` files. `padding` is stored as an extra layout key, which the JVM store ignores; a plain number (written by 0.8.0) still means uniform padding, and missing sides use the default. Text widths are estimated at 0.6 × font size per character. When zoomed out, the canvas's 7px minimum label size can still make text extend past a box edge. `scripts/menu_smoke.py` (optionally `WIRECRAFT_SMOKE_FIXTURE=…`) checks menus, mode highlight, sheet contours, Fit and save without a selection natively; `scripts/padding_smoke.py` drags a real top-left handle and checks the two edited sides, the unchanged sides and one-step undo.
 
 ## Verification
 

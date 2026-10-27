@@ -522,14 +522,46 @@ pub const PORT_PITCH: f64 = 24.;
 pub const COMPOSITE_PADDING: f64 = 64.;
 /// Space above a composite's children for its three header lines.
 const COMPOSITE_HEADER: f64 = 64.;
-/// Stored `layout.padding`, the composite free space edited by its resize handle.
-pub fn composite_padding(n: &crate::Node) -> f64 {
-    n.layout
-        .extra
-        .get("padding")
-        .and_then(|v| v.as_f64())
-        .filter(|v| v.is_finite())
-        .map_or(COMPOSITE_PADDING, |v| v.clamp(0., 2000.))
+/// Free space between a composite's border and its children, per side.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Padding {
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+    pub left: f64,
+}
+impl Padding {
+    pub const MAX: f64 = 2000.;
+    pub fn uniform(value: f64) -> Self {
+        Self {
+            top: value,
+            right: value,
+            bottom: value,
+            left: value,
+        }
+    }
+    pub fn to_json(self) -> serde_json::Value {
+        serde_json::json!({"top":self.top,"right":self.right,"bottom":self.bottom,"left":self.left})
+    }
+}
+/// Stored `layout.padding`, edited by the composite's corner handles. An object
+/// gives per-side values (missing sides use the default); a plain number, as
+/// written by 0.8.0, applies to every side.
+pub fn composite_padding(n: &crate::Node) -> Padding {
+    let side = |v: Option<&serde_json::Value>| {
+        v.and_then(serde_json::Value::as_f64)
+            .filter(|v| v.is_finite())
+            .map_or(COMPOSITE_PADDING, |v| v.clamp(0., Padding::MAX))
+    };
+    match n.layout.extra.get("padding") {
+        Some(serde_json::Value::Object(sides)) => Padding {
+            top: side(sides.get("top")),
+            right: side(sides.get("right")),
+            bottom: side(sides.get("bottom")),
+            left: side(sides.get("left")),
+        },
+        value => Padding::uniform(side(value)),
+    }
 }
 /// Text width estimate for the canvas sans-serif face; slightly generous so
 /// proportional glyphs never cross the border.
@@ -633,10 +665,10 @@ fn fit_composites(d: &Document, shapes: &mut BTreeMap<String, Shape>) {
         let title = text_width(&format!("⊟ {} {}", n.name, n.name_detail), 14.) + 9. + 26.;
         if let Some(shape) = shapes.get_mut(&id) {
             shape.rect = Rect {
-                x: bounds.x - padding,
-                y: bounds.y - padding - COMPOSITE_HEADER,
-                width: (bounds.width + 2. * padding).max(title),
-                height: bounds.height + 2. * padding + COMPOSITE_HEADER,
+                x: bounds.x - padding.left,
+                y: bounds.y - padding.top - COMPOSITE_HEADER,
+                width: (bounds.width + padding.left + padding.right).max(title),
+                height: bounds.height + padding.top + padding.bottom + COMPOSITE_HEADER,
             };
         }
     }
