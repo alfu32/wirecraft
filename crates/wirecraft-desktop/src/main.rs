@@ -1572,6 +1572,12 @@ impl Render for Wirecraft {
                     self.drag_delta[1] - routed_delta[1],
                 ]
             };
+            let errors = self
+                .generated_diagnostics
+                .iter()
+                .filter(|d| d["severity"] == 1)
+                .filter_map(|d| d["source"]["nodeId"].as_str().map(str::to_string))
+                .collect::<BTreeSet<_>>();
             let moving = self.drag_ids.clone();
             let resize = self
                 .resize_start
@@ -1642,7 +1648,9 @@ impl Render for Wirecraft {
                                     b
                                 },
                                 move |b, _, window, cx| {
-                                    scene.paint(b, view, &selected, &moving, drag, window, cx);
+                                    scene.paint(
+                                        b, view, &selected, &moving, drag, &errors, window, cx,
+                                    );
                                     if let Some((r, delta)) = resize {
                                         let p = view.screen([r.x, r.y]);
                                         window.paint_quad(quad(
