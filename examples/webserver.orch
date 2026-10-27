@@ -263,20 +263,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:30:53Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'router' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": "IMPLEMENTATION",
       "statusChanges": [
@@ -585,20 +575,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:30:31Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'ReqRep' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": "TESTING",
       "statusChanges": [
@@ -642,7 +622,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -686,20 +666,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:07:50Z",
+        "date": "2026-10-27T22:44:56Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'request' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -768,20 +738,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T17:25:24Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'awitResponseLoop' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -861,20 +821,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:27:29Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'socket_respond' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": "IMPLEMENTATION",
       "statusChanges": [
@@ -912,7 +862,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -958,20 +908,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-26T13:23:25.299535725Z",
-        "user": "alfu64"
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeHomeAboutResponse' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -996,7 +936,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -1042,20 +982,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-26T13:24:57.190649813Z",
-        "user": "alfu64"
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeApiUserDetailsResponse' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -1080,7 +1010,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -1126,20 +1056,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-26T13:24:19.176840124Z",
-        "user": "alfu64"
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeHomeAboutRequest' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -1164,7 +1084,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -1210,20 +1130,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-26T13:24:03.317919367Z",
-        "user": "alfu64"
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeHomeVersionRequest' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -1248,7 +1158,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -1294,20 +1204,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-26T13:24:35.940509226Z",
-        "user": "alfu64"
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeApiUserDetailsRequest' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -1332,7 +1232,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -1376,20 +1276,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:07:50Z",
+        "date": "2026-10-27T22:44:56Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'response' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],
@@ -1457,20 +1347,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:26:12Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routes' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": "IMPLEMENTATION",
       "statusChanges": [
@@ -1565,20 +1445,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:50:20Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeApiUserDetails' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_10886e3b-8eac-4654-92e5-8461794ca831",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "/api/user",
       "status": "FUNCTIONAL",
       "statusChanges": [
@@ -1679,20 +1549,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:26:31Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeHomeAbout' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "/home/about",
       "status": "FUNCTIONAL",
       "statusChanges": [
@@ -1781,20 +1641,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:50:16Z",
+        "date": "2026-10-27T22:44:57Z",
         "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeHomeVersion' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "/home/version",
       "status": "FUNCTIONAL",
       "statusChanges": [
@@ -2525,7 +2375,7 @@
         "openHeight": 70.0,
         "isExpanded": true
       },
-      "fileLayoutStrategyId": "direct-file-system-homomorphism",
+      "fileLayoutStrategyId": "none",
       "text": {
         "source": "",
         "sourceLanguageId": "",
@@ -2571,20 +2421,10 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-26T13:24:49.746163127Z",
-        "user": "alfu64"
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
       },
-      "diagnostics": [
-        {
-          "severity": "Error",
-          "message": "C compilation supports only the single-file layout; 'routeHomeVersionResponse' resolves to 'direct-file-system-homomorphism'.",
-          "nodeId": "link_1eb6b930-6980-40be-8710-8ed323817aa7",
-          "textSection": null,
-          "line": null,
-          "column": null,
-          "sourcePluginId": "c-compiler"
-        }
-      ],
+      "diagnostics": [],
       "nameDetail": "",
       "status": null,
       "statusChanges": [],

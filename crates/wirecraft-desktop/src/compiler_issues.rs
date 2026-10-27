@@ -6,8 +6,14 @@ impl Wirecraft {
     }
     pub(super) fn refresh_compiler_issues(&mut self) {
         let mut issues = BTreeMap::new();
-        for node in self.snapshot.document.nodes.values() {
+        let d = &self.snapshot.document;
+        let live_c17 = c17_checked(d);
+        for node in d.nodes.values() {
             for diagnostic in &node.diagnostics {
+                // Results persisted by the baseline C compiler are superseded by the live C17 check.
+                if live_c17 && diagnostic["sourcePluginId"] == "c-compiler" {
+                    continue;
+                }
                 let severity = diagnostic["severity"].as_u64().or_else(|| {
                     match diagnostic["severity"]
                         .as_str()?
@@ -65,9 +71,7 @@ impl Wirecraft {
                 }
                 this.compiler_again = false;
                 let d = &this.snapshot.document;
-                if d.effective(&d.root_node_id, "languageId") != "c"
-                    || d.effective(&d.root_node_id, "technologyId") != "c-native"
-                {
+                if !c17_checked(d) {
                     return;
                 }
                 let mut request =
@@ -84,4 +88,9 @@ impl Wirecraft {
             self.queue_compiler_check(cx);
         }
     }
+}
+/// Whether the live C17 check owns this design's compiler diagnostics.
+fn c17_checked(d: &wirecraft_core::Document) -> bool {
+    d.effective(&d.root_node_id, "languageId") == "c"
+        && d.effective(&d.root_node_id, "technologyId") == "c-native"
 }

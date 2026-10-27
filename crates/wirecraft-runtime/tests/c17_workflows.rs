@@ -713,6 +713,16 @@ fn webserver_example_serves_routes_fallbacks_and_shuts_down_after_its_limit() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/webserver.orch");
     let d = wirecraft_core::store::load(&path).unwrap();
+    // Every entity inherits the root's single-file layout and ships without stale diagnostics.
+    for node in d.nodes.values() {
+        assert!(node.diagnostics.is_empty(), "{}", node.name);
+        assert_eq!(
+            d.effective(&node.id, "fileLayoutStrategyId"),
+            "single-file",
+            "{}",
+            node.name
+        );
+    }
     let unit = C17::generate(&d, "root").unwrap();
     let temp = tempfile::tempdir().unwrap();
     let source = temp.path().join(&unit.files[0].path);
