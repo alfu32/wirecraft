@@ -526,23 +526,24 @@ impl Service {
             }
             "entities.align" => {
                 let ids: Vec<String> = serde_json::from_value(a["nodeIds"].clone())?;
-                if ids.len() < 2 {
-                    return Err(Error::new("invalid_input", "Select at least two entities"));
-                }
                 let operation = required(a, "operation")?;
                 let mut nodes = ids
                     .iter()
                     .map(|id| candidate.node(id).cloned())
-                    .collect::<Result<Vec<_>>>()?;
-                if nodes
-                    .iter()
-                    .any(|n| n.is_link() || n.parent_id != nodes[0].parent_id)
-                {
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .filter(|n| !n.is_link())
+                    .collect::<Vec<_>>();
+                if nodes.len() < 2 {
+                    return Err(Error::new("invalid_input", "Select at least two boxes"));
+                }
+                if nodes.iter().any(|n| n.parent_id != nodes[0].parent_id) {
                     return Err(Error::new(
                         "invalid_input",
-                        "Align entities in the same parent",
+                        "Align boxes in the same parent",
                     ));
                 }
+                let aligned = nodes.iter().map(|n| n.id.clone()).collect::<Vec<_>>();
                 let left = nodes
                     .iter()
                     .map(|n| n.layout.x)
@@ -563,7 +564,7 @@ impl Service {
                     if nodes.len() < 3 {
                         return Err(Error::new(
                             "invalid_input",
-                            "Distribution requires at least three entities",
+                            "Distribution requires at least three boxes",
                         ));
                     }
                     let horizontal = operation == "distribute-horizontal";
@@ -620,7 +621,7 @@ impl Service {
                         candidate.patch(&n.id, &json!({"layout":layout}))?;
                     }
                 }
-                json!({"aligned":ids,"operation":operation})
+                json!({"aligned":aligned,"operation":operation})
             }
             "create_entity" => {
                 let kind: NodeKind =

@@ -45,3 +45,7 @@ Implemented native 45-degree reference candidate scoring, compact self-link prio
 ## 0.6.2 same-side feedback
 
 Completed the requested less-crowded-side port pairs (right on ties), local U with a retained vertical leg, long leads and original endpoint symbols. Verified 90 Rust tests plus optimized installed backend and native canvas/follow-up checks; capture retry and screenshots are recorded in `evidence/v0.6.2/`. Remaining migration work remains in the parity matrix.
+
+## 0.6.3 mixed-selection layout correction
+
+Filter links before all layout validation and bounds calculation in the shared service; preserve one-transaction undo and box-count validation. Verify all six operations and installed backend/API behavior. No UI-specific duplicate layout rules.

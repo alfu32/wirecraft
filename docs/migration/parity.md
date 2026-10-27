@@ -74,3 +74,7 @@ Final workspace verification: 88 tests passed with optional real toolchains, for
 ## 0.6.2 same-side feedback
 
 User-specified local U replaces around-the-box self loops. Both ports use the less occupied side (right on ties), input above output, paired before ordinary channels. Tests cover all occupancy comparisons, multiple loops, provider boxes versus top flags, local no-box-entry/no-overlap geometry, and long leads. 90 Rust tests, formatting and strict Clippy passed. Installed backend/MCP/clangd, native canvas and follow-up checks pass (X11 screenshot retry noted); visually inspected same-side U captures and binary hashes are in [0.6.2 evidence](evidence/v0.6.2/verification.json).
+
+## 0.6.3 box-only layout
+
+Align left/right/top/bottom and distribute horizontally/vertically ignore selected links in the shared service. Regression checks cover all six operations with mixed-parent links and extreme link bounds, box-only result IDs, untouched link data, one-step undo and minimum box counts. Release checks are recorded in status.md.

@@ -1,5 +1,5 @@
 use serde_json::{Value, json};
-use wirecraft_core::{Document, NodeKind, store};
+use wirecraft_core::{Document, Link, NodeKind, store};
 use wirecraft_runtime::{
     archetypes, export,
     service::{Request, Service},
@@ -67,6 +67,118 @@ fn alignment_distribution_cut_paste_and_undo_are_transactions() {
         .is_err()
     );
     assert_eq!(serde_json::to_value(&s.document).unwrap(), before);
+}
+#[test]
+fn align_and_distribute_ignore_selected_links_in_bounds_parent_checks_and_results() {
+    for (operation, expected) in [
+        ("left", [0., 0., 0.]),
+        ("right", [520., 540., 500.]),
+        ("top", [0., 0., 0.]),
+        ("bottom", [440., 430., 400.]),
+        ("distribute-horizontal", [0., 260., 500.]),
+        ("distribute-vertical", [0., 195., 400.]),
+    ] {
+        let mut d = Document::new("Mixed selection");
+        let group = d.create("root", "Group", NodeKind::Group).unwrap();
+        let outside = d.create("root", "Outside", NodeKind::Processor).unwrap();
+        let mut boxes = vec![];
+        for (x, y, w, h) in [
+            (0., 0., 100., 50.),
+            (70., 80., 80., 60.),
+            (500., 400., 120., 90.),
+        ] {
+            let id = d.create(&group, "Box", NodeKind::Processor).unwrap();
+            d.patch(&id, &json!({"layout":{"x":x,"y":y,"width":w,"height":h}}))
+                .unwrap();
+            boxes.push(id);
+        }
+        let link = d
+            .create_link(
+                "Selected link",
+                Link {
+                    source_node_id: boxes[0].clone(),
+                    target_node_id: outside,
+                    interaction_kind: "data".into(),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        d.patch(
+            &link,
+            &json!({"layout":{"x":-10000.,"y":10000.,"width":5000.,"height":5000.}}),
+        )
+        .unwrap();
+        assert_ne!(d.nodes[&link].parent_id, d.nodes[&boxes[0]].parent_id);
+        let before = serde_json::to_value(&d).unwrap();
+        let link_before = serde_json::to_value(&d.nodes[&link]).unwrap();
+        let mut s = Service::new(d, None);
+        let result = s
+            .execute(Request::new(
+                "entities.align",
+                json!({
+                    "nodeIds":[link,boxes[0],boxes[1],boxes[2]], "operation":operation
+                }),
+            ))
+            .unwrap();
+        assert_eq!(result["aligned"], json!(boxes), "{operation}");
+        for (id, coordinate) in boxes.iter().zip(expected) {
+            let n = &s.document.nodes[id];
+            let horizontal = matches!(operation, "left" | "right" | "distribute-horizontal");
+            assert_eq!(
+                if horizontal { n.layout.x } else { n.layout.y },
+                coordinate,
+                "{operation}"
+            );
+        }
+        assert_eq!(
+            serde_json::to_value(&s.document.nodes[&link]).unwrap(),
+            link_before
+        );
+        assert_eq!(s.revision, 1);
+        s.execute(Request::new("edit.undo", json!({}))).unwrap();
+        assert_eq!(
+            serde_json::to_value(&s.document).unwrap(),
+            before,
+            "{operation}"
+        );
+    }
+}
+#[test]
+fn layout_minimum_selection_counts_only_boxes_and_failed_operations_are_atomic() {
+    let mut d = Document::new("Layout minimum");
+    let a = d.create("root", "A", NodeKind::Processor).unwrap();
+    let b = d.create("root", "B", NodeKind::Processor).unwrap();
+    let link = d
+        .create_link(
+            "Link",
+            Link {
+                source_node_id: a.clone(),
+                target_node_id: b.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let before = serde_json::to_value(&d).unwrap();
+    let mut s = Service::new(d, None);
+    for (ids, operation, message) in [
+        (json!([link]), "left", "Select at least two boxes"),
+        (json!([a, link]), "top", "Select at least two boxes"),
+        (
+            json!([a, b, link]),
+            "distribute-horizontal",
+            "Distribution requires at least three boxes",
+        ),
+    ] {
+        let error = s
+            .execute(Request::new(
+                "entities.align",
+                json!({"nodeIds":ids,"operation":operation}),
+            ))
+            .unwrap_err();
+        assert_eq!(error.message, message);
+        assert_eq!(s.revision, 0);
+        assert_eq!(serde_json::to_value(&s.document).unwrap(), before);
+    }
 }
 #[test]
 fn real_svg_png_and_vector_pdf_exports() {

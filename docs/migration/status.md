@@ -1,6 +1,10 @@
 # Current migration status
 
-Wirecraft **0.6.2** adds compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
+Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
+
+## Box-only align/distribute (0.6.3)
+
+All four edge alignments and both distribution operations filter links in the shared application service before counting boxes, checking parents or calculating bounds. Mixed selections work even when a selected link belongs to another parent or has extreme stored coordinates. Responses list only operated-on boxes; link data remains untouched. Alignment requires two boxes, distribution three; insufficient box selections fail atomically with explicit box-count messages. The operation remains one undo transaction. Desktop and API use the same service, without a project format change.
 
 ## Same-side feedback loops (0.6.2)
 
