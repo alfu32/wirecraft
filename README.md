@@ -1,6 +1,6 @@
 # Wirecraft
 
-Rust + GPUI migration of [Threadworks](https://github.com/alfu32/threadworks), based on revision `7d392d3a0e30b86445e00e7c03032a5188b26593` (2.6.7). This is an early working migration, **not feature-complete**. See [parity](docs/migration/parity.md), [architecture](docs/migration/architecture.md), and [current status](docs/migration/status.md).
+Rust + GPUI migration of [Threadworks](https://github.com/alfu32/threadworks), based on revision `7d392d3a0e30b86445e00e7c03032a5188b26593` (2.6.7). This is an early working migration, **not feature-complete**. See [parity](docs/migration/parity.md), [architecture](docs/migration/architecture.md), and [current status](docs/migration/status.md). Planned Wirecraft extensions: [pluggable components](docs/design/components.md) (specification).
 
 The framework-independent graph/storage crate is shared by a headless backend and a desktop client. The desktop owns an authenticated loopback backend process. MCP and the desktop invoke the same services. TCC and its native integration are absent.
 
