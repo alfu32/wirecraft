@@ -61,7 +61,17 @@ cargo run -p wirecraft-runtime -- export-compiler examples/nodejs.orch /tmp/wire
 cargo run -p wirecraft-runtime -- compile examples/nodejs.orch /tmp/wirecraft-custom-example --compiler /tmp/wirecraft-nodejs-compiler/compiler.wirecompiler.json
 ```
 
-Five runnable graph examples are in `examples/`: Go (`go build`), Node.js (`node`), Kotlin (Kotlin 2.2.0/JVM 21 or the generated Gradle build), PHP (`php`), QuickJS (`qjs`). Install these external tools separately; Wirecraft does not execute bundled foreign binaries. Model `@…` overrides, project files and portable JSON compiler bundles work through the shared CLI/API/MCP service. The generated JVM compiler-class ABI is replaced by that portable data format. C17 still uses its typed Rust emitter; C template execution/source capabilities, aggregate mixed technologies, template composite boundary channels and wider collection/editor parity remain pending.
+Five runnable graph examples are in `examples/`: Go (`go build`), Node.js (`node`), Kotlin (Kotlin 2.2.0/JVM 21 or the generated Gradle build), PHP (`php`), QuickJS (`qjs`). Install these external tools separately; Wirecraft does not execute bundled foreign binaries. Model `@…` overrides, project files and portable JSON compiler bundles work through the shared CLI/API/MCP service. The generated JVM compiler-class ABI is replaced by that portable data format. C17 still uses its typed Rust emitter; C template execution, aggregate mixed technologies, template composite boundary channels and wider collection/editor parity remain pending.
+
+`examples/webserver.orch` is a complete C17 HTTP/1.1 server modeled as a dataflow network: accept → router → routes → respond, with a pending-request feedback loop and an HTTP library lent as `libhttp`. Its full specification is in the model's Specification sections, starting with the root entity:
+
+```sh
+cargo run -p wirecraft-runtime -- compile examples/webserver.orch /tmp/wirecraft-webserver
+clang -std=c17 -Wall -Wextra -pedantic /tmp/wirecraft-webserver/WebServer.c -o /tmp/wirecraft-webserver/webserver
+WEBSERVER_PORT=8080 /tmp/wirecraft-webserver/webserver   # then: curl -i http://127.0.0.1:8080/home/about
+```
+
+Routes: `/home/about`, `/home/version`, `/api/user`; other paths answer 404, other methods 405, malformed requests 400. Set `WEBSERVER_MAX_REQUESTS=N` to exit after N requests and `WEBSERVER_BIND_ANY=1` to listen beyond loopback.
 
 ## C17 topology generation
 
