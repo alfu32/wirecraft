@@ -126,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   (state/'recovery.json').unlink(missing_ok=True)
   (state/'ui.json').write_text(json.dumps({'document_id':webserver['id'],'parent':'root','tab':'Designer','selected':router,'selected_ids':[router],'sidebar_width':300,'viewport':{'x':40,'y':40,'zoom':1}}))
   launch();command('Zoom Extents');shot('webserver-routed-channels')
-  xd('mousemove','--window',window,1030,650);xd('click','--repeat',3,'--delay',100,4);time.sleep(.4);shot('webserver-routing-detail')
+  before_zoom=ui()['viewport']['zoom'];xd('mousemove','--window',window,1030,650,'click','--repeat',3,'--delay',100,4);wait(lambda:ui()['viewport']['zoom']>before_zoom);shot('webserver-routing-detail')
   web=api('export.preview',{'kind':'plan','options':{'format':'Auto'},'overview':True})
   assert web['svg'].count('class="composite-port"')==6
   assert 'routing-error' not in web['svg']

@@ -37,3 +37,25 @@ Implementation and verification tracking: [walkthrough parity](../walkthrough.md
 Additional evidence: [working C ticker project](example-c.orch) and [reference plan/specification PDF](ticker-print.pdf); hashes and inspection notes are recorded in [artifacts.json](artifacts.json). Treat the project as an immutable reference; generation/execution checks use temporary copies and external clang, never its legacy TCC launcher.
 
 Evidence 026–038 was supplied in the conversation on 2026-10-27. The manifest preserves supplied order and hashes; exact capture timestamps were unavailable. It covers assembled export, context commands, semantic colors, stuck pointer/resize state, capability annotations and WebServer composite routing. The untracked root `example.orch` remains unchanged; a routing test fixture copies its graph/code/layout, omitting user avatar data.
+
+Additional supplied evidence (capture times unavailable; supplied order retained):
+
+| Photo | Feature | Observation |
+|---|---|---|
+| [026](026-jvm-export-assembled-page-layout.png) | Export overview | Whole drawing, page contours, alignment and folding marks; global parts/title blocks. |
+| [027](027-wirecraft-export-cropped-tile-regression.png) | Export regression | Old Wirecraft preview showed only a cropped A4 tile and blank origin area. |
+| [028](028-jvm-context-all-commands-and-archetypes.png) | Context menu | Application commands and nested C archetypes in designer right-click menu. |
+| [029](029-jvm-c-editor-semantic-colors.png) | C semantic colors | Types, calls, parameters and fields colored inside generated function body. |
+| [030](030-wirecraft-c-highlighting-regression.png) | Editor regression | Missing registered C grammar left mostly JSON-like strings and numbers. |
+| [031](031-wirecraft-phantom-inspector-region.png) | Pointer regression | Designer after editor switch; reported invisible reactive region. |
+| [032](032-wirecraft-node-follows-released-pointer.png) | Pointer regression | Reported picked node followed pointer after release. |
+| [033](033-wirecraft-stuck-resize-cursor-and-draft-guard.png) | Pointer regression | Vertical resize cursor over content; apply-draft guard; Escape later released UI. |
+| [034](034-jvm-dependency-provider-boxes-and-consumer-flags.png) | Dependency annotations | write_append_file has files and argslib incoming flagpoles; providers have dependant boxes. |
+| [035](035-jvm-library-dependants-four-callouts.png) | Library dependants | includes_lib exposes includes5/includes3/includes2/includes6 separately; libraries have incoming flags. |
+| [036](036-jvm-link-interaction-kind-selector.png) | Link interactions | Data, library, source, runnable and type-usage capability distinctions control representation. |
+| [037](037-jvm-webserver-routes-and-composite-ports.png) | Routing reference | Separated routed channels avoid boxes; aligned crossings at routes boundary. |
+| [038](038-wirecraft-webserver-overlapping-channel-regression.png) | Routing regression | Old dogleg routing overlaps channels; missing composite port alignment. |
+| [039](039-jvm-completion-identifiers-and-signatures.png) | Completion signatures | Two columns show identifiers and callable/type declarations in socket_accept body context. |
+| [040](040-jvm-hover-injected-library-function-signature.png) | Hover signatures | Hover identifies the injecting base_lib dependency and shows int fclose(FILE *stream). |
+| [041](041-jvm-technical-port-arrows-and-reverse-flow.png) | Technical drawing | Sharp technical boxes, outlined source ports, filled destination arrows, named typed reverse-flow dashed channels. |
+| [042](042-jvm-clickable-compiler-issue-count-and-list.png) | Compiler issues | Red box badge represents errors OR warnings; status issue count opens the compilation diagnostics list. |

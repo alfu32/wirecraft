@@ -34,17 +34,17 @@ Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. 
 
 | Workflow | Reference / implementation | Verification | Current gap |
 |---|---|---|---|
-| Assembled technical plan | photos 026–027; JVM SheetLayout/drawTechnicalSheet; core/sheets.rs, export.rs and desktop/reports.rs | plan_overview tests, walkthrough PDF/vector tests | native layout inspection pending; typography not pixel-identical |
-| Library capability representation | photos 034–036; drawDependencyAnnotations; core/drawing.rs, desktop/scene.rs | shared projection; dedicated callout tests pending | native inspection pending |
-| Separated composite routing | photos 037–038 and isolated WebServer fixture; core/routing.rs | fixture no-box-entry/no-overlap, six distinct boundary ports; nearer-side angular fan | native bridge/render checks pending; bounded search may report unroutable crowded imports |
-| Compiler coloring | photos 029–030; core/editor.rs, runtime/generated_analysis.rs, desktop/editor_tokens.rs | real clangd Unicode tokens, runtime, libs, members, buffers, seven generated files | native widget color inspection pending |
-| Scrollable context commands | photo 028; desktop/workbench.rs | workspace compilation | native menu traversal pending |
-| Pointer freeze | photos 031–033; vendor window_border.rs and desktop/interaction.rs | baseline five startup / three release cases pass; exact incident not reproduced | verify new capture/edge changes natively |
+| Assembled technical plan | photos 026–027; JVM SheetLayout/drawTechnicalSheet; core/sheets.rs, export.rs and desktop/reports.rs | plan_overview tests, walkthrough PDF/vector tests | native assembled overview passed; typography not pixel-identical |
+| Library capability representation | photos 034–036; drawDependencyAnnotations; core/drawing.rs, desktop/scene.rs | shared projection and dedicated callout tests passed | native inspection passed |
+| Separated composite routing | photos 037–038 and isolated WebServer fixture; core/routing.rs | fixture no-box-entry/no-overlap, six distinct boundary ports; nearer-side angular fan | native rendering inspected; bounded search may report unroutable crowded imports |
+| Compiler coloring | photos 029–030; core/editor.rs, runtime/generated_analysis.rs, desktop/editor_tokens.rs | real clangd Unicode tokens, runtime, libs, members, buffers, seven generated files | native widget color assertions passed |
+| Scrollable context commands | photo 028; desktop/workbench.rs | native menu scrolling, nested insertion and undo passed | all current commands reachable |
+| Pointer freeze | photos 031–033; vendor window_border.rs and desktop/interaction.rs | baseline five startup / three release cases pass; exact incident not reproduced | release/capture suites pass; exact original incident not reproduced |
 
 | Additional workflow | Reference | Rust component | Verification / remaining gap |
 |---|---|---|---|
-| Completion identifier + signature | photo 039; JVM compiler-context suggestions | completion.rs, generated_analysis.rs | real clangd runtime/library signatures; final native rerun pending |
-| Function/struct hover + supplier | photo 040 | editor_hover.rs, editor.rs, generated_analysis.rs | real clangd Unicode/function/struct/library hover; native popup check pending |
+| Completion identifier + signature | photo 039; JVM compiler-context suggestions | completion.rs, generated_analysis.rs | real clangd runtime/library signatures; native insertion/undo/stale dismissal and signature rendering passed |
+| Function/struct hover + supplier | photo 040 | editor_hover.rs, editor.rs, generated_analysis.rs | real clangd Unicode/function/struct/library hover; native full struct and injected-function popups inspected |
 | Technical ports / reverse flow | photo 041 | shared port_glyphs, scene.rs, export.rs | outlined outputs, filled input arrows, channel:type labels; reverse links dashed |
-| Compiler warning/error count and list | photo 042 | compiler_issues.rs, workbench.rs | independent background check; Info excluded, clickable count/list/reveal; native check pending |
+| Compiler warning/error count and list | photo 042 | compiler_issues.rs, workbench.rs | independent background check; Info excluded, clickable count/list/reveal; native issue count/list/source reveal passed |
 | Live JVM contract refresh | baseline/jvm-live-2026-10-27 | runtime/tests/jvm_readonly_baseline.rs | counts, link contracts and structural validation match; safe reads only |

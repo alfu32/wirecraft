@@ -1,0 +1,239 @@
+{
+  "version": "0.5.0",
+  "sourceBaseline": {
+    "version": "Threadworks 2.6.7",
+    "revision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
+    "liveMcp": "../../baseline/jvm-live-2026-10-27/readonly-comparison.json"
+  },
+  "applicationCommit": "9769d62",
+  "testCommit": "e7e1ea3",
+  "platform": "Linux x86_64",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "clangd": "clangd version 13.0.0 (https://github.com/apple/llvm-project.git 8ee3f51668ac68de50d541a815f00859f4922f98)",
+  "checks": {
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    "tests": {
+      "command": "cargo test --workspace --locked",
+      "result": "passed",
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "coreIntegration": 22,
+      "desktopGeometry": 6,
+      "runtimeIntegration": 43
+    },
+    "clippy": {
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "result": "passed"
+    },
+    "releaseBuild": {
+      "command": "cargo build --workspace --release --locked -j 2",
+      "result": "passed"
+    },
+    "installedCommand": "python3 scripts/package_smoke.py dist/wirecraft-0.5.0-linux-x86_64.tar.gz --desktop --walkthrough --editor --canvas --startup --gesture --followup",
+    "installedSuites": [
+      {
+        "desktop": "passed",
+        "generatedDiagnosticRevealed": true,
+        "generatedDiagnosticsMapped": true,
+        "clangdDiagnostics": true,
+        "externalCompilerDiagnostics": true,
+        "ownedChildrenStopped": true,
+        "editorDraft": true,
+        "draftRestoredAndApplied": true,
+        "nodes": 4,
+        "canvasLink": true,
+        "clipboardUndo": true,
+        "recovery": true,
+        "exitCode": 0,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/desktop-smoke"
+      },
+      {
+        "walkthrough": "passed",
+        "kanbanDrag": true,
+        "backlog": true,
+        "inspectorPreservedSource": true,
+        "panePersistence": true,
+        "lightThemeAndIndentPersistence": true,
+        "archetypePreviewAndInsert": true,
+        "realPlanPreview": true,
+        "mcpIndependentControls": true,
+        "compositeCollapseMoveResize": true,
+        "typeUsageCalloutSelection": true,
+        "typeAndMetadataEdits": true,
+        "invalidTableDraftRecovery": true,
+        "matrixEndpointNavigation": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/walkthrough-smoke"
+      },
+      {
+        "editor": "passed",
+        "compilerContextInsertion": true,
+        "completionUndo": true,
+        "applyShortcut": true,
+        "staleMenuDismissal": true,
+        "statusDropdownAndApply": true,
+        "inlineTablesVisible": true,
+        "minimizeMaximizeRestoreClose": true,
+        "ownedChildrenStopped": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/editor-smoke"
+      },
+      {
+        "canvas": "passed",
+        "wheelZoomAnchored": true,
+        "middleDragPan": true,
+        "directionalWindows": true,
+        "addRemoveReplace": true,
+        "treeSelectionAndReparent": true,
+        "selectionContoursAndBounds": true,
+        "groupDragSingleUndo": true,
+        "descendantsMoveOnce": true,
+        "releaseOutsideCanvas": true,
+        "debouncedPreviewWithoutMutation": true,
+        "cycleRejected": true,
+        "panPreservesDraft": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
+      },
+      {
+        "startup": "passed",
+        "cases": [
+          {
+            "case": "fresh-file",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "restored-empty",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "restored-selection",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "deleted-selection",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "different-document",
+            "selection": "passed",
+            "draft": false
+          }
+        ],
+        "artifacts": "/home/alfu64/Development/wirecraft/target/startup-smoke"
+      },
+      {
+        "releaseAfterEditorSwitch": "passed",
+        "repetitions": 3,
+        "noHoverMovementAfterRelease": true,
+        "noPhantomDraft": true,
+        "treeResponsive": true,
+        "edgeResizeCursorReturnsToArrow": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/gesture-release-smoke"
+      },
+      {
+        "semanticColors": "passed",
+        "contextMenuScrollAndNestedInsert": "passed",
+        "dependencyCallouts": "captured",
+        "planOverview": "passed",
+        "webserverCompositeRouting": "passed",
+        "compilerIssueReveal": "passed",
+        "hoverPopups": "captured",
+        "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+      },
+      {
+        "package": "passed",
+        "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.5.0-linux-x86_64.tar.gz",
+        "installedBackend": true,
+        "mcpTools": 37,
+        "pdfExport": true,
+        "workbenchMcp": true,
+        "nativeC17Graph": true,
+        "generatedClangd": true,
+        "semanticTokensAndHover": true,
+        "installedStartup": true,
+        "installedGesture": true,
+        "installedFollowup": true,
+        "installedDesktop": true,
+        "installedWalkthrough": true,
+        "installedEditor": true,
+        "installedCanvas": true
+      }
+    ]
+  },
+  "binaries": {
+    "wirecraft": {
+      "sha256": "b0841a34ecd1787da575da7b518d7510e76159ae1f0222ae97d442b6db3aed60",
+      "bytes": 20484528
+    },
+    "wirecraft-desktop": {
+      "sha256": "a311ca10cfd7471a715239d1b7ce5e0f2520ae7c6e43268f05bdacc344061d00",
+      "bytes": 61715024
+    }
+  },
+  "archive": "dist/wirecraft-0.5.0-linux-x86_64.tar.gz",
+  "archiveChecksumFile": "dist/wirecraft-0.5.0-linux-x86_64.tar.gz.sha256",
+  "vectorPlan": {
+    "file": "ticker-plan-vector.pdf",
+    "format": "A4",
+    "pages": 3,
+    "embeddedImages": 0,
+    "searchableText": true,
+    "columns": 3,
+    "rows": 1,
+    "assemblyWidthMm": 620.0,
+    "assemblyHeightMm": 297.0
+  },
+  "screenshots": {
+    "assembled-plan.png": "ad6b5ffa6a5c89efa87258e44917530092e5713d2b0b5169e326eadc14473e65",
+    "webserver-routed-channels.png": "75cec368ca16338cfd3053987454957c5a63229166a5e4fc95c5f59e7eac94e6",
+    "webserver-routing-detail.png": "68f6341aa7cde45d5edb6ae497c4c3f01758dbaef1a66ca7f44c5ae9630e393c",
+    "hover-struct.png": "b1c66134039edcddbaa111f80f723a828b59d76d7db5a105751523c9130ec2e6",
+    "hover-injected-function.png": "b1c66134039edcddbaa111f80f723a828b59d76d7db5a105751523c9130ec2e6",
+    "compiler-issue-list.png": "b1c66134039edcddbaa111f80f723a828b59d76d7db5a105751523c9130ec2e6",
+    "semantic-colors.png": "5e0f468183886abbeeceb77551002b5476f3862d1183a5bd2ee96d2fe3834f5e",
+    "context-archetype-groups.png": "3e255e0a42453f8d95faf96cabdfe6d063fecdab0256d54a2ebf5ef8efc6dd6b",
+    "completion-identifiers-and-signatures.png": "d04d8655b502012622c539abdc932985466aff78a3ff3947c2c83a64d5867279"
+  },
+  "visualInspection": [
+    "Full assembled plan with shared parts/title blocks and page/alignment/folding guides",
+    "C lexical and mapped semantic colors",
+    "Complete emitted Packet struct hover and injected tm function signature/provenance",
+    "Compiler issue count/list and source navigation",
+    "Completion identifiers with signatures",
+    "Separated 45-degree WebServer routes, boundary ports, reverse dashes and crossing bridges"
+  ],
+  "limitations": [
+    "Exact initial intermittent freeze not reproduced; owned startup/release/cursor regressions passed",
+    "Windows/macOS and clean-image dependency installation unverified",
+    "No physical print sent",
+    "Full migration scope remains open; see status.md"
+  ],
+  "packaging": {
+    "evidenceRepackUsesIdenticalVerifiedBinaries": true,
+    "bundledPatchedWidgetLicense": true,
+    "installedHeadlessAfterEvidenceRepack": {
+      "package": "passed",
+      "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.5.0-linux-x86_64.tar.gz",
+      "installedBackend": true,
+      "mcpTools": 37,
+      "pdfExport": true,
+      "workbenchMcp": true,
+      "nativeC17Graph": true,
+      "generatedClangd": true,
+      "semanticTokensAndHover": true,
+      "installedStartup": false,
+      "installedGesture": false,
+      "installedFollowup": false,
+      "installedDesktop": false,
+      "installedWalkthrough": false,
+      "installedEditor": false,
+      "installedCanvas": false
+    }
+  }
+}

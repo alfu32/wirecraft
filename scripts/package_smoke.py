@@ -10,6 +10,8 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-package-smoke-') as tmp:
  prefix=tmp/'installed'
  subprocess.run([str(package/'install.sh'),str(prefix)],check=True,capture_output=True,text=True)
  backend=prefix/'bin/wirecraft';desktop=prefix/'bin/wirecraft-desktop'
+ assert (prefix/'share/doc/wirecraft/gpui-component-Apache-2.0.txt').is_file()
+ assert (prefix/'share/doc/wirecraft/gpui-component-patches.md').is_file()
  subprocess.run([str(desktop),'--help'],check=True,capture_output=True)
  project=tmp/'fixture.orch'
  subprocess.run([str(backend),'new',str(project)],check=True)
