@@ -37,7 +37,7 @@ For headless stdio clients, use the built executable (stdout contains protocol o
 
 For HTTP, `wirecraft serve` prints one JSON readiness record containing `endpoint`, `mcp`, and `token`; send `Authorization: Bearer <token>` to `/mcp`, `/api`, or `/events`. The backend binds only `127.0.0.1`, defaults to an OS-selected port, rejects browser Origin requests, and leaves the old server alone. `/health` is a non-mutating liveness route. Explicit `--port` and `--token` are available; `--recovery FILE` opts into recovery storage.
 
-An API request is `{"command":"threadwork.get_design","arguments":{}}`. Mutations can add `"expectedRevision": 3` to reject stale updates. `/events` is an authenticated SSE stream; reconnecting clients must reload a snapshot after a resync event. `file.open`, `file.save`, `edit.undo`, `edit.redo` and document commands share this contract. Errors carry a stable code and message. MCP retains the original 19 tool schemas and adds 18 Wirecraft tools for project files, graph fragments, archetypes, reports, exports, graph-template/literal/C17 generation, mapped graph diagnostics, LSP and build jobs. `wirecraft.workbench` exposes sheet/document previews and exports, clipboard prompts, settings, MCP controls and printers through the same services. Unavailable commands and graph compilers return explicit limitations.
+An API request is `{"command":"threadwork.get_design","arguments":{}}`. Mutations can add `"expectedRevision": 3` to reject stale updates. `/events` is an authenticated SSE stream; reconnecting clients must reload a snapshot after a resync event. `file.open`, `file.save`, `edit.undo`, `edit.redo` and document commands share this contract. Errors carry a stable code and message. MCP retains the original 19 tool schemas and adds 19 Wirecraft tools for project files, graph fragments, archetypes, pluggable components, reports, exports, graph-template/literal/C17 generation, mapped graph diagnostics, LSP and build jobs. `wirecraft.workbench` exposes sheet/document previews and exports, clipboard prompts, settings, MCP controls and printers through the same services. Unavailable commands and graph compilers return explicit limitations.
 
 ## Reusable workflows, reports and exports
 
@@ -63,15 +63,15 @@ cargo run -p wirecraft-runtime -- compile examples/nodejs.orch /tmp/wirecraft-cu
 
 Five runnable graph examples are in `examples/`: Go (`go build`), Node.js (`node`), Kotlin (Kotlin 2.2.0/JVM 21 or the generated Gradle build), PHP (`php`), QuickJS (`qjs`). Install these external tools separately; Wirecraft does not execute bundled foreign binaries. Model `@…` overrides, project files and portable JSON compiler bundles work through the shared CLI/API/MCP service. The generated JVM compiler-class ABI is replaced by that portable data format. C17 still uses its typed Rust emitter; C template execution, aggregate mixed technologies, template composite boundary channels and wider collection/editor parity remain pending.
 
-`examples/webserver.orch` is a complete C17 HTTP/1.1 server modeled as a dataflow network: accept → router → routes → respond, with a pending-request feedback loop and an HTTP library lent as `libhttp`. Its full specification is in the model's Specification sections, starting with the root entity:
+The WebServer example is a C17 HTTP/1.1 server modeled as a dataflow network, split into a [pluggable component](docs/design/components.md). `examples/webserver-component.orch` is the HTTP transport (accept, a pending-request feedback loop, respond, and an HTTP library lent as `libhttp`); it publishes a `request` output and a `response` input through Exterior circles. `examples/webserver.orch` places it as the Reference `http` and supplies the router and routes. Both specifications are in the models' Specification sections, starting with each root entity:
 
 ```sh
 cargo run -p wirecraft-runtime -- compile examples/webserver.orch /tmp/wirecraft-webserver
-clang -std=c17 -Wall -Wextra -pedantic /tmp/wirecraft-webserver/WebServer.c -o /tmp/wirecraft-webserver/webserver
+clang -std=c17 -Wall -Wextra -pedantic /tmp/wirecraft-webserver/WebServerApp.c -o /tmp/wirecraft-webserver/webserver
 WEBSERVER_PORT=8080 /tmp/wirecraft-webserver/webserver   # then: curl -i http://127.0.0.1:8080/home/about
 ```
 
-Routes: `/home/about`, `/home/version`, `/api/user`; other paths answer 404, other methods 405, malformed requests 400. Set `WEBSERVER_MAX_REQUESTS=N` to exit after N requests and `WEBSERVER_BIND_ANY=1` to listen beyond loopback.
+Routes: `/home/about`, `/home/version`, `/api/user`; other paths answer 404, other methods 405, malformed requests 400. Set `WEBSERVER_MAX_REQUESTS=N` to exit after N requests and `WEBSERVER_BIND_ANY=1` to listen beyond loopback. After editing the component, run `cargo run -p wirecraft-runtime -- update-references examples/webserver.orch` (or **Graph → Update Component Reference**) to re-pin it.
 
 ## C17 topology generation
 
