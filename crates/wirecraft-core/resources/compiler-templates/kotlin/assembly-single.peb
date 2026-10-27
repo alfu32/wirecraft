@@ -1,0 +1,72 @@
+{# composite.single-file: assembles root runtime/main, inline child declarations, and ownDeclaration; isCompilationRoot prevents duplicate entry points. #}{% if isCompilationRoot %}package generated
+
+class RuntimeContext {
+    val imports: MutableMap<String, Any?> = mutableMapOf()
+}
+
+class ThreadworkRunner {
+    @Volatile
+    private var running = true
+
+    @Volatile
+    private var shutdownSignal = 0
+
+    private var transit = 0UL
+    private var shutdownPreviousTransit = 0UL
+    private var shutdownIdleTicks = 0U
+    private var shutdownRemainingTicks = 0U
+
+    fun installShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(Thread { shutdownRequest() })
+    }
+
+    fun shutdownRequest() {
+        running = false
+    }
+
+    fun getShutdownSignal(): Int = shutdownSignal
+
+    fun isRunning(): Boolean = running
+
+    fun recordTransit() {
+        transit++
+    }
+
+    fun beginShutdownDrain(idleTicks: UInt) {
+        shutdownPreviousTransit = transit
+        shutdownIdleTicks = idleTicks
+        shutdownRemainingTicks = idleTicks
+    }
+
+    fun hasRecentTransit(): Boolean {
+        if (transit != shutdownPreviousTransit) {
+            shutdownPreviousTransit = transit
+            shutdownRemainingTicks = shutdownIdleTicks
+            return true
+        }
+        if (shutdownRemainingTicks == 0U) return false
+        shutdownRemainingTicks--
+        return true
+    }
+}
+
+val threadworkRunner = ThreadworkRunner()
+{% endif %}{% if inlineChildDeclarations is not empty %}{{ inlineChildDeclarations }}
+
+{% endif %}{{ ownDeclaration }}
+{% if isCompilationRoot %}
+fun main() {
+    val context = RuntimeContext()
+    threadworkRunner.installShutdownHook()
+    {{ initializerSymbol }}(context)
+
+    while (threadworkRunner.isRunning()) {
+        {{ runSymbol }}(context)
+    }
+
+    threadworkRunner.beginShutdownDrain(10U)
+    while (threadworkRunner.hasRecentTransit()) {
+        {{ runSymbol }}(context)
+    }
+}
+{% endif %}

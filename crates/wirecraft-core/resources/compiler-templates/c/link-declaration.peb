@@ -1,0 +1,36 @@
+{# Each C data link owns two buffers and a dedicated transport function. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}{# C library links are exposed as compiler-generated prefixed function pointers. #}
+{% elseif link.isSourceCapability %}typedef struct {{ link.capabilityTypeSymbol }} {
+    const char *template_source;
+    char *(*getSource)(
+        const struct {{ link.capabilityTypeSymbol }} *capability,
+        const threadwork_build_parameter *parameters,
+        size_t parameter_count);
+} {{ link.capabilityTypeSymbol }};
+
+static char *{{ link.dependencySymbol }}_get_source(
+    const {{ link.capabilityTypeSymbol }} *capability,
+    const threadwork_build_parameter *parameters,
+    size_t parameter_count)
+{
+    return threadwork_materialize_source(capability->template_source, parameters, parameter_count);
+}
+
+static {{ link.capabilityTypeSymbol }} {{ link.dependencySymbol }} = {
+    .template_source = "{{ link.sourceNodeDeclarationDoubleQuoted }}",
+    .getSource = {{ link.dependencySymbol }}_get_source
+};
+{% elseif not link.isCapability %}static threadwork_buffer {{ link.aPortSymbol }} = {
+    .element_size = sizeof({% if link.typeSymbol == "string" %}char *{% elseif link.typeSymbol == "number" %}double{% elseif link.typeSymbol == "date" %}int64_t{% elseif link.typeSymbol == "array" %}ThreadworkArray{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}void *{% endif %})
+};
+static threadwork_buffer {{ link.bPortSymbol }} = {
+    .element_size = sizeof({% if link.typeSymbol == "string" %}char *{% elseif link.typeSymbol == "number" %}double{% elseif link.typeSymbol == "date" %}int64_t{% elseif link.typeSymbol == "array" %}ThreadworkArray{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}void *{% endif %})
+};
+
+{{ transportProvenanceComment }}
+static threadwork_error_t {{ link.transportSymbol }}(threadwork_buffer *a, threadwork_buffer *b)
+{
+    return threadwork_buffer_transport(a, b);
+}
+{% endif %}

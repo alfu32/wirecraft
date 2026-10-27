@@ -1,0 +1,5 @@
+{# Emit a Go structure for one modeled Threadwork type. #}
+{{ nodeProvenanceComment }}
+type {{ symbol }} struct {
+{% for field in typeFields %}	{{ field.symbol }} {% if field.isReference %}*{% endif %}{% if field.typeName == "string" %}string{% elseif field.typeName == "number" %}float64{% elseif field.typeName == "boolean" %}bool{% elseif field.typeName == "date" %}int64{% elseif field.typeName == "array" %}[]any{% else %}{{ field.typeSymbol }}{% endif %}
+{% endfor %}}

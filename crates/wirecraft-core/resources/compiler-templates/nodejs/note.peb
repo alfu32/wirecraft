@@ -1,0 +1,1 @@
+{# note.declaration: emits declaration/specification text as the current node's non-executable block comment. #}{{ node.declarationBlockComment }}

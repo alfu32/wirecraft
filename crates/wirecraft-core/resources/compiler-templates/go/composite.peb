@@ -1,0 +1,19 @@
+{# Initialize descendants once, then execute children and transports on each frame. #}
+{{ initializerProvenanceComment }}
+func {{ initializerSymbol }}(context *ThreadworkContext{% for link in incomingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {{ link.argumentSymbol }} {% if link.isSourceCapability %}*{{ link.capabilityTypeSymbol }}{% else %}any{% endif %}{% endif %}{% endfor %}) error {
+{% if instantiation is not empty %}{{ instantiationIndent4 }}
+{% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.stereotype != "ServiceLibrary" and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}	if err := {{ child.initializerSymbol }}(context{% for link in child.incomingDataLinks %}, &{{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, &{{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {% if link.isSourceCapability %}&{% endif %}{{ link.dependencySymbol }}{% endif %}{% endfor %}); err != nil {
+		return err
+	}
+{% endif %}{% endfor %}	return nil
+}
+
+{{ runProvenanceComment }}
+func {{ runSymbol }}(context *ThreadworkContext{% for link in incomingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {{ link.argumentSymbol }} {% if link.isSourceCapability %}*{{ link.capabilityTypeSymbol }}{% else %}any{% endif %}{% endif %}{% endfor %}) error {
+{% if declaration is not empty %}{{ declarationIndent4 }}
+{% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.stereotype != "ServiceLibrary" and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}	if err := {{ child.runSymbol }}(context{% for link in child.incomingDataLinks %}, &{{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, &{{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {% if link.isSourceCapability %}&{% endif %}{{ link.dependencySymbol }}{% endif %}{% endfor %}); err != nil {
+		return err
+	}
+{% endif %}{% endfor %}{% for linkArtifact in linkArtifacts %}{% if linkArtifact.instantiation is not empty and not linkArtifact.link.isCapability %}{{ linkArtifact.instantiation }}
+{% endif %}{% endfor %}	return nil
+}

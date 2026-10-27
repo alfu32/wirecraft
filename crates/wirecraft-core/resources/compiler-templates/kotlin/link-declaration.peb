@@ -1,0 +1,34 @@
+{# A data link owns two typed FIFO buffers so processor execution and transport remain separate phases. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}val {{ link.dependencySymbol }}: {% if link.sourceNodeTypeSymbol is not empty %}{{ link.sourceNodeTypeSymbol }}{% else %}Any?{% endif %} = {% if link.libraryInstantiation is not empty %}{{ link.libraryInstantiation }}{% else %}null{% endif %}
+{% elseif link.isSourceCapability %}class {{ link.capabilityTypeSymbol }} {
+    fun getSource(parameters: Map<String, Any?> = emptyMap()): String {
+        var product = "{{ link.sourceNodeDeclarationDollarEscaped }}"
+        parameters.forEach { (name, value) ->
+            product = product.replace("$" + "{" + name + "}", value.toString())
+        }
+        return product
+    }
+}
+val {{ link.dependencySymbol }} = {{ link.capabilityTypeSymbol }}()
+{% elseif link.isRunnableCapability %}class {{ link.capabilityTypeSymbol }} {
+    fun getRunnable(parameters: Map<String, Any?> = emptyMap()): kotlin.reflect.KFunction<*> {
+        parameters.hashCode()
+        return ::{{ link.sourceRunSymbol }}
+    }
+}
+val {{ link.dependencySymbol }} = {{ link.capabilityTypeSymbol }}()
+{% elseif not link.isCapability %}val {{ link.aPortSymbol }} = ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>()
+val {{ link.bPortSymbol }} = ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>()
+
+{{ transportProvenanceComment }}
+fun {{ link.transportSymbol }}(
+    a: ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>,
+    b: ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>,
+) {
+    if (a.isNotEmpty()) {
+        b.addLast(a.removeFirst())
+        threadworkRunner.recordTransit()
+    }
+}
+{% endif %}

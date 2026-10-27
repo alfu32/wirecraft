@@ -1,0 +1,1 @@
+{# child.import: binds the child's explicit initialization/run functions and compatibility facade. #}const { {{ child.initializerSymbol }}, {{ child.runSymbol }}, {{ child.symbol }} } = require("{{ child.relativeModulePath }}");

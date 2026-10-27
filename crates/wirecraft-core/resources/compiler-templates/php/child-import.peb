@@ -1,0 +1,1 @@
+{# child.import: receives one child artifact and requires its relativePath before the parent invokes child.symbol. #}require_once __DIR__ . '/{{ child.relativePath }}';

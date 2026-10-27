@@ -1,0 +1,26 @@
+{# composite.file-based: orders childImports, runtimeSupport, owned linkDeclarations, and ownDeclaration into one CommonJS module. #}{% if childImports is not empty %}{{ childImports }}
+
+{% endif %}{{ runtimeSupport }}
+{% if linkDeclarations is not empty %}
+{{ linkDeclarations }}
+{% endif %}
+{{ ownDeclaration }}
+{% if isCompilationRoot %}
+function threadworkRun() {
+  const context = createRuntimeContext();
+  threadworkRunner.installShutdownHandlers();
+  {{ initializerSymbol }}(context);
+
+  while (threadworkRunner.isRunning()) {
+    {{ runSymbol }}(context);
+  }
+
+  threadworkRunner.beginShutdownDrain(10);
+  while (threadworkRunner.hasRecentTransit()) {
+    {{ runSymbol }}(context);
+  }
+}
+
+module.exports.threadworkRun = threadworkRun;
+if (require.main === module) threadworkRun();
+{% endif %}

@@ -1,0 +1,28 @@
+{# Each data link owns source and destination FIFO buffers. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}{# Library declarations are available at package scope. #}
+{% elseif link.isSourceCapability %}type {{ link.capabilityTypeSymbol }} struct {
+	templateSource string
+}
+
+func (capability *{{ link.capabilityTypeSymbol }}) GetSource(parameters map[string]string) string {
+	return threadworkMaterializeSource(capability.templateSource, parameters)
+}
+
+var {{ link.dependencySymbol }} = {{ link.capabilityTypeSymbol }}{
+	templateSource: "{{ link.sourceNodeDeclarationDoubleQuoted }}",
+}
+{% elseif link.isRunnableCapability %}var {{ link.dependencySymbol }} any
+{% elseif not link.isCapability %}// {{ link.aPortSymbol }} carries {% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}any{% endif %} values produced by {{ link.sourceNodeName }}.
+var {{ link.aPortSymbol }} ThreadworkBuffer
+
+// {{ link.bPortSymbol }} carries {% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}any{% endif %} values consumed by {{ link.targetNodeName }}.
+var {{ link.bPortSymbol }} ThreadworkBuffer
+
+{{ transportProvenanceComment }}
+func {{ link.transportSymbol }}(a *ThreadworkBuffer, b *ThreadworkBuffer) {
+	if threadworkTransport(a, b) {
+		threadworkRunner.RecordTransit()
+	}
+}
+{% endif %}

@@ -1,0 +1,1 @@
+{# static-file.path: uses explicitPath from node metadata when set, otherwise places the literal file under safeProjectName. #}{% if explicitPath is not empty %}{{ explicitPath }}{% else %}{{ safeProjectName }}/{{ name }}{% endif %}

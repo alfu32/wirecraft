@@ -1,0 +1,69 @@
+{# Shared execution state for one generated Node.js application. #}
+class ThreadworkRunner {
+  constructor() {
+    this.running = true;
+    this.shutdownSignal = 0;
+    this.transit = 0;
+    this.shutdownPreviousTransit = 0;
+    this.shutdownIdleTicks = 0;
+    this.shutdownRemainingTicks = 0;
+  }
+
+  /** Record SIGINT/SIGTERM and request network shutdown. */
+  installShutdownHandlers() {
+    const requestShutdown = (signalNumber) => {
+      this.shutdownSignal = signalNumber;
+      this.shutdownRequest();
+    };
+    process.once("SIGINT", () => requestShutdown(2));
+    process.once("SIGTERM", () => requestShutdown(15));
+  }
+
+  /** Request shutdown; modeled nodes decide whether they continue emitting packets. */
+  shutdownRequest() {
+    this.running = false;
+  }
+
+  /** Return the last SIGINT or SIGTERM number received by the runtime, or zero. */
+  getShutdownSignal() {
+    return this.shutdownSignal || 0;
+  }
+
+  /** Return the requested running state for modeled code to inspect. */
+  isRunning() {
+    return this.running;
+  }
+
+  /** Increment the count of packets completed by modeled transports. */
+  recordTransit() {
+    this.transit += 1;
+  }
+
+  /** Start the bounded idle window used to drain residual network traffic. */
+  beginShutdownDrain(idleTicks) {
+    this.shutdownPreviousTransit = this.transit;
+    this.shutdownIdleTicks = idleTicks;
+    this.shutdownRemainingTicks = idleTicks;
+  }
+
+  /** Return true while transport activity or the idle drain window remains. */
+  hasRecentTransit() {
+    if (this.transit !== this.shutdownPreviousTransit) {
+      this.shutdownPreviousTransit = this.transit;
+      this.shutdownRemainingTicks = this.shutdownIdleTicks;
+      return true;
+    }
+    if (this.shutdownRemainingTicks === 0) return false;
+    this.shutdownRemainingTicks -= 1;
+    return true;
+  }
+}
+
+const threadworkRunnerKey = Symbol.for("threadwork.runner");
+const threadworkRunner = globalThis[threadworkRunnerKey] ??= new ThreadworkRunner();
+globalThis.threadworkRunner ??= threadworkRunner;
+
+/** Create the shared context passed to generated Node.js nodes. */
+function createRuntimeContext() {
+  return { imports: Object.create(null) };
+}

@@ -1,0 +1,33 @@
+{# QuickJS link-owned buffers and synchronous capability adapters. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}const {{ link.dependencySymbol }} = {% if link.libraryInstantiation is not empty %}{{ link.libraryInstantiation }}{% else %}undefined{% endif %};
+{% elseif link.isSourceCapability %}const {{ link.dependencySymbol }} = {
+  getSource(parameters = {}) {
+    let product = "{{ link.sourceNodeDeclarationDoubleQuoted }}";
+    for (const [name, value] of Object.entries(parameters)) {
+      product = product.split("$" + "{" + name + "}").join(String(value));
+    }
+    return product;
+  },
+};
+{% elseif link.isRunnableCapability %}const {{ link.dependencySymbol }} = {
+  getRunnable(parameters = {}) {
+    let product = "{{ link.sourceNodeDeclarationDoubleQuoted }}";
+    for (const [name, value] of Object.entries(parameters)) {
+      product = product.split("$" + "{" + name + "}").join(String(value));
+    }
+    const factory = new Function(product + "\nreturn typeof {{ link.sourceNodeSymbol }} === 'function' ? {{ link.sourceNodeSymbol }} : undefined;");
+    return factory();
+  },
+};
+{% elseif not link.isCapability %}const {{ link.aPortSymbol }} = [];
+const {{ link.bPortSymbol }} = [];
+
+{{ transportProvenanceComment }}
+function {{ link.transportSymbol }}(a, b) {
+  if (a.length > 0) {
+    b.push(a.shift());
+    threadworkRunner.recordTransit();
+  }
+}
+{% endif %}

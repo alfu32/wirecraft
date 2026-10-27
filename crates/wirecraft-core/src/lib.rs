@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 //! Framework and transport independent design model and project storage.
 pub mod model;
 pub mod store;
@@ -20,3 +21,7 @@ pub mod assistance;
 pub mod editor;
 
 mod routing;
+
+pub mod templates;
+
+pub mod compiler;

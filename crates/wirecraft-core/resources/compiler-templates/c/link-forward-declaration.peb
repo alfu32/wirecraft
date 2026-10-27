@@ -1,0 +1,1 @@
+{# C wire definitions are complete hoisted declarations; arbitrary payload source is not forward-declared. #}

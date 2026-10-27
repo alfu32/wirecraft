@@ -1,0 +1,6 @@
+{# Project manifest: uses project-level safePackageName and root.symbol to define the CommonJS package and entry module. #}{
+  "name": "{{ safePackageName }}",
+  "version": "0.0.0",
+  "type": "commonjs",
+  "main": "{{ root.symbol }}.js"
+}

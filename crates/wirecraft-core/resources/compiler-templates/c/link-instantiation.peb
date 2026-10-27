@@ -1,0 +1,10 @@
+{# Advances one modeled data link after processor execution. #}
+{{ linkProvenanceComment }}
+{% if not link.isCapability %}    if (threadwork_buffer_count(&{{ link.aPortSymbol }}) > 0U) {
+        if ({{ link.transportSymbol }}(&{{ link.aPortSymbol }}, &{{ link.bPortSymbol }}) != THREADWORK_OK) {
+            return THREADWORK_ERROR;
+        }
+        if (threadwork_runner__record_transit(&threadwork_runner) != THREADWORK_OK) {
+            return THREADWORK_ERROR;
+        }
+    }{% endif %}

@@ -1,0 +1,26 @@
+{# Defines one terminal processor. Instantiation is setup code; declaration is recurring code. #}
+{{ initializerProvenanceComment }}
+static threadwork_error_t tw_{{ initializerSymbol }}(threadwork_context *context{% for link in incomingDataLinks %}, threadwork_buffer *{{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, threadwork_buffer *{{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {% if link.isSourceCapability %}{{ link.capabilityTypeSymbol }} *{% elseif link.sourceNodeTypeSymbol is not empty %}{{ link.sourceNodeTypeSymbol }}{% else %}void *{% endif %} {{ link.argumentSymbol }}{% endif %}{% endfor %})
+{
+    (void)context;
+{% for link in incomingDataLinks %}    (void){{ link.argumentSymbol }};
+{% endfor %}{% for link in outgoingDataLinks %}    (void){{ link.argumentSymbol }};
+{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}    (void){{ link.argumentSymbol }};
+{% endif %}
+{% endfor %}
+{% if instantiation is not empty %}{{ instantiationIndent4 }}
+{% endif %}    return THREADWORK_OK;
+}
+
+{{ runProvenanceComment }}
+static threadwork_error_t tw_{{ runSymbol }}(threadwork_context *context{% for link in incomingDataLinks %}, threadwork_buffer *{{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, threadwork_buffer *{{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {% if link.isSourceCapability %}{{ link.capabilityTypeSymbol }} *{% elseif link.sourceNodeTypeSymbol is not empty %}{{ link.sourceNodeTypeSymbol }}{% else %}void *{% endif %} {{ link.argumentSymbol }}{% endif %}{% endfor %})
+{
+    (void)context;
+{% for link in incomingDataLinks %}    (void){{ link.argumentSymbol }};
+{% endfor %}{% for link in outgoingDataLinks %}    (void){{ link.argumentSymbol }};
+{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}    (void){{ link.argumentSymbol }};
+{% endif %}
+{% endfor %}
+{% if declaration is not empty %}{{ declarationIndent4 }}
+{% endif %}    return THREADWORK_OK;
+}

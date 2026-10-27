@@ -1,0 +1,5 @@
+{# type.hoisted-declaration: emits a C struct once in the translation-unit type prelude. ThreadworkArray is supplied by runtime.peb. #}
+{{ nodeProvenanceComment }}
+typedef struct {{ symbol }} {
+{% for field in typeFields %}    {% if field.typeName == "string" %}char *{% elseif field.typeName == "boolean" %}bool {% elseif field.typeName == "number" %}double {% elseif field.typeName == "date" %}int64_t {% elseif field.typeName == "array" %}ThreadworkArray {% elseif field.isCompilerPrimitive %}{{ field.typeName }} {% if field.isReference %}*{% endif %}{% else %}struct {{ field.typeSymbol }} {% if field.isReference %}*{% endif %}{% endif %}{{ field.symbol }};
+{% endfor %}} {{ symbol }};

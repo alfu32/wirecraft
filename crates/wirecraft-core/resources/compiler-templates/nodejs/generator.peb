@@ -1,0 +1,19 @@
+{# Modeled generator code decides whether shutdown state permits emission. #}
+{{ initializerProvenanceComment }}
+function {{ initializerSymbol }}(context = {}{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %}) {
+{% if instantiation is not empty %}{{ instantiationIndent2 }}
+{% endif %}}
+
+{{ runProvenanceComment }}
+function {{ runSymbol }}(context = {}{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %}) {
+{% if declaration is not empty %}{{ declarationIndent2 }}
+{% else %}  // {{ name }} has no declaration text yet.
+{% endif %}}
+
+function {{ symbol }}(context = {}{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %}) {
+  return {{ runSymbol }}(context{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %});
+}
+
+module.exports.{{ initializerSymbol }} = {{ initializerSymbol }};
+module.exports.{{ runSymbol }} = {{ runSymbol }};
+module.exports.{{ symbol }} = {{ symbol }};

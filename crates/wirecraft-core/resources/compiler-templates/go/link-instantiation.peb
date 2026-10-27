@@ -1,0 +1,3 @@
+{# Advance one modeled data transport after processor execution. #}
+{{ linkProvenanceComment }}
+{% if not link.isCapability %}	{{ link.transportSymbol }}(&{{ link.aPortSymbol }}, &{{ link.bPortSymbol }}){% endif %}

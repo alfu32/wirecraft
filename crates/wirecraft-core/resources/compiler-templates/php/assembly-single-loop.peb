@@ -1,0 +1,30 @@
+{# Optional composite.single-file override for long-running PHP applications. #}<?php
+
+{% if childImports is not empty %}{{ childImports }}
+
+{% endif %}{{ runtimeSupport }}
+{% if inlineChildDeclarationsWithoutPhpTag is not empty %}
+{{ inlineChildDeclarationsWithoutPhpTag }}
+{% endif %}{% if linkDeclarations is not empty %}
+{{ linkDeclarations }}
+{% endif %}
+{{ ownDeclaration }}
+{% if isCompilationRoot %}
+function threadwork_run(): void
+{
+    $context = createRuntimeContext();
+    threadwork_runner()->installShutdownHandlers();
+    {{ initializerSymbol }}($context);
+
+    while (threadwork_runner()->isRunning()) {
+        {{ runSymbol }}($context);
+    }
+
+    threadwork_runner()->beginShutdownDrain(10);
+    while (threadwork_runner()->hasRecentTransit()) {
+        {{ runSymbol }}($context);
+    }
+}
+
+if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) threadwork_run();
+{% endif %}

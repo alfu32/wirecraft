@@ -1,0 +1,3 @@
+{# Data transport is a separate phase over the link-owned source and destination buffers. #}
+{{ linkProvenanceComment }}
+{% if not link.isCapability %}{{ link.transportSymbol }}({{ link.aPortSymbol }}, {{ link.bPortSymbol }}){% endif %}

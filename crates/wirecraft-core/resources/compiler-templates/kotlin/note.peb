@@ -1,0 +1,1 @@
+{# note.declaration: emits the current note node's derived metadataComment. #}{{ node.metadataComment }}

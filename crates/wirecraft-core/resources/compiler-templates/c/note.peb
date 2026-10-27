@@ -1,0 +1,2 @@
+{# Keeps notes legal at C file scope. #}
+{{ node.declarationBlockComment }}

@@ -1,0 +1,43 @@
+{# A data link owns two FIFO buffers so processors can execute independently before the transport phase. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}const {{ link.dependencySymbol }} = {% if link.libraryInstantiation is not empty %}{{ link.libraryInstantiation }}{% else %}undefined{% endif %};
+{% elseif link.isSourceCapability %}const {{ link.dependencySymbol }} = {
+  getSource(parameters = {}) {
+    let product = "{{ link.sourceNodeDeclarationDoubleQuoted }}";
+    for (const [name, value] of Object.entries(parameters)) {
+      product = product.split("$" + "{" + name + "}").join(String(value));
+    }
+    return product;
+  },
+};
+{% elseif link.isRunnableCapability %}const {{ link.dependencySymbol }} = {
+  getRunnable(parameters = {}) {
+    let product = "{{ link.sourceNodeDeclarationDoubleQuoted }}";
+    for (const [name, value] of Object.entries(parameters)) {
+      product = product.split("$" + "{" + name + "}").join(String(value));
+    }
+    product = product.replace(/^module\.exports\..*$/gm, "");
+    const factory = new Function(
+      "require",
+      "module",
+      "exports",
+      product + "\nreturn typeof {{ link.sourceNodeSymbol }} === 'function' ? {{ link.sourceNodeSymbol }} : undefined;",
+    );
+    const generatedModule = { exports: {} };
+    return factory(require, generatedModule, generatedModule.exports)
+      || generatedModule.exports.{{ link.sourceNodeSymbol }};
+  },
+};
+{% elseif not link.isCapability %}/** @type {Array<{% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}*{% endif %}>} */
+const {{ link.aPortSymbol }} = [];
+/** @type {Array<{% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}*{% endif %}>} */
+const {{ link.bPortSymbol }} = [];
+
+{{ transportProvenanceComment }}
+function {{ link.transportSymbol }}(a, b) {
+  if (a.length > 0) {
+    b.push(a.shift());
+    threadworkRunner.recordTransit();
+  }
+}
+{% endif %}

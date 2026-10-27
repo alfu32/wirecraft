@@ -1,0 +1,23 @@
+{# File-based node/composite declaration: emits generated.nodes initializer/run functions using current node text and compiled child/link artifacts. #}
+package generated.nodes
+
+import generated.RuntimeContext
+{% if linkDeclarations is not empty %}{{ linkDeclarations }}
+
+{% endif %}
+{{ initializerProvenanceComment }}
+fun {{ initializerSymbol }}(context: RuntimeContext{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}: ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}: ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}: {% if link.isSourceCapability or link.isRunnableCapability %}{{ link.capabilityTypeSymbol }}{% else %}Any?{% endif %}{% endfor %}) {
+{% if node.isComposite %}{% for child in childArtifacts %}{% if child.node.kind.name != "Note" and child.node.kind.name != "Type" %}    generated.nodes.{{ child.initializerSymbol }}(context{% for link in child.incomingDataLinks %}, {{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, {{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, {{ link.dependencySymbol }}{% endfor %})
+{% endif %}{% else %}    // Composite node '{{ name }}' has no executable children to initialize.
+{% endfor %}{% elseif instantiation is not empty %}{{ instantiationIndent4 }}
+{% else %}    // Node '{{ name }}' has no instantiation text yet.
+{% endif %}}
+
+{{ runProvenanceComment }}
+fun {{ runSymbol }}(context: RuntimeContext{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}: ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}: ArrayDeque<{% if link.typeSymbol == "string" %}String{% elseif link.typeSymbol == "number" %}Double{% elseif link.typeSymbol == "date" %}java.time.Instant{% elseif link.typeSymbol == "array" %}List<Any?>{% elseif link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}Any?{% endif %}>{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}: {% if link.isSourceCapability or link.isRunnableCapability %}{{ link.capabilityTypeSymbol }}{% else %}Any?{% endif %}{% endfor %}) {
+{% if node.isComposite %}{% for child in childArtifacts %}{% if child.node.kind.name != "Note" and child.node.kind.name != "Type" %}    generated.nodes.{{ child.runSymbol }}(context{% for link in child.incomingDataLinks %}, {{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, {{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, {{ link.dependencySymbol }}{% endfor %})
+{% endif %}
+{% endfor %}{% for linkArtifact in linkArtifacts %}{% if linkArtifact.instantiation is not empty %}    {{ linkArtifact.instantiation }}
+{% endif %}{% endfor %}{% elseif declaration is not empty %}{{ declarationIndent4 }}
+{% else %}    // Node '{{ name }}' has no declaration text yet.
+{% endif %}}

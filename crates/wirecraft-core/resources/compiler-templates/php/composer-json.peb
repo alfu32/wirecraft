@@ -1,0 +1,5 @@
+{# Project manifest: converts project-level safePackageName into minimal Composer package metadata. #}{
+  "name": "threadwork/{{ safePackageName }}",
+  "type": "project",
+  "require": {}
+}

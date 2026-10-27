@@ -1,0 +1,38 @@
+{# Each data link owns two FIFO arrays and a transport function. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}{# Library links compile into prefixed function aliases with the service-library source. #}
+{% elseif link.isSourceCapability %}${{ link.dependencySymbol }} = new class("{{ link.sourceNodeDeclarationDollarEscaped }}") {
+    public function __construct(private string $template) {}
+
+    public function getSource(array $parameters = []): string
+    {
+        $product = $this->template;
+        foreach ($parameters as $name => $value) {
+            $product = str_replace('$' . '{' . $name . '}', (string) $value, $product);
+        }
+        return $product;
+    }
+};
+{% elseif link.isRunnableCapability %}${{ link.dependencySymbol }} = new class {
+    public function getRunnable(array $parameters = []): Closure
+    {
+        return static function (...$arguments) use ($parameters): mixed {
+            $GLOBALS['threadwork_build_parameters'] = $parameters;
+            return {{ link.sourceNodeSymbol }}(...$arguments);
+        };
+    }
+};
+{% elseif not link.isCapability %}/** @var array<int, {% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}mixed{% endif %}> ${{ link.aPortSymbol }} */
+${{ link.aPortSymbol }} = [];
+/** @var array<int, {% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}mixed{% endif %}> ${{ link.bPortSymbol }} */
+${{ link.bPortSymbol }} = [];
+
+{{ transportProvenanceComment }}
+function {{ link.transportSymbol }}(array &$a, array &$b): void
+{
+    if (count($a) > 0) {
+        $b[] = array_shift($a);
+        threadwork_runner()->recordTransit();
+    }
+}
+{% endif %}

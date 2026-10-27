@@ -1,0 +1,14 @@
+{# Project entry point: creates RuntimeContext, then initializes and runs each project-level scopeRoots node view. #}package generated
+
+fun main() {
+    val context = RuntimeContext()
+    threadworkRunner.installShutdownHook()
+{% for node in scopeRoots %}    generated.nodes.{{ node.initializerSymbol }}(context)
+{% endfor %}    while (threadworkRunner.isRunning()) {
+{% for node in scopeRoots %}        generated.nodes.{{ node.runSymbol }}(context)
+{% endfor %}    }
+    threadworkRunner.beginShutdownDrain(10U)
+    while (threadworkRunner.hasRecentTransit()) {
+{% for node in scopeRoots %}        generated.nodes.{{ node.runSymbol }}(context)
+{% endfor %}    }
+}

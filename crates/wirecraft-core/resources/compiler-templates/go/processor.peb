@@ -1,0 +1,12 @@
+{# Define one terminal Go processor. #}
+{{ initializerProvenanceComment }}
+func {{ initializerSymbol }}(context *ThreadworkContext{% for link in incomingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {{ link.argumentSymbol }} {% if link.isSourceCapability %}*{{ link.capabilityTypeSymbol }}{% else %}any{% endif %}{% endif %}{% endfor %}) error {
+{% if instantiation is not empty %}{{ instantiationIndent4 }}
+{% endif %}	return nil
+}
+
+{{ runProvenanceComment }}
+func {{ runSymbol }}(context *ThreadworkContext{% for link in incomingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }} *ThreadworkBuffer{% endfor %}{% for link in dependencyInjectionLinks %}{% if not link.isLibraryCapability %}, {{ link.argumentSymbol }} {% if link.isSourceCapability %}*{{ link.capabilityTypeSymbol }}{% else %}any{% endif %}{% endif %}{% endfor %}) error {
+{% if declaration is not empty %}{{ declarationIndent4 }}
+{% endif %}	return nil
+}

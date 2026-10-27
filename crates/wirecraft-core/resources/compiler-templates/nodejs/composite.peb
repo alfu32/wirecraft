@@ -1,0 +1,21 @@
+{# A composite initializes descendants once, then executes and transports on each frame. #}
+{{ initializerProvenanceComment }}
+function {{ initializerSymbol }}(context = {}{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %}) {
+{% if instantiation is not empty %}{{ instantiationIndent2 }}
+{% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}  {{ child.initializerSymbol }}(context{% for link in child.incomingDataLinks %}, {{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, {{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, {{ link.dependencySymbol }}{% endfor %});
+{% endif %}{% endfor %}}
+
+{{ runProvenanceComment }}
+function {{ runSymbol }}(context = {}{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %}) {
+{% if declaration is not empty %}{{ declarationIndent2 }}
+{% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}  {{ child.runSymbol }}(context{% for link in child.incomingDataLinks %}, {{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, {{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, {{ link.dependencySymbol }}{% endfor %});
+{% endif %}{% endfor %}{% for linkArtifact in linkArtifacts %}{% if linkArtifact.instantiation is not empty and not linkArtifact.link.isCapability %}  {{ linkArtifact.instantiation }}
+{% endif %}{% endfor %}}
+
+function {{ symbol }}(context = {}{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %}) {
+  return {{ runSymbol }}(context{% for link in incomingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in outgoingDataLinks %}, {{ link.argumentSymbol }}{% endfor %}{% for link in dependencyInjectionLinks %}, {{ link.argumentSymbol }}{% endfor %});
+}
+
+module.exports.{{ initializerSymbol }} = {{ initializerSymbol }};
+module.exports.{{ runSymbol }} = {{ runSymbol }};
+module.exports.{{ symbol }} = {{ symbol }};

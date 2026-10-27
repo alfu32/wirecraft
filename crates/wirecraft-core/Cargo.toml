@@ -12,6 +12,7 @@ uuid.workspace = true
 base64 = "0.22"
 regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+minijinja = { version = "=3.0.4", features = ["serde", "fuel"] }
 
 [dev-dependencies]
 tempfile = "3"

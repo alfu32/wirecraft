@@ -1,0 +1,1 @@
+{# project.name: normalizes the raw project name; this special role receives projectName, safeProjectName, safePackageName, and safeIdentifier only. #}{{ safeIdentifier }}

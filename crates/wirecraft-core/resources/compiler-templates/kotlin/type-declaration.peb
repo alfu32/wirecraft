@@ -1,0 +1,5 @@
+{# type.declaration: emits a Kotlin data class for a declared Threadwork type. #}
+{{ nodeProvenanceComment }}
+data class {{ symbol }}(
+{% for field in typeFields %}    val {{ field.symbol }}: {% if field.typeName == "string" %}String{% elseif field.typeName == "number" %}Double{% elseif field.typeName == "date" %}java.time.Instant{% elseif field.typeName == "array" %}List<Any?>{% else %}{{ field.typeSymbol }}{% endif %}{% if not loop.last %},{% endif %}
+{% endfor %})
