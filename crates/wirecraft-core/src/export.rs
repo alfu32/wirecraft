@@ -255,8 +255,11 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
         }
     }
     for port in &drawing.boundary_ports {
-        write!(out,"<circle class=\"composite-port\" cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"#00897b\"/><text x=\"{}\" y=\"{}\" font-size=\"9\">{}</text>",port.point[0],port.point[1],port.point[0]+5.,port.point[1]-6.,escape(&port.label)).unwrap();
+        let owner = drawing.shapes[&port.owner].rect;
+        let right = port.point[0] > owner.x + owner.width / 2.;
+        write!(out,"<circle class=\"composite-port\" cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"#00897b\"/><text x=\"{}\" y=\"{}\" text-anchor=\"{}\" font-size=\"9\">{}</text>",port.point[0],port.point[1],port.point[0]+if right{9.}else{-9.},port.point[1]-6.,if right{"start"}else{"end"},escape(&port.label)).unwrap();
     }
+
     for annotation in drawing.annotations.values() {
         let r = annotation.rect;
         let owner = drawing.shapes[&annotation.owner].rect;

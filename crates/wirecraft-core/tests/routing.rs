@@ -104,6 +104,30 @@ fn imported_webserver_routes_avoid_boxes_separate_lanes_and_use_boundary_ports()
     for p in ys.windows(2) {
         assert!(p[1] - p[0] > 10.);
     }
+    let r = group.1.rect;
+    let mut fan = drawing
+        .boundary_ports
+        .iter()
+        .map(|port| {
+            let edge = &drawing.edges[&port.edge];
+            let inside = if drawing.shapes[&edge.source].depth > group.1.depth {
+                edge.points.first().unwrap()
+            } else {
+                edge.points.last().unwrap()
+            };
+            (
+                port.point[1],
+                (inside[1] - r.y - r.height / 2.).atan2((inside[0] - r.x - r.width / 2.).abs()),
+            )
+        })
+        .collect::<Vec<_>>();
+    fan.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for pair in fan.windows(2) {
+        assert!(
+            pair[0].1 <= pair[1].1 + 1e-9,
+            "Composite fan out of angular order: {fan:?}"
+        );
+    }
     // Non-emitting link layout metadata must not block C editor context.
     let id = d
         .nodes

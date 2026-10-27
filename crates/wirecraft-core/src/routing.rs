@@ -16,6 +16,7 @@ struct Port {
     edge: String,
     right: bool,
     boundary: bool,
+    toward_target: bool,
     other: Point,
     point: Point,
 }
@@ -60,17 +61,19 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
         let right = ancestors(d, drawing, &edge.target);
         let common = left.iter().find(|p| right.contains(p)).cloned();
         let mut path = vec![];
-        let mut add = |owner: &str, boundary: bool, other: Point, side: bool| {
-            path.push(ports.len());
-            ports.push(Port {
-                owner: owner.into(),
-                edge: id.clone(),
-                right: side,
-                boundary,
-                other,
-                point: [0.; 2],
-            });
-        };
+        let mut add =
+            |owner: &str, boundary: bool, other: Point, side: bool, toward_target: bool| {
+                path.push(ports.len());
+                ports.push(Port {
+                    owner: owner.into(),
+                    edge: id.clone(),
+                    right: side,
+                    boundary,
+                    toward_target,
+                    other,
+                    point: [0.; 2],
+                });
+            };
         // For data/error links both ends may use either side. Dependencies are
         // annotations, deliberately excluded from this relaxation.
         add(
@@ -78,22 +81,36 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
             false,
             bc,
             edge.source == edge.target || bc[0] >= ac[0],
+            true,
         );
         for p in left.iter().take_while(|p| Some(*p) != common.as_ref()) {
-            add(p, true, bc, bc[0] >= center(drawing.shapes[p].rect)[0]);
+            add(
+                p,
+                true,
+                ac,
+                bc[0] >= center(drawing.shapes[p].rect)[0],
+                false,
+            );
         }
         let enter = right
             .iter()
             .take_while(|p| Some(*p) != common.as_ref())
             .collect::<Vec<_>>();
         for p in enter.into_iter().rev() {
-            add(p, true, ac, ac[0] >= center(drawing.shapes[p].rect)[0]);
+            add(
+                p,
+                true,
+                bc,
+                ac[0] >= center(drawing.shapes[p].rect)[0],
+                true,
+            );
         }
         add(
             &edge.target,
             false,
             ac,
             edge.source != edge.target && ac[0] >= bc[0],
+            false,
         );
         paths.insert(id.clone(), (path, common));
     }
@@ -132,13 +149,13 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
         for (path, _) in paths.values() {
             let source = ports[*path.first().unwrap()].point;
             let target = ports[*path.last().unwrap()].point;
-            for (i, index) in path.iter().enumerate() {
-                ports[*index].other = if i == 0 {
+            for index in path {
+                // A composite's symbolic ports fan toward the internal endpoint,
+                // avoiding arbitrary UUID ties between links with one external peer.
+                ports[*index].other = if ports[*index].toward_target {
                     target
-                } else if i + 1 == path.len() {
-                    source
                 } else {
-                    ports[*index].other
+                    source
                 };
             }
         }
@@ -214,7 +231,7 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
                     owner: b.owner.clone(),
                     edge: id.clone(),
                     point: b.point,
-                    label: drawing.edges[&id].name.clone(),
+                    label: drawing.edges[&id].source_label.clone(),
                 });
                 if region.as_deref() == Some(&b.owner) {
                     region = ancestors(d, drawing, &b.owner)

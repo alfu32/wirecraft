@@ -642,11 +642,12 @@ impl Scene {
                 BorderStyle::Solid,
             ));
             if view.zoom >= 0.35 {
-                self.label(
+                let owner = self.drawing.shapes[&port.owner].rect;
+                self.port_label(
                     &port.label,
-                    p + point(px(5.), px(-12.)),
+                    p,
+                    port.point[0] > owner.x + owner.width / 2.,
                     (9. * view.zoom as f32).max(5.),
-                    0x70bdb3,
                     window,
                     cx,
                 );
