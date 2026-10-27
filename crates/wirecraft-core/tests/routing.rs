@@ -341,6 +341,12 @@ fn feedback_uses_the_less_crowded_side_before_adding_both_ports_and_prefers_righ
             points[0][1] > points.last().unwrap()[1],
             "Input must be above output"
         );
+        assert!(
+            points
+                .windows(2)
+                .any(|p| (p[0][0] - p[1][0]).abs() < 1e-6 && (p[0][1] - p[1][1]).abs() > 1e-6),
+            "U must retain a vertical leg: {points:?}"
+        );
         for p in points {
             assert!(
                 (p[0] - side) * dir >= -1e-6 && (p[0] - side) * dir <= 88. + 1e-6,

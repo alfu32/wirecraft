@@ -227,12 +227,12 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
             .then_with(|| a.cmp(b))
     });
     let route_order = paths.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>();
-    let mut self_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut self_counts: BTreeMap<(String, bool), usize> = BTreeMap::new();
     for (id, (path, common)) in paths {
         let self_link = drawing.edges[&id].source == drawing.edges[&id].target;
         let self_rank = if self_link {
             let count = self_counts
-                .entry(drawing.edges[&id].source.clone())
+                .entry((drawing.edges[&id].source.clone(), ports[path[0]].right))
                 .or_default();
             let rank = *count;
             *count += 1;
@@ -513,7 +513,11 @@ fn self_loop(
     } else {
         node.x
     };
-    let base = OUTPUT_OFFSET + STUB + CHAMFER + rank as f64 * GAP * std::f64::consts::SQRT_2;
+    // Leave a real vertical leg even when neighboring ports are close: the
+    // general half-segment chamfer would collapse this U into a pointed V.
+    let cut = CHAMFER.min((a[1] - b[1]).abs() / 3.);
+    let vertical = (b[1] - a[1]).signum();
+    let base = OUTPUT_OFFSET + STUB + cut + rank as f64 * GAP * std::f64::consts::SQRT_2;
     let own = expand(node, 8.);
     let others = obstacles
         .iter()
@@ -529,7 +533,14 @@ fn self_loop(
     let mut fallback = None;
     for ring in 0..=8 {
         let x = side + dir * (base + f64::from(ring) * GAP);
-        let path = chamfer(vec![a, [x, a[1]], [x, b[1]], b]);
+        let path = vec![
+            a,
+            [x - dir * cut, a[1]],
+            [x, a[1] + vertical * cut],
+            [x, b[1] - vertical * cut],
+            [x - dir * cut, b[1]],
+            b,
+        ];
         let soft = soft_cost(&path, &others, occupied, bounds);
         if fallback.as_ref().is_none_or(|(old, _)| soft < *old) {
             fallback = Some((soft, path.clone()));
