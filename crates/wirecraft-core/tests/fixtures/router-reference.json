@@ -1,0 +1,256 @@
+{
+  "sourceRevision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
+  "sourcePath": "app-desktop/src/main/kotlin/com/threadwork/app/ui/ThreadworkDesktopApp.kt",
+  "extractedMethodsSha256": "95a421bf31f359394ad5e0f46cee34592a93fe4a96d2ae9f75bb132f12d0e2c9",
+  "cases": [
+    {
+      "name": "wide-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        400,
+        240
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          240,
+          240
+        ],
+        [
+          400,
+          240
+        ]
+      ]
+    },
+    {
+      "name": "tall-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        240,
+        400
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          240,
+          240
+        ],
+        [
+          240,
+          400
+        ]
+      ]
+    },
+    {
+      "name": "descending-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        400,
+        -240
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          240,
+          -240
+        ],
+        [
+          400,
+          -240
+        ]
+      ]
+    },
+    {
+      "name": "reverse-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        -400,
+        240
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          -240,
+          240
+        ],
+        [
+          -400,
+          240
+        ]
+      ]
+    },
+    {
+      "name": "pure-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        240,
+        240
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          240,
+          240
+        ]
+      ]
+    },
+    {
+      "name": "horizontal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        400,
+        0
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          400,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "vertical",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        0,
+        400
+      ],
+      "obstacles": [],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          400
+        ]
+      ]
+    },
+    {
+      "name": "obstacle-switches-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        400,
+        240
+      ],
+      "obstacles": [
+        [
+          150,
+          80,
+          80,
+          100
+        ]
+      ],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          160,
+          0
+        ],
+        [
+          400,
+          240
+        ]
+      ]
+    },
+    {
+      "name": "crossing-switches-diagonal",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        400,
+        240
+      ],
+      "obstacles": [],
+      "occupied": [
+        [
+          [
+            120,
+            40
+          ],
+          [
+            120,
+            200
+          ]
+        ]
+      ],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          160,
+          0
+        ],
+        [
+          400,
+          240
+        ]
+      ]
+    }
+  ]
+}

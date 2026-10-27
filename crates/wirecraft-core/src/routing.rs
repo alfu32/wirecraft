@@ -254,56 +254,6 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
         }
         edge.points = points;
     }
-    // Cut orthogonal corners into 45 degree runs, without reducing the obstacle
-    // clearance. Routing uses the reserved Manhattan lanes; these short diagonal
-    // cuts stay inside the same corner envelope.
-    let obstacles = drawing
-        .shapes
-        .values()
-        .filter(|s| !s.composite || !s.expanded)
-        .map(|s| expand(s.rect, 8.))
-        .collect::<Vec<_>>();
-    let original = drawing
-        .edges
-        .iter()
-        .map(|(id, e)| (id.clone(), e.points.clone()))
-        .collect::<Vec<_>>();
-    for (id, edge) in &mut drawing.edges {
-        let mut result = vec![];
-        for (i, &p) in edge.points.iter().enumerate() {
-            if i == 0 || i + 1 == edge.points.len() {
-                result.push(p);
-                continue;
-            }
-            let a = edge.points[i - 1];
-            let b = edge.points[i + 1];
-            let da = [a[0] - p[0], a[1] - p[1]];
-            let db = [b[0] - p[0], b[1] - p[1]];
-            let la = da[0].abs() + da[1].abs();
-            let lb = db[0].abs() + db[1].abs();
-            let cut = 18_f64.min(la / 3.).min(lb / 3.);
-            let before = [p[0] + da[0] / la * cut, p[1] + da[1] / la * cut];
-            let after = [p[0] + db[0] / lb * cut, p[1] + db[1] / lb * cut];
-            let clear = cut > 1.
-                && !obstacles
-                    .iter()
-                    .any(|r| r.intersects_segment(before, after))
-                && !original
-                    .iter()
-                    .filter(|(key, _)| key != id)
-                    .any(|(_, path)| {
-                        path.windows(2).any(|s| {
-                            Rect::from_points(before, after).intersects_segment(s[0], s[1])
-                        })
-                    });
-            if clear {
-                result.extend([before, after]);
-            } else {
-                result.push(p);
-            }
-        }
-        edge.points = result;
-    }
     let mut previous: Vec<(Point, Point)> = vec![];
     for edge in drawing.edges.values_mut().filter(|e| !e.annotation_only) {
         for s in edge.points.windows(2) {
@@ -349,13 +299,9 @@ fn simplify(points: &mut Vec<Point>) {
         while result.len() > 1 {
             let a = result[result.len() - 2];
             let b = result[result.len() - 1];
-            if ((a[0] - b[0]).abs() < 1e-6
-                && (b[0] - p[0]).abs() < 1e-6
-                && (b[1] - a[1]) * (p[1] - b[1]) >= 0.)
-                || ((a[1] - b[1]).abs() < 1e-6
-                    && (b[1] - p[1]).abs() < 1e-6
-                    && (b[0] - a[0]) * (p[0] - b[0]) >= 0.)
-            {
+            let u = [b[0] - a[0], b[1] - a[1]];
+            let v = [p[0] - b[0], p[1] - b[1]];
+            if (u[0] * v[1] - u[1] * v[0]).abs() < 1e-6 && u[0] * v[0] + u[1] * v[1] >= 0. {
                 result.pop();
             } else {
                 break;
@@ -365,6 +311,156 @@ fn simplify(points: &mut Vec<Point>) {
     }
     *points = result;
 }
+// Reference candidate/scoring contract: Threadworks 2.6.7 GraphCanvas
+// bestRouteBetween/routeCandidates/chamferOrthogonalTurns/routeCost.
+const ROUTING_STEP: f64 = 40.;
+const CHAMFER: f64 = 22.;
+const BEND_COST: f64 = 18.;
+const CROSSING_COST: f64 = 2500.;
+const SCALE: f64 = 1000.;
+const EPS: f64 = 1e-6;
+fn length(a: Point, b: Point) -> f64 {
+    (b[0] - a[0]).hypot(b[1] - a[1])
+}
+fn path_length(path: &[Point]) -> f64 {
+    path.windows(2).map(|p| length(p[0], p[1])).sum()
+}
+fn octilinear(a: Point, b: Point) -> bool {
+    let dx = (b[0] - a[0]).abs();
+    let dy = (b[1] - a[1]).abs();
+    dx < EPS || dy < EPS || (dx - dy).abs() < EPS
+}
+fn candidates(a: Point, b: Point) -> Vec<Vec<Point>> {
+    let mut result = vec![vec![a, b]];
+    let lanes = |start: f64, end: f64| {
+        // Keep fractional world coordinates: unlike java.awt.Point, the canvas
+        // need not round ports or move a route when the graph is translated.
+        let mid = (start + end) / 2.;
+        let mut lanes = (-7..=7)
+            .map(|i| mid + f64::from(i) * ROUTING_STEP)
+            .collect::<Vec<_>>();
+        lanes.extend([
+            start + ROUTING_STEP,
+            start - ROUTING_STEP,
+            end + ROUTING_STEP,
+            end - ROUTING_STEP,
+        ]);
+        lanes.sort_by(|a, b| (a - mid).abs().total_cmp(&(b - mid).abs()));
+        lanes.dedup();
+        lanes
+    };
+    for x in lanes(a[0], b[0]) {
+        result.push(vec![a, [x, a[1]], [x, b[1]], b]);
+    }
+    for y in lanes(a[1], b[1]) {
+        result.push(vec![a, [a[0], y], [b[0], y], b]);
+    }
+    let dx = b[0] - a[0];
+    let dy = b[1] - a[1];
+    let diagonal = dx.abs().min(dy.abs());
+    if diagonal > ROUTING_STEP {
+        result.push(vec![
+            a,
+            [a[0] + dx.signum() * diagonal, a[1] + dy.signum() * diagonal],
+            b,
+        ]);
+        result.push(vec![
+            a,
+            [b[0] - dx.signum() * diagonal, b[1] - dy.signum() * diagonal],
+            b,
+        ]);
+    }
+    result
+        .into_iter()
+        .map(|path| {
+            let mut result = vec![path[0]];
+            for p in path.windows(3) {
+                let u = [p[1][0] - p[0][0], p[1][1] - p[0][1]];
+                let v = [p[2][0] - p[1][0], p[2][1] - p[1][1]];
+                if (u[0].abs() < EPS && v[1].abs() < EPS) || (u[1].abs() < EPS && v[0].abs() < EPS)
+                {
+                    let cut = CHAMFER
+                        .min(length(p[0], p[1]) / 2.)
+                        .min(length(p[1], p[2]) / 2.);
+                    if cut >= 4. {
+                        result.push([p[1][0] - u[0].signum() * cut, p[1][1] - u[1].signum() * cut]);
+                        result.push([p[1][0] + v[0].signum() * cut, p[1][1] + v[1].signum() * cut]);
+                        continue;
+                    }
+                }
+                result.push(p[1]);
+            }
+            result.push(*path.last().unwrap());
+            simplify(&mut result);
+            result
+        })
+        .collect()
+}
+// Return None for coincident channel runs in *any* direction, including 45°.
+// Near-parallel lanes retain the old spacing preference; crossings use the JVM
+// penalty. These checks apply to final candidate geometry before it is reserved.
+fn segment_penalty(a: Point, b: Point, occupied: &[(Point, Point)]) -> Option<f64> {
+    let u = [b[0] - a[0], b[1] - a[1]];
+    let len = length(a, b);
+    if len < EPS {
+        return Some(0.);
+    }
+    let mut penalty = 0.;
+    for &(c, d) in occupied {
+        let v = [d[0] - c[0], d[1] - c[1]];
+        let other_len = length(c, d);
+        if other_len < EPS {
+            continue;
+        }
+        let w = [c[0] - a[0], c[1] - a[1]];
+        let cross = |a: Point, b: Point| a[0] * b[1] - a[1] * b[0];
+        let den = cross(u, v);
+        if den.abs() / (len * other_len) < 1e-9 {
+            let project = |p: Point| ((p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]) / len;
+            let p = project(c);
+            let q = project(d);
+            if p.max(q).min(len) - p.min(q).max(0.) > EPS {
+                let distance = cross(w, u).abs() / len;
+                if distance < EPS {
+                    return None;
+                }
+                if distance < GAP - EPS {
+                    penalty += 50.;
+                }
+            }
+        } else {
+            let t = cross(w, v) / den;
+            let s = cross(w, u) / den;
+            if (-1e-9..=1. + 1e-9).contains(&t)
+                && (-1e-9..=1. + 1e-9).contains(&s)
+                && ![c, d]
+                    .into_iter()
+                    .any(|p| length(a, p) < EPS || length(b, p) < EPS)
+            {
+                penalty += CROSSING_COST;
+            }
+        }
+    }
+    Some(penalty)
+}
+fn route_cost(
+    path: &[Point],
+    obstacles: &[Rect],
+    occupied: &[(Point, Point)],
+    bounds: Option<Rect>,
+) -> Option<f64> {
+    if path.iter().any(|p| bounds.is_some_and(|r| !r.contains(*p))) {
+        return None;
+    }
+    let mut cost = path_length(path) + path.len().saturating_sub(2) as f64 * BEND_COST;
+    for p in path.windows(2) {
+        if !octilinear(p[0], p[1]) || obstacles.iter().any(|r| r.intersects_segment(p[0], p[1])) {
+            return None;
+        }
+        cost += segment_penalty(p[0], p[1], occupied)?;
+    }
+    Some(cost)
+}
 fn search(
     a: Point,
     b: Point,
@@ -372,6 +468,23 @@ fn search(
     occupied: &[(Point, Point)],
     bounds: Option<Rect>,
 ) -> Vec<Point> {
+    let mut best = None;
+    for path in candidates(a, b) {
+        if let Some(cost) = route_cost(&path, obstacles, occupied, bounds) {
+            let len = path_length(&path);
+            if best
+                .as_ref()
+                .is_none_or(|(c, l, _)| cost < *c || (cost == *c && len < *l))
+            {
+                best = Some((cost, len, path));
+            }
+        }
+    }
+    // Preserve the reference candidate choice when clear. The bounded visibility
+    // search handles layouts for which none of those candidates is feasible.
+    if let Some((_, _, path)) = best {
+        return path;
+    }
     search_with_margin(a, b, obstacles, occupied, bounds, 240.)
 }
 fn search_with_margin(
@@ -409,34 +522,69 @@ fn search_with_margin(
         xs.extend([r.x + GAP, r.x + r.width - GAP]);
         ys.extend([r.y + GAP, r.y + r.height - GAP]);
     }
+    // Diagonal guide intersections from both endpoints make exact 45° paths
+    // reachable even on the nonuniform obstacle grid (ports can be fractional).
+    let base_x = xs.clone();
+    let base_y = ys.clone();
+    for p in [a, b] {
+        for x in &base_x {
+            let delta = (x - p[0]).abs();
+            ys.extend([p[1] - delta, p[1] + delta]);
+        }
+        for y in &base_y {
+            let delta = (y - p[1]).abs();
+            xs.extend([p[0] - delta, p[0] + delta]);
+        }
+    }
     for coords in [&mut xs, &mut ys] {
         coords.retain(|v| v.is_finite());
         coords.sort_by(f64::total_cmp);
         coords.dedup_by(|a, b| (*a - *b).abs() < 1e-7);
     }
-    // Bound pathological imported scenes; normal local corridors are much smaller.
-    if xs.len().saturating_mul(ys.len()) > 250_000 {
+    let count = xs.len().saturating_mul(ys.len());
+    if count > 250_000 {
         return vec![];
     }
-    let locate = |p: Point| -> usize {
+    let locate = |p: Point| {
         ys.binary_search_by(|v| v.total_cmp(&p[1])).unwrap() * xs.len()
             + xs.binary_search_by(|v| v.total_cmp(&p[0])).unwrap()
     };
     let point = |i: usize| [xs[i % xs.len()], ys[i / xs.len()]];
+    // Consecutive visibility vertices on x-y and x+y lines add four real
+    // diagonal moves. No post-search corner replacement changes reservations.
+    let mut diagonal = vec![[None; 4]; count];
+    for axis in 0..2 {
+        let mut lines: BTreeMap<i64, Vec<usize>> = BTreeMap::new();
+        for i in 0..count {
+            let p = point(i);
+            let key = if axis == 0 { p[0] - p[1] } else { p[0] + p[1] };
+            lines.entry((key * 1e6).round() as i64).or_default().push(i);
+        }
+        for line in lines.values_mut() {
+            line.sort_by(|a, b| point(*a)[0].total_cmp(&point(*b)[0]));
+            for pair in line.windows(2) {
+                if octilinear(point(pair[0]), point(pair[1])) {
+                    diagonal[pair[0]][axis * 2] = Some(pair[1]);
+                    diagonal[pair[1]][axis * 2 + 1] = Some(pair[0]);
+                }
+            }
+        }
+    }
     let start = locate(a);
     let goal = locate(b);
-    let mut costs = vec![u64::MAX; xs.len() * ys.len() * 3];
+    // Four unoriented segment axes plus the initial no-direction state.
+    let mut costs = vec![u64::MAX; count * 5];
     let mut prev = vec![usize::MAX; costs.len()];
     let mut heap = BinaryHeap::new();
-    costs[start * 3 + 2] = 0;
-    heap.push(std::cmp::Reverse((0u64, 0u64, start * 3 + 2)));
+    costs[start * 5 + 4] = 0;
+    heap.push(std::cmp::Reverse((0u64, 0u64, start * 5 + 4)));
     let mut found = None;
     while let Some(std::cmp::Reverse((_, cost, state))) = heap.pop() {
         if costs[state] != cost {
             continue;
         }
-        let i = state / 3;
-        let direction = state % 3;
+        let i = state / 5;
+        let direction = state % 5;
         if i == goal {
             found = Some(state);
             break;
@@ -444,66 +592,53 @@ fn search_with_margin(
         let p = point(i);
         let x = i % xs.len();
         let y = i / xs.len();
-        for next in [
+        let neighbors = [
             x.checked_sub(1).map(|v| y * xs.len() + v),
             (x + 1 < xs.len()).then_some(i + 1),
             y.checked_sub(1).map(|v| v * xs.len() + x),
             (y + 1 < ys.len()).then_some(i + xs.len()),
-        ]
-        .into_iter()
-        .flatten()
-        {
+            diagonal[i][0],
+            diagonal[i][1],
+            diagonal[i][2],
+            diagonal[i][3],
+        ];
+        for next in neighbors.into_iter().flatten() {
             let q = point(next);
-            let dir = if (p[0] - q[0]).abs() < 1e-7 { 1 } else { 0 };
+            let dir = if (p[0] - q[0]).abs() < EPS {
+                1
+            } else if (p[1] - q[1]).abs() < EPS {
+                0
+            } else if (q[0] - p[0]) * (q[1] - p[1]) > 0. {
+                2
+            } else {
+                3
+            };
             if bounds.is_some_and(|r| !r.contains(q))
                 || obstacles.iter().any(|r| r.intersects_segment(p, q))
             {
                 continue;
             }
-            let mut penalty = 0;
-            let mut blocked = false;
-            for &(c, d) in &occupied {
-                let vertical = (c[0] - d[0]).abs() < 1e-7;
-                if vertical == (dir == 1) {
-                    let axis = if vertical { 1 } else { 0 };
-                    let cross = 1 - axis;
-                    let overlap = p[axis].max(q[axis]).min(c[axis].max(d[axis]))
-                        - p[axis].min(q[axis]).max(c[axis].min(d[axis]));
-                    if overlap > 1e-6 {
-                        let distance = (p[cross] - c[cross]).abs();
-                        if distance < 1e-6 {
-                            blocked = true;
-                            break;
-                        }
-                        if distance < GAP - 1e-6 {
-                            penalty += 500;
-                        }
-                    }
-                } else if Rect::from_points(c, d).intersects_segment(p, q) {
-                    penalty += 800;
-                }
-            }
-            if blocked {
+            let Some(penalty) = segment_penalty(p, q, &occupied) else {
                 continue;
-            }
-            let length = ((p[0] - q[0]).abs() + (p[1] - q[1]).abs()) * 10.;
+            };
             let total = cost
-                + length.ceil() as u64
-                + penalty
-                + if direction != 2 && direction != dir {
-                    250
-                } else {
-                    0
-                };
-            let state_next = next * 3 + dir;
-            if total < costs[state_next] {
-                costs[state_next] = total;
-                prev[state_next] = state;
-                let estimate = ((q[0] - b[0]).abs() + (q[1] - b[1]).abs()) * 10.;
+                + ((length(p, q)
+                    + penalty
+                    + if direction != 4 && direction != dir {
+                        BEND_COST
+                    } else {
+                        0.
+                    })
+                    * SCALE)
+                    .ceil() as u64;
+            let next_state = next * 5 + dir;
+            if total < costs[next_state] {
+                costs[next_state] = total;
+                prev[next_state] = state;
                 heap.push(std::cmp::Reverse((
-                    total + estimate.floor() as u64,
+                    total + (length(q, b) * SCALE).floor() as u64,
                     total,
-                    state_next,
+                    next_state,
                 )));
             }
         }
@@ -513,7 +648,7 @@ fn search_with_margin(
     };
     let mut path = vec![];
     loop {
-        path.push(point(state / 3));
+        path.push(point(state / 5));
         if prev[state] == usize::MAX {
             break;
         }
@@ -522,4 +657,84 @@ fn search_with_margin(
     path.reverse();
     simplify(&mut path);
     path
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn jvm_candidate_and_scoring_goldens_match() {
+        let reference: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/router-reference.json")).unwrap();
+        for case in reference["cases"].as_array().unwrap() {
+            let a: Point = serde_json::from_value(case["start"].clone()).unwrap();
+            let b: Point = serde_json::from_value(case["end"].clone()).unwrap();
+            let obstacles = case["obstacles"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| Rect {
+                    x: r[0].as_f64().unwrap(),
+                    y: r[1].as_f64().unwrap(),
+                    width: r[2].as_f64().unwrap(),
+                    height: r[3].as_f64().unwrap(),
+                })
+                .collect::<Vec<_>>();
+            let occupied: Vec<(Point, Point)> =
+                serde_json::from_value(case["occupied"].clone()).unwrap();
+            let expected: Vec<Point> =
+                serde_json::from_value(case["expectedRoute"].clone()).unwrap();
+            let route = search(a, b, &obstacles, &occupied, None);
+            assert_eq!(route, expected, "Reference case {}", case["name"]);
+        }
+    }
+    #[test]
+    fn visibility_search_uses_long_diagonals_around_boxes_and_handles_fractional_ports() {
+        for offset in [[0., 0.], [0.25, -0.125], [10000.25, 20000.75]] {
+            let a = offset;
+            let b = [400. + offset[0], 240. + offset[1]];
+            let obstacles = [Rect {
+                x: 150. + offset[0],
+                y: 60. + offset[1],
+                width: 100.,
+                height: 160.,
+            }];
+            let route = search_with_margin(a, b, &obstacles, &[], None, 240.);
+            assert_eq!(route.first(), Some(&a));
+            assert_eq!(route.last(), Some(&b));
+            assert!(
+                route_cost(&route, &obstacles, &[], None).is_some(),
+                "{route:?}"
+            );
+            assert!(
+                route
+                    .windows(2)
+                    .any(|p| (p[1][0] - p[0][0]).abs() > 40. && (p[1][1] - p[0][1]).abs() > 40.),
+                "No substantial diagonal: {route:?}"
+            );
+        }
+    }
+    #[test]
+    fn diagonal_lanes_cannot_overlap_and_crossings_have_the_same_cost_at_every_angle() {
+        for (a, b, c, d) in [
+            ([0., 0.], [200., 200.], [50., 50.], [150., 150.]),
+            ([0., 200.], [200., 0.], [50., 150.], [150., 50.]),
+            ([0., 0.], [200., 0.], [50., 0.], [150., 0.]),
+            ([0., 0.], [0., 200.], [0., 50.], [0., 150.]),
+        ] {
+            assert!(segment_penalty(a, b, &[(c, d)]).is_none());
+        }
+        assert_eq!(
+            segment_penalty([0., 0.], [200., 200.], &[([0., 200.], [200., 0.])]),
+            Some(CROSSING_COST)
+        );
+        assert_eq!(
+            segment_penalty([0., 100.], [200., 100.], &[([100., 0.], [100., 200.])]),
+            Some(CROSSING_COST)
+        );
+        let occupied = [([0., 0.], [400., 400.])];
+        let path = search([40., 40.], [300., 300.], &[], &occupied, None);
+        assert!(path.len() > 2);
+        assert!(route_cost(&path, &[], &occupied, None).is_some());
+    }
 }

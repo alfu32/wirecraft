@@ -97,6 +97,16 @@ fn imported_webserver_routes_avoid_boxes_separate_lanes_and_use_boundary_ports()
         .map(|p| {
             assert_eq!(p.owner, *group.0);
             assert_eq!(p.point[0], group.1.rect.x);
+            let route = &drawing.edges[&p.edge].points;
+            assert!(
+                route.windows(2).any(|s| {
+                    (s[0][1] - p.point[1]).abs() < 1e-6
+                        && (s[1][1] - p.point[1]).abs() < 1e-6
+                        && s[0][0].min(s[1][0]) <= p.point[0] - 19.9
+                        && s[0][0].max(s[1][0]) >= p.point[0] + 19.9
+                }),
+                "Composite crossing lost its aligned port stubs: {route:?}"
+            );
             p.point[1]
         })
         .collect::<Vec<_>>();
@@ -245,4 +255,58 @@ fn obstructed_endpoints_report_failure_instead_of_silently_drawing_through_a_box
             .unwrap()
             .contains("routing-error")
     );
+}
+
+#[test]
+fn open_routes_choose_substantial_diagonals_in_all_quadrants_and_vector_exports() {
+    for (x, y) in [
+        (600., 400.),
+        (600., -400.),
+        (-600., 400.),
+        (-600., -400.),
+        (400., 600.),
+    ] {
+        let mut d = Document::new("Diagonal routing");
+        let a = box_at(&mut d, "root", "A", 0., 0.);
+        let b = box_at(&mut d, "root", "B", x, y);
+        let id = wire(&mut d, &a, &b, "channel");
+        let drawing = Drawing::new(&d, "root");
+        assert_routes(&drawing);
+        let points = &drawing.edges[&id].points;
+        let mut total = 0.;
+        let mut diagonal = 0.;
+        for p in points.windows(2) {
+            let dx = (p[1][0] - p[0][0]).abs();
+            let dy = (p[1][1] - p[0][1]).abs();
+            let len = dx.hypot(dy);
+            total += len;
+            if dx > 1e-6 && dy > 1e-6 {
+                diagonal += len;
+            }
+        }
+        let first = points.first().unwrap();
+        let last = points.last().unwrap();
+        let dx = (last[0] - first[0]).abs() - 40.;
+        let dy = (last[1] - first[1]).abs();
+        let possible = dx.min(dy) * std::f64::consts::SQRT_2;
+        assert!(
+            (diagonal - possible).abs() < 1e-6,
+            "Diagonal does not span the available displacement: {points:?}"
+        );
+        let optimum = 40. + dx.max(dy) - dx.min(dy) + possible;
+        assert!(
+            (total - optimum).abs() < 1e-6,
+            "Route has unnecessary H/V detours: {points:?}"
+        );
+        let svg = wirecraft_core::export::drawing_svg(&d, "root").unwrap();
+        let polyline = points
+            .iter()
+            .map(|p| format!("{},{}", p[0], p[1]))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            svg.contains(&polyline),
+            "Vector export must use the shared route"
+        );
+    }
 }

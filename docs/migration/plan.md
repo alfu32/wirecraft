@@ -37,3 +37,7 @@ Before the next source-capability/compiler milestone, implement and verify photo
 ## Compiler/template restoration (0.6.0)
 
 The user's missing-language inventory takes precedence over the remaining C source-capability slice. Acceptance: embed and checksum all six original template sets; parse every Pebble asset; connect graph generation, template catalog and portable model-override export to CLI, desktop and MCP; execute isolated Go/Node/Kotlin/PHP/QuickJS producer/channel/consumer programs; verify both relevant file layouts, source maps, custom bundle round trips, unsafe paths and malformed templates. Keep broader parity explicit. Continue with C source capabilities/overrides, template composite boundary ports, aggregate mixed-language dispatch, remaining collections and generated-body editor adapters; do not equate asset import with full migration.
+
+## Router and recovered inspector edits (0.6.1)
+
+Migrate the JVM candidate/Euclidean scoring rules and test reference outputs before routing reservations. Keep strict box/channel constraints, add native diagonal fallback moves and preserve composite boundary ports. Check all quadrants and both desktop/vector output. Separately restore inspector text Enter/blur commits (JVM applyOnCommit), preserve real recovered drafts, and make Apply/Discard visible in Designer. Verify link rename, restart, body-draft Apply and recovered-name Discard through an owned native fixture; do not modify the user's live draft or project.
