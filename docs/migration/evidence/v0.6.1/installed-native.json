@@ -1,0 +1,107 @@
+[
+  {
+    "editor": "passed",
+    "compilerContextInsertion": true,
+    "completionUndo": true,
+    "applyShortcut": true,
+    "staleMenuDismissal": true,
+    "statusDropdownAndApply": true,
+    "inlineTablesVisible": true,
+    "minimizeMaximizeRestoreClose": true,
+    "ownedChildrenStopped": true,
+    "artifacts": "/home/alfu64/Development/wirecraft/target/editor-smoke"
+  },
+  {
+    "canvas": "passed",
+    "wheelZoomAnchored": true,
+    "middleDragPan": true,
+    "directionalWindows": true,
+    "addRemoveReplace": true,
+    "treeSelectionAndReparent": true,
+    "selectionContoursAndBounds": true,
+    "groupDragSingleUndo": true,
+    "descendantsMoveOnce": true,
+    "releaseOutsideCanvas": true,
+    "debouncedPreviewWithoutMutation": true,
+    "cycleRejected": true,
+    "panPreservesDraft": true,
+    "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
+  },
+  {
+    "startup": "passed",
+    "cases": [
+      {
+        "case": "fresh-file",
+        "selection": "passed",
+        "draft": false
+      },
+      {
+        "case": "restored-empty",
+        "selection": "passed",
+        "draft": false
+      },
+      {
+        "case": "restored-selection",
+        "selection": "passed",
+        "draft": false
+      },
+      {
+        "case": "deleted-selection",
+        "selection": "passed",
+        "draft": false
+      },
+      {
+        "case": "different-document",
+        "selection": "passed",
+        "draft": false
+      }
+    ],
+    "artifacts": "/home/alfu64/Development/wirecraft/target/startup-smoke"
+  },
+  {
+    "releaseAfterEditorSwitch": "passed",
+    "repetitions": 3,
+    "noHoverMovementAfterRelease": true,
+    "noPhantomDraft": true,
+    "treeResponsive": true,
+    "edgeResizeCursorReturnsToArrow": true,
+    "artifacts": "/home/alfu64/Development/wirecraft/target/gesture-release-smoke"
+  },
+  {
+    "semanticColors": "passed",
+    "contextMenuScrollAndNestedInsert": "passed",
+    "dependencyCallouts": "captured",
+    "planOverview": "passed",
+    "webserverCompositeRouting": "passed",
+    "compilerIssueReveal": "passed",
+    "hoverPopups": "captured",
+    "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+  },
+  {
+    "nameEnter": "passed",
+    "nameBlur": "passed",
+    "restoredBodyApplyFromDesigner": "passed",
+    "recoveredNameDiscardFromDesigner": "passed",
+    "selection": "passed",
+    "artifacts": "/home/alfu64/Development/wirecraft/target/draft-smoke"
+  },
+  {
+    "package": "passed",
+    "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.6.1-linux-x86_64.tar.gz",
+    "installedBackend": true,
+    "mcpTools": 37,
+    "pdfExport": true,
+    "workbenchMcp": true,
+    "nativeC17Graph": true,
+    "generatedClangd": true,
+    "semanticTokensAndHover": true,
+    "installedDraft": true,
+    "installedStartup": true,
+    "installedGesture": true,
+    "installedFollowup": true,
+    "installedDesktop": false,
+    "installedWalkthrough": false,
+    "installedEditor": true,
+    "installedCanvas": true
+  }
+]

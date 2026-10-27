@@ -1,0 +1,9 @@
+{
+  "releaseAfterEditorSwitch": "passed",
+  "repetitions": 3,
+  "noHoverMovementAfterRelease": true,
+  "noPhantomDraft": true,
+  "treeResponsive": true,
+  "edgeResizeCursorReturnsToArrow": true,
+  "artifacts": "/home/alfu64/Development/wirecraft/target/gesture-release-smoke"
+}

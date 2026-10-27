@@ -1,0 +1,10 @@
+{
+  "semanticColors": "passed",
+  "contextMenuScrollAndNestedInsert": "passed",
+  "dependencyCallouts": "captured",
+  "planOverview": "passed",
+  "webserverCompositeRouting": "passed",
+  "compilerIssueReveal": "passed",
+  "hoverPopups": "captured",
+  "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+}

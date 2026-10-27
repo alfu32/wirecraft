@@ -1,0 +1,259 @@
+warning: use of deprecated module `std::usize`: all constants in this module replaced by associated constants on the type
+ --> vendor/gpui-component/src/highlighter/diagnostics.rs:4:5
+  |
+4 |     usize,
+  |     ^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/diagnostics.rs:218:27
+    |
+218 |             start: usize::MIN,
+    |                           ^^^
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/diagnostics.rs:219:25
+    |
+219 |             end: usize::MIN,
+    |                         ^^^
+
+warning: use of deprecated module `std::usize`: all constants in this module replaced by associated constants on the type
+  --> vendor/gpui-component/src/highlighter/highlighter.rs:11:5
+   |
+11 |     usize,
+   |     ^^^^^
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:123:27
+    |
+123 |             start: usize::MIN,
+    |                           ^^^
+
+warning: use of deprecated constant `std::usize::MAX`: replaced by the `MAX` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:124:25
+    |
+124 |             end: usize::MAX,
+    |                         ^^^
+
+warning: use of deprecated constant `std::usize::MAX`: replaced by the `MAX` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:125:31
+    |
+125 |             min_start: usize::MAX,
+    |                               ^^^
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:126:29
+    |
+126 |             max_end: usize::MIN,
+    |                             ^^^
+
+   Compiling wirecraft-runtime v0.6.1 (/home/alfu64/Development/wirecraft/crates/wirecraft-runtime)
+warning: `gpui-component` (lib) generated 8 warnings
+   Compiling wirecraft-desktop v0.6.1 (/home/alfu64/Development/wirecraft/crates/wirecraft-desktop)
+   Compiling wirecraft-core v0.6.1 (/home/alfu64/Development/wirecraft/crates/wirecraft-core)
+    Finished `test` profile [unoptimized] target(s) in 6.99s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/debug/deps/wirecraft_core-3de8a55cf1a096cc)
+
+running 3 tests
+test routing::tests::diagonal_lanes_cannot_overlap_and_crossings_have_the_same_cost_at_every_angle ... ok
+test routing::tests::jvm_candidate_and_scoring_goldens_match ... ok
+test routing::tests::visibility_search_uses_long_diagonals_around_boxes_and_handles_fractional_ports ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/canvas_interactions.rs (target/debug/deps/canvas_interactions-95c749d1c536335a)
+
+running 3 tests
+test wheel_zoom_preserves_world_point_at_cursor_including_clamps ... ok
+test window_containment_and_crossing_include_boundary_without_bounding_box_false_hits ... ok
+test selection_add_remove_replace_are_idempotent_and_preserve_unhit_items ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compatibility.rs (target/debug/deps/compatibility-e8788d62b951e3bf)
+
+running 6 tests
+test link_indexes_boundaries_moves_self_links_and_cascade ... ok
+test legacy_map_unknown_fields_binary_and_text_survive ... ok
+test save_is_atomic_and_can_be_reopened ... ok
+test corrupt_and_duplicate_documents_fail ... ok
+test source_fixture_roundtrips_without_payload_loss ... ok
+test cursor_zoom_is_invariant_and_culling_is_local ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/graph_workflows.rs (target/debug/deps/graph_workflows-43003aa6d11f84c0)
+
+running 9 tests
+test repaired_endpoint_port_ids_match_the_source_naming_contract ... ok
+test clipboard_remaps_types_and_internal_links_without_rewriting_user_text ... ok
+test analysis_separates_dependencies_errors_and_feedback ... ok
+test dependency_matrix_reverses_capability_direction_and_ignores_source_capabilities ... ok
+test composite_projection_keeps_absolute_children_and_collapses_boundary_links ... ok
+test vector_and_markdown_exports_escape_untrusted_content ... ok
+test validation_inheritance_and_status_history ... ok
+test routed_link_index_culls_empty_interiors_and_matches_segment_bounds ... ok
+test type_usage_callouts_reference_entities_and_are_exported ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/routing.rs (target/debug/deps/routing-f3cd06058b46fdc3)
+
+running 8 tests
+test pcb_crossings_have_two_hollow_vias_with_a_backside_connector_and_unbroken_peer ... ok
+test endpoint_caps_match_original_templates_and_horizontal_leads_are_46_units ... ok
+test feedback_reserves_tight_local_envelopes_and_first_ports_before_other_channels ... ok
+test nearer_side_ports_follow_angular_order_and_detour_around_obstacles ... ok
+test open_routes_choose_substantial_diagonals_in_all_quadrants_and_vector_exports ... ok
+test obstructed_layout_keeps_a_best_effort_route_without_error_labels ... ok
+test imported_webserver_routes_avoid_boxes_separate_lanes_and_use_boundary_ports ... ok
+test dependency_callouts_are_separate_from_data_routes_and_issue_dots_include_warnings_and_exclude_info ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/templates.rs (target/debug/deps/templates-2d80c8a32ed72124)
+
+running 3 tests
+test pebble_branches_legacy_placeholders_and_graph_overrides_are_preserved ... ok
+test every_original_template_parses_and_all_six_sets_resolve_roles ... ok
+test rendered_output_is_bounded_and_overrides_are_case_insensitive ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/main.rs (target/debug/deps/wirecraft_desktop-9a84fba526eca4bb)
+
+running 6 tests
+test scene::tests::directional_windows_select_whole_objects_or_crossed_nodes_and_routes ... ok
+test scene::tests::moving_primitives_are_culled_at_their_preview_positions ... ok
+test scene::tests::pick_and_selection_bounds_follow_all_moving_nodes_and_selected_links ... ok
+test scene::tests::links_inside_composite_remain_pickable ... ok
+test scene::tests::completed_reroute_retains_its_obstacle_detour ... ok
+test scene::tests::hidden_selected_descendant_projects_to_visible_composite_contour ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/wirecraft_runtime-61311565cc7d383a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/wirecraft-3cd886f43ed8f360)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/c17_workflows.rs (target/debug/deps/c17_workflows-04613368ade5dda1)
+
+running 7 tests
+test unsupported_capabilities_and_conflicting_types_fail_before_writing ... ok
+test conflicting_payload_definitions_fail_and_identical_definitions_are_emitted_once ... ok
+test cli_compile_preserves_the_original_project_and_emits_a_c_translation_unit ... ok
+test nested_composites_payload_types_library_aliases_and_initialization ... ok
+test self_feedback_uses_explicit_in_out_arguments ... ok
+test modeled_producer_typed_link_consumer_shutdown_and_multi_packet_transport ... ok
+test generated_clangd_diagnostics_map_back_to_node_section_and_line ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/expanded_workflows.rs (target/debug/deps/expanded_workflows-c2d8ced3f077dc95)
+
+running 5 tests
+test explicit_settings_import_preserves_ui_values_and_excludes_credentials ... ok
+test alignment_distribution_cut_paste_and_undo_are_transactions ... ok
+test all_bundled_archetypes_import_with_fresh_ids ... ok
+test literal_generation_source_maps_external_compiler_and_path_safety ... ok
+test real_svg_png_and_vector_pdf_exports ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/jvm_readonly_baseline.rs (target/debug/deps/jvm_readonly_baseline-0c2b2dce995504d2)
+
+running 1 test
+test webserver_network_and_link_contracts_match_live_jvm_read_results ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/plan_overview.rs (target/debug/deps/plan_overview-fccd395555b099db)
+
+running 2 tests
+test whole_plan_has_one_technical_frame_grid_and_shared_overlap_marks ... ok
+test graph_translation_does_not_create_blank_origin_pages_and_preview_is_explicit ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.36s
+
+     Running tests/services.rs (target/debug/deps/services-c1388198fa476d84)
+
+running 13 tests
+test inverse_positions_reject_surrogate_and_utf8_splits ... ok
+test recovery_failures_are_visible_without_repeating_committed_mutations ... ok
+test shutdown_closes_live_event_subscriptions ... ok
+test failed_save_reports_committed_revision_and_preserves_recovery ... ok
+test unicode_lsp_positions ... ok
+test recovery_preserves_unsaved_state_path_and_draft_save_failure ... ok
+test user_merge_and_partial_text_updates ... ok
+test transactions_conflict_undo_save_and_unsaved_protection ... ok
+test stdio_client_initializes_lists_calls_and_stops ... ok
+test real_http_mcp_client_and_shared_revision ... ok
+test lsp_cancellation_stale_results_and_abrupt_crash ... ok
+test real_clangd_sync_diagnostics_requests_restart_and_cleanup ... ok
+test build_jobs_failure_cancellation_and_timeout ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/template_compilers.rs (target/debug/deps/template_compilers-66f2eb24856cef95)
+
+running 7 tests
+test cli_custom_compiler_bundle_export_and_roundtrip ... ok
+test php_quickjs_generate_and_bundle_roundtrip_with_graph_overrides ... ok
+test template_failures_paths_static_companions_and_scope_are_explicit ... ok
+test http_mcp_template_catalog_compile_export_and_reuse_share_services ... ok
+test real_php_and_quickjs_generated_dataflows ... ok
+test real_go_and_node_generated_dataflows ... ok
+test real_kotlin_generated_dataflows ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.47s
+
+     Running tests/ticker_workflow.rs (target/debug/deps/ticker_workflow-7349ab2c6dc777ce)
+
+running 6 tests
+test editor_ast_resolves_real_companion_header_types_and_functions ... ok
+test full_generated_ast_maps_semantic_tokens_into_unicode_body_and_stages_companions ... ok
+test generated_hover_reports_function_struct_and_injected_dependency_signatures ... ok
+test supplied_ticker_preserves_exports_reports_draft_error_and_runs_corrected_copy ... ok
+test compiler_context_completes_runtime_channels_libraries_and_members_without_committing ... ok
+test real_mcp_editor_context_and_vector_documentation_use_shared_services ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.69s
+
+     Running tests/walkthrough.rs (target/debug/deps/walkthrough-7432267ff99ca2dc)
+
+running 9 tests
+test legacy_appearance_and_font_preferences_activate_without_importing_credentials ... ok
+test structural_matrix_is_relationship_union_not_parenthood ... ok
+test clipboard_assistance_contains_task_types_authored_text_and_compiler_contract ... ok
+test project_revision_updates_transactionally_and_node_edits_capture_it ... ok
+test settings_are_validated_persisted_and_mcp_can_stop_without_stopping_ui ... ok
+test archetype_preview_and_board_transitions_share_transactions ... ok
+test raster_pdf_embeds_an_image_and_vector_pdf_keeps_searchable_text ... ok
+test combined_pdf_includes_plan_and_documentation_and_auto_never_silently_crops ... ok
+test technical_sheets_and_documentation_export_real_paginated_content ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s
+
+   Doc-tests wirecraft_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests wirecraft_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

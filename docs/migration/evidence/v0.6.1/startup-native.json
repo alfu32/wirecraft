@@ -1,0 +1,31 @@
+{
+  "startup": "passed",
+  "cases": [
+    {
+      "case": "fresh-file",
+      "selection": "passed",
+      "draft": false
+    },
+    {
+      "case": "restored-empty",
+      "selection": "passed",
+      "draft": false
+    },
+    {
+      "case": "restored-selection",
+      "selection": "passed",
+      "draft": false
+    },
+    {
+      "case": "deleted-selection",
+      "selection": "passed",
+      "draft": false
+    },
+    {
+      "case": "different-document",
+      "selection": "passed",
+      "draft": false
+    }
+  ],
+  "artifacts": "/home/alfu64/Development/wirecraft/target/startup-smoke"
+}

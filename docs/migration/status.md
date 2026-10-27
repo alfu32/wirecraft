@@ -1,6 +1,6 @@
 # Current migration status
 
-Wirecraft **0.6.1** corrects native diagonal routing and recovered inspector edits, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and untracked root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
+Wirecraft **0.6.1** corrects native diagonal routing and recovered inspector edits, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
 ## Router and recovered-edit correction
 
@@ -8,7 +8,7 @@ The earlier router was H/V search with short diagonal cuts, not a faithful migra
 
 The newly reported locked-content incident was inspected read-only: the live graph was at revision 0 with no committed rename, while the saved UI session contained a name-only draft for the selected link. The JVM's `applyOnCommit` handles inspector Enter/focus loss; the Rust name input was missing both. Name edits now commit on Enter/blur; other inspector text fields support Enter. A persistent draft strip in every view exposes Apply, Discard and Show editor, and Ctrl-Enter works from Designer. Real drafts still restore and concurrent-edit protections remain. The old live instance and its draft were not changed. This evidence explains this specific guard lock, not every previously reported intermittent pointer/startup incident.
 
-Native isolated checks pass for name Enter/blur, restart with a real body draft, Apply from Designer, recovered-name Discard and subsequent tree selection. Final regression/package results are being recorded below; historical release checks retain their original scope.
+Native isolated checks pass for name Enter/blur, restart with a real body draft, Apply from Designer, recovered-name Discard and subsequent tree selection. The final workspace run passed **88 Rust tests, zero failed or ignored**, including the optional real compiler/toolchain tests. Formatting and strict Clippy passed; upstream widget dependency warnings remain. Ten routing outputs and four port templates were regenerated from the recorded Kotlin source without changes to the fixture. Native canvas, five startup scenarios, three repeated editor-to-designer release cycles and follow-up editor/menu/export/routing checks passed. The optimized archive passes installed backend/MCP (37 tools), PDF/C17/clangd and native editor/canvas/startup/release/follow-up/draft checks. Results and binary hashes are recorded in [verification](evidence/v0.6.1/verification.json); historical release checks below retain their original scope.
 
 ## Compiler/template milestone
 

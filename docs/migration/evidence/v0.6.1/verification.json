@@ -1,0 +1,157 @@
+{
+  "version": "0.6.1",
+  "sourceRevision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
+  "implementationCommit": "d0b29db3c6318b08231e8816449081833063f65c",
+  "platform": "Linux x86_64, XWayland/Vulkan",
+  "checks": {
+    "format": "passed: cargo fmt --all -- --check",
+    "strictClippy": "passed: cargo clippy --workspace --all-targets --locked -- -D warnings; upstream widget warnings remain",
+    "rustTests": {
+      "passed": 88,
+      "failed": 0,
+      "ignored": 0,
+      "command": "cargo test --workspace --locked -- --include-ignored",
+      "environment": {
+        "WIRECRAFT_TEST_KOTLINC": "/tmp/wirecraft-toolchains/kotlin-2.2.0/kotlinc/bin/kotlinc",
+        "WIRECRAFT_TEST_PHP": "/tmp/wirecraft-toolchains/php",
+        "WIRECRAFT_TEST_QJS": "/tmp/wirecraft-toolchains/quickjs-2026-06-04/qjs"
+      }
+    },
+    "jvmGoldens": {
+      "routes": 10,
+      "portTemplates": 4,
+      "regeneration": "passed; identical fixture",
+      "command": "WIRECRAFT_TEST_KOTLINC=/path/to/kotlinc python3 scripts/reference-router-fixtures.py"
+    },
+    "optimizedBuild": "passed: scripts/package-linux.sh release",
+    "installedPackage": {
+      "package": "passed",
+      "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.6.1-linux-x86_64.tar.gz",
+      "installedBackend": true,
+      "mcpTools": 37,
+      "pdfExport": true,
+      "workbenchMcp": true,
+      "nativeC17Graph": true,
+      "generatedClangd": true,
+      "semanticTokensAndHover": true,
+      "installedDraft": true,
+      "installedStartup": true,
+      "installedGesture": true,
+      "installedFollowup": true,
+      "installedDesktop": false,
+      "installedWalkthrough": false,
+      "installedEditor": true,
+      "installedCanvas": true
+    },
+    "installedNativeSuites": [
+      {
+        "editor": "passed",
+        "compilerContextInsertion": true,
+        "completionUndo": true,
+        "applyShortcut": true,
+        "staleMenuDismissal": true,
+        "statusDropdownAndApply": true,
+        "inlineTablesVisible": true,
+        "minimizeMaximizeRestoreClose": true,
+        "ownedChildrenStopped": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/editor-smoke"
+      },
+      {
+        "canvas": "passed",
+        "wheelZoomAnchored": true,
+        "middleDragPan": true,
+        "directionalWindows": true,
+        "addRemoveReplace": true,
+        "treeSelectionAndReparent": true,
+        "selectionContoursAndBounds": true,
+        "groupDragSingleUndo": true,
+        "descendantsMoveOnce": true,
+        "releaseOutsideCanvas": true,
+        "debouncedPreviewWithoutMutation": true,
+        "cycleRejected": true,
+        "panPreservesDraft": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
+      },
+      {
+        "startup": "passed",
+        "cases": [
+          {
+            "case": "fresh-file",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "restored-empty",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "restored-selection",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "deleted-selection",
+            "selection": "passed",
+            "draft": false
+          },
+          {
+            "case": "different-document",
+            "selection": "passed",
+            "draft": false
+          }
+        ],
+        "artifacts": "/home/alfu64/Development/wirecraft/target/startup-smoke"
+      },
+      {
+        "releaseAfterEditorSwitch": "passed",
+        "repetitions": 3,
+        "noHoverMovementAfterRelease": true,
+        "noPhantomDraft": true,
+        "treeResponsive": true,
+        "edgeResizeCursorReturnsToArrow": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/gesture-release-smoke"
+      },
+      {
+        "semanticColors": "passed",
+        "contextMenuScrollAndNestedInsert": "passed",
+        "dependencyCallouts": "captured",
+        "planOverview": "passed",
+        "webserverCompositeRouting": "passed",
+        "compilerIssueReveal": "passed",
+        "hoverPopups": "captured",
+        "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+      },
+      {
+        "nameEnter": "passed",
+        "nameBlur": "passed",
+        "restoredBodyApplyFromDesigner": "passed",
+        "recoveredNameDiscardFromDesigner": "passed",
+        "selection": "passed",
+        "artifacts": "/home/alfu64/Development/wirecraft/target/draft-smoke"
+      }
+    ],
+    "installedCommand": "python3 scripts/package_smoke.py dist/wirecraft-0.6.1-linux-x86_64.tar.gz --editor --startup --draft --followup --canvas --gesture"
+  },
+  "binarySha256": {
+    "wirecraft": "edae0676a926f0636ec46a63c37377dbacade060f9985c34ece7c51833db6e6a",
+    "wirecraft-desktop": "dfe35530107955febf26cd165d58eb36b97bba1cc682bd1699fc0c2f19774516"
+  },
+  "observedBehaviors": [
+    "Compact self-feedback reserves local envelopes and first ports before ordinary channels",
+    "Original five-point hollow output and filled notched input caps, 46-unit horizontal leads",
+    "Hollow via pairs with gray backside connectors painted behind crossing conductors",
+    "Exhausted clear-route search retains best-effort geometry without routing-error labels",
+    "Inspector name commits on Enter and blur; all views expose recovered draft Apply/Discard",
+    "Five startup selection cases and three repeated editor-to-designer release cycles pass"
+  ],
+  "preserved": "Live JVM and Wirecraft instances/settings and user-modified example.orch/example.copy.orch were not mutated by tests",
+  "limitations": [
+    "Full migration remains incomplete; see status.md and parity.md",
+    "Float coordinates, strict clearance preference, compact feedback and bounded fallback are deliberate extensions; golden agreement does not claim exhaustive pixel parity",
+    "Impossible/crowded layouts can retain intersecting best-effort paths",
+    "The inspected name-only draft explains the specific guard lock; the original intermittent startup freeze has not been reproduced",
+    "Windows/macOS, physical printing and clean-machine installation remain unverified",
+    "C source capabilities/overrides and broader compiler/LSP/template parity remain pending"
+  ]
+}
