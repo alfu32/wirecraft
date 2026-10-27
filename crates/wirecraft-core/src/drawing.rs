@@ -3,7 +3,7 @@
 use crate::{
     Document, NodeKind,
     analysis::{Relation, relation, stereotype},
-    viewport::{Rect, SceneIndex, route},
+    viewport::Rect,
 };
 use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone)]
@@ -23,9 +23,11 @@ pub struct Shape {
 #[derive(Clone)]
 pub struct Edge {
     pub name: String,
+    pub annotation_only: bool,
     pub source_label: String,
     pub target_label: String,
     pub points: Vec<[f64; 2]>,
+    pub crossings: Vec<[f64; 2]>,
     pub relation: Option<Relation>,
     pub color_key: &'static str,
     pub dashed: bool,
@@ -35,11 +37,21 @@ pub struct Edge {
 #[derive(Clone)]
 pub struct Annotation {
     pub owner: String,
+    pub flag: bool,
+    pub color_key: &'static str,
     pub target: String,
     pub label: String,
     pub rect: Rect,
 }
+#[derive(Clone)]
+pub struct BoundaryPort {
+    pub owner: String,
+    pub edge: String,
+    pub point: [f64; 2],
+    pub label: String,
+}
 pub struct Drawing {
+    pub boundary_ports: Vec<BoundaryPort>,
     /// Includes hidden descendants projected to their visible collapsed ancestor.
     pub visible_ancestor: BTreeMap<String, String>,
     pub annotations: BTreeMap<String, Annotation>,
@@ -131,7 +143,16 @@ impl Drawing {
                         d.effective(&id, "technologyId")
                     ),
                     fields,
-                    diagnostics: n.diagnostics.len(),
+                    diagnostics: n
+                        .diagnostics
+                        .iter()
+                        .filter(|v| {
+                            v["severity"] == 1
+                                || v["severity"]
+                                    .as_str()
+                                    .is_some_and(|s| s.eq_ignore_ascii_case("error"))
+                        })
+                        .count(),
                 },
             );
             visible_ancestor.insert(id.clone(), id.clone());
@@ -148,9 +169,8 @@ impl Drawing {
             }));
         }
         // Stable port order, independently for incoming and outgoing links.
-        let mut outgoing: BTreeMap<String, Vec<String>> = BTreeMap::new();
-        let mut incoming: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut projected = Vec::new();
+        let mut capabilities = Vec::new();
         for n in d.nodes.values() {
             if let Some(l) = &n.link {
                 let (Some(a), Some(b)) = (
@@ -162,17 +182,19 @@ impl Drawing {
                 if a == b && l.source_node_id != l.target_node_id {
                     continue;
                 }
-                outgoing.entry(a.clone()).or_default().push(n.id.clone());
-                incoming.entry(b.clone()).or_default().push(n.id.clone());
-                projected.push((n, a.clone(), b.clone()));
-            }
-        }
-        let mut index = SceneIndex::default();
-        if !projected.is_empty() {
-            for (id, s) in &shapes {
-                if !s.composite || !s.expanded {
-                    index.insert(id.clone(), s.rect);
+                if matches!(
+                    relation(d, n),
+                    Some(
+                        Relation::Dependency
+                            | Relation::Source
+                            | Relation::Runnable
+                            | Relation::TypeUsage
+                    )
+                ) {
+                    capabilities.push((n, a.clone(), b.clone()));
+                    continue;
                 }
+                projected.push((n, a.clone(), b.clone()));
             }
         }
         let mut edges = BTreeMap::new();
@@ -180,52 +202,6 @@ impl Drawing {
             let l = n.link.as_ref().unwrap();
             let src = &shapes[&a];
             let dst = &shapes[&b];
-            let port_y = |id: &str, ports: &BTreeMap<String, Vec<String>>, r: Rect| {
-                r.y + r.height
-                    * ((ports[id].iter().position(|v| v == &n.id).unwrap_or(0) + 1) as f64
-                        / (ports[id].len() + 1) as f64)
-            };
-            let start = [src.rect.x + src.rect.width, port_y(&a, &outgoing, src.rect)];
-            let end = [dst.rect.x, port_y(&b, &incoming, dst.rect)];
-            let mut points = if a == b {
-                route(src.rect, dst.rect)
-            } else {
-                let mid = (start[0] + end[0]) / 2.;
-                vec![start, [mid, start[1]], [mid, end[1]], end]
-            };
-            // Try nearby horizontal corridors if the direct dogleg crosses a terminal.
-            let clear = |points: &[[f64; 2]]| {
-                points.windows(2).all(|pair| {
-                    let r = Rect {
-                        x: pair[0][0].min(pair[1][0]) - 3.,
-                        y: pair[0][1].min(pair[1][1]) - 3.,
-                        width: (pair[0][0] - pair[1][0]).abs() + 6.,
-                        height: (pair[0][1] - pair[1][1]).abs() + 6.,
-                    };
-                    index.query(r).into_iter().all(|id| id == a || id == b)
-                })
-            };
-            if a != b && !clear(&points) {
-                for y in [
-                    src.rect.y.min(dst.rect.y) - 30.,
-                    (src.rect.y + src.rect.height).max(dst.rect.y + dst.rect.height) + 30.,
-                    src.rect.y.min(dst.rect.y) - 80.,
-                    (src.rect.y + src.rect.height).max(dst.rect.y + dst.rect.height) + 80.,
-                ] {
-                    let candidate = vec![
-                        start,
-                        [start[0] + 20., start[1]],
-                        [start[0] + 20., y],
-                        [end[0] - 20., y],
-                        [end[0] - 20., end[1]],
-                        end,
-                    ];
-                    if clear(&candidate) {
-                        points = candidate;
-                        break;
-                    }
-                }
-            }
             let type_name = if l.type_name.is_empty() {
                 d.nodes
                     .get(&l.type_definition_id)
@@ -238,6 +214,7 @@ impl Drawing {
                 n.id.clone(),
                 Edge {
                     name: n.name.clone(),
+                    annotation_only: false,
                     source_label: format!(
                         "{}{}{}",
                         l.source_port_name,
@@ -245,7 +222,8 @@ impl Drawing {
                         type_name
                     ),
                     target_label: l.target_port_name.clone(),
-                    points,
+                    points: vec![],
+                    crossings: vec![],
                     relation: relation(d, n),
                     color_key: match relation(d, n) {
                         Some(Relation::Error) => "linkError",
@@ -310,6 +288,8 @@ impl Drawing {
                         format!("type-usage:{type_id}:{i}"),
                         Annotation {
                             owner: type_id.clone(),
+                            flag: false,
+                            color_key: "typeStroke",
                             target,
                             label,
                             rect,
@@ -318,11 +298,91 @@ impl Drawing {
                 }
             }
         }
-        Self {
+        let mut providers: BTreeMap<String, Vec<_>> = BTreeMap::new();
+        let mut consumers: BTreeMap<String, Vec<_>> = BTreeMap::new();
+        for (n, a, b) in capabilities {
+            providers.entry(a.clone()).or_default().push(n);
+            consumers.entry(b.clone()).or_default().push(n);
+            edges.insert(
+                n.id.clone(),
+                Edge {
+                    name: n.name.clone(),
+                    annotation_only: true,
+                    source_label: String::new(),
+                    target_label: String::new(),
+                    points: vec![],
+                    crossings: vec![],
+                    relation: relation(d, n),
+                    color_key: "linkDependency",
+                    dashed: true,
+                    source: a,
+                    target: b,
+                },
+            );
+        }
+        for (owner, links) in providers {
+            let shape = &shapes[&owner];
+            for (i, n) in links.iter().enumerate() {
+                let source = d.node(&n.link.as_ref().unwrap().source_node_id).ok();
+                let label = format!(
+                    "{}: {}",
+                    n.name,
+                    source.map(|n| n.name.as_str()).unwrap_or(&shape.name)
+                );
+                annotations.insert(
+                    format!("provider:{}", n.id),
+                    Annotation {
+                        owner: owner.clone(),
+                        target: n.id.clone(),
+                        flag: false,
+                        color_key: "linkDependency",
+                        rect: Rect {
+                            x: shape.rect.x + shape.rect.width + 24.,
+                            y: shape.rect.y + 8. + i as f64 * 30.,
+                            width: (label.chars().count() as f64 * 7. + 16.).max(80.),
+                            height: 24.,
+                        },
+                        label,
+                    },
+                );
+            }
+        }
+        for (owner, links) in consumers {
+            let shape = &shapes[&owner];
+            let count = links.len();
+            for (i, n) in links.iter().enumerate() {
+                let source = d.node(&n.link.as_ref().unwrap().source_node_id).ok();
+                let label = format!(
+                    "{}: {}",
+                    n.name,
+                    source.map(|n| n.name.as_str()).unwrap_or("")
+                );
+                annotations.insert(
+                    format!("consumer:{}", n.id),
+                    Annotation {
+                        owner: owner.clone(),
+                        target: n.id.clone(),
+                        flag: true,
+                        color_key: "linkDependency",
+                        rect: Rect {
+                            x: shape.rect.x + 36.,
+                            y: shape.rect.y - count as f64 * 24. - 26. + i as f64 * 24.,
+                            width: (label.chars().count() as f64 * 7. + 16.).max(80.),
+                            height: 26.,
+                        },
+                        label,
+                    },
+                );
+            }
+        }
+        let mut drawing = Self {
             visible_ancestor,
             shapes,
             edges,
             annotations,
-        }
+            boundary_ports: vec![],
+        };
+        crate::routing::route_drawing(d, &mut drawing);
+        drawing
     }
 }

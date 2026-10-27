@@ -598,8 +598,13 @@ impl Wirecraft {
             bar
         }
     }
-    pub(super) fn render_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(super) fn render_menu(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         let group = self.menu.as_deref()?;
+        let context_menu = group.starts_with("Context");
         let mut panel = div()
             .id("command-panel")
             .w(px(520.))
@@ -823,6 +828,66 @@ impl Wirecraft {
                     },
                 ));
             }
+        } else if let Some(category) = group.strip_prefix("Context:Archetypes") {
+            panel = panel.child(button("context-back", "‹ Back").on_click(cx.listener(
+                |this, _, _, cx| {
+                    this.menu = Some(if this.menu.as_deref() == Some("Context:Archetypes") {
+                        "Context".into()
+                    } else {
+                        "Context:Archetypes".into()
+                    });
+                    cx.notify();
+                },
+            )));
+            let mut list = div()
+                .id("context-archetypes")
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll();
+            if category.is_empty() {
+                let groups = self
+                    .archetypes
+                    .iter()
+                    .map(|a| a["group"].as_str().unwrap_or("Other").to_string())
+                    .collect::<BTreeSet<_>>();
+                for category in groups {
+                    let text = format!("{category} ›");
+                    list = list.child(
+                        button(SharedString::from(text.clone()), text.clone()).on_click(
+                            cx.listener(move |this, _, _, cx| {
+                                this.menu = Some(format!("Context:Archetypes:{category}"));
+                                cx.notify();
+                            }),
+                        ),
+                    );
+                }
+            } else {
+                let category = category.trim_start_matches(':');
+                for archetype in self
+                    .archetypes
+                    .iter()
+                    .filter(|a| a["group"].as_str().unwrap_or("Other") == category)
+                {
+                    let id = archetype["id"].as_str().unwrap_or("").to_string();
+                    let name = archetype["name"].as_str().unwrap_or(&id).to_string();
+                    list = list.child(button(SharedString::from(id.clone()), name).on_click(
+                        cx.listener(move |this, _, _, cx| {
+                            if this.has_draft(cx) {
+                                this.status =
+                                    "Apply the editor draft before inserting an archetype".into();
+                            } else {
+                                this.client.send(
+                                    "archetypes.import",
+                                    json!({"id":id,"parentId":this.parent}),
+                                );
+                                this.menu = None;
+                            }
+                            cx.notify();
+                        }),
+                    ));
+                }
+            }
+            panel = panel.child(list);
         } else {
             if group == "Commands" {
                 panel = panel.child(Input::new(&self.query));
@@ -835,6 +900,7 @@ impl Wirecraft {
             panel = panel.child(
                 div()
                     .id("command-list")
+                    .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
                     .track_scroll(&self.palette_scroll)
@@ -842,7 +908,7 @@ impl Wirecraft {
                         COMMANDS
                             .iter()
                             .filter(|c| {
-                                (group == "Commands" || c.group == group)
+                                (["Commands", "Context"].contains(&group) || c.group == group)
                                     && format!("{} {}", c.group, c.label)
                                         .to_lowercase()
                                         .contains(&query)
@@ -866,11 +932,13 @@ impl Wirecraft {
                                         cx.listener(move |this, _, w, cx| this.command(id, w, cx)),
                                     )
                                     .child(icons::icon(c.icon))
-                                    .child(div().flex_1().child(if group == "Commands" {
-                                        format!("{}: {}", c.group, c.label)
-                                    } else {
-                                        c.label.into()
-                                    }))
+                                    .child(div().flex_1().child(
+                                        if ["Commands", "Context"].contains(&group) {
+                                            format!("{}: {}", c.group, c.label)
+                                        } else {
+                                            c.label.into()
+                                        },
+                                    ))
                                     .child(
                                         div()
                                             .text_xs()
@@ -878,7 +946,50 @@ impl Wirecraft {
                                             .child(c.shortcut),
                                     )
                             }),
-                    ),
+                    )
+                    .when(group == "Context", |list| {
+                        list.child(
+                            button("context-archetype-catalog", "Archetypes ›").on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.menu = Some("Context:Archetypes".into());
+                                    this.client.send("archetypes.list", json!({}));
+                                    cx.notify();
+                                }),
+                            ),
+                        )
+                    }),
+            );
+        }
+        if context_menu {
+            let origin = self.context_origin.unwrap_or(point(px(40.), px(100.)));
+            let bounds = window.viewport_size();
+            let height = (f32::from(bounds.height) - 32.).min(650.);
+            let left = f32::from(origin.x)
+                .min(f32::from(bounds.width) - 532.)
+                .max(8.);
+            let top = f32::from(origin.y)
+                .min(f32::from(bounds.height) - height - 8.)
+                .max(8.);
+            return Some(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.menu = None;
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        panel
+                            .h(px(height))
+                            .absolute()
+                            .left(px(left))
+                            .top(px(top))
+                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()),
+                    )
+                    .into_any_element(),
             );
         }
         Some(

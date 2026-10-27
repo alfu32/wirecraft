@@ -330,7 +330,7 @@ impl Service {
                     store::atomic_write(Path::new(required(a, "path")?), text.as_bytes())?;
                     return Ok(json!({"exported":true,"path":a["path"]}));
                 }
-                let (pages, summary) = if a["kind"] == "all" {
+                let (pages, summary, overview) = if a["kind"] == "all" {
                     let sheet = serde_json::from_value(
                         a.get("sheetOptions").cloned().unwrap_or(json!({})),
                     )?;
@@ -346,6 +346,7 @@ impl Service {
                     (
                         plan.pages,
                         json!({"kind":"all","planPages":plan_pages,"documentationPages":documentation_pages}),
+                        None,
                     )
                 } else if documentation {
                     let options =
@@ -353,13 +354,14 @@ impl Service {
                     (
                         wirecraft_core::documentation::pages(&self.document, parent, &options)?,
                         json!({"kind":"documentation"}),
+                        None,
                     )
                 } else {
                     let options =
                         serde_json::from_value(a.get("options").cloned().unwrap_or(json!({})))?;
                     let plan = wirecraft_core::sheets::plan(&self.document, parent, &options)?;
-                    let summary = json!({"format":plan.format,"widthMm":plan.width_mm,"heightMm":plan.height_mm,"rows":plan.rows,"columns":plan.columns,"clipped":plan.clipped});
-                    (plan.pages, summary)
+                    let summary = json!({"format":plan.format,"widthMm":plan.width_mm,"heightMm":plan.height_mm,"rows":plan.rows,"columns":plan.columns,"clipped":plan.clipped,"overviewWidthMm":plan.overview_width_mm,"overviewHeightMm":plan.overview_height_mm,"tiles":plan.tiles});
+                    (plan.pages, summary, Some(plan.overview))
                 };
                 if r.command == "export.write" {
                     crate::export::pages_with_mode(
@@ -373,14 +375,19 @@ impl Service {
                     );
                 }
                 let page = a["page"].as_u64().unwrap_or(0) as usize;
-                let svg = pages
-                    .get(page)
-                    .ok_or_else(|| Error::new("invalid_input", "Preview page out of range"))?;
+                let is_overview = a["overview"] == true && overview.is_some();
+                let svg = if is_overview {
+                    overview.as_ref().unwrap()
+                } else {
+                    pages
+                        .get(page)
+                        .ok_or_else(|| Error::new("invalid_input", "Preview page out of range"))?
+                };
                 use base64::Engine;
                 let png = base64::engine::general_purpose::STANDARD
                     .encode(crate::export::thumbnail(svg)?);
                 return Ok(
-                    json!({"pngBase64":png,"svg":svg,"page":page,"pages":pages.len(),"summary":summary,"generation":a["generation"],"revision":self.revision}),
+                    json!({"pngBase64":png,"svg":svg,"page":page,"pages":pages.len(),"overview":is_overview,"summary":summary,"generation":a["generation"],"revision":self.revision}),
                 );
             }
             "export.diagram" => {

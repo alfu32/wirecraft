@@ -1,5 +1,15 @@
 # Current migration status
 
+## Current fixes in progress (2026-10-27)
+
+- Shared plan composition now provides the assembled drawing by default, page contours, overlap alignment crosses, folding marks, one parts list and one title block. Individual sheets remain selectable. `export.preview` accepts `overview: true` while preserving its default tile contract.
+- Dependency/source/runnable/type capability links use provider boxes and consumer flagpoles; data routing uses clearance search, separate channels, nearer-side ports, angular ordering, 45° corner cuts and explicit composite ports. WebServer fixture routes pass no-overlap/no-box-entry checks.
+- C/C++ grammar registration and compiler semantic overlays replace accidental JSON fallback. Real clangd token mapping passes for Unicode, runtime helpers, injected libraries, buffers, types and members; all generated companion files are staged.
+- Window border resize hitboxes are confined to gutters. Window-level capture finishes gestures across child controls; hover without a held button, Escape and focus loss release stale gestures. Exact intermittent first-start freeze is not reproduced; five isolated startup cases and three editor-to-designer release cases passed the old baseline too, so they do not prove the cause.
+- Right-click menu includes all commands in a scrollable list and grouped archetypes. Screenshots 026–038 preserve the new reference/regression evidence and hashes. Red dots indicate Error diagnostics, excluding warnings/info.
+- Executed: workspace compilation; 13 focused graphics/export tests; real-clangd semantic mapping test. Native verification and final full-suite/lint/package checks are pending for this working revision. The user’s running dirty project was inspected through authenticated MCP using safe reads only; 37 tools, five resources and two prompts were advertised. No mouse interaction state is exposed through MCP.
+
+
 Wirecraft 0.4.1 adds canvas/tree gesture corrections to the runnable Linux workbench. **The full migration remains unfinished.** Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. The user's edited `../threadworks/examples/example-c.orch` is left untouched. The original desktop was not stopped or restarted. Work is committed and pushed to master with Conventional Commits; only patch/minor tags are authorized.
 
 ## Working behavior

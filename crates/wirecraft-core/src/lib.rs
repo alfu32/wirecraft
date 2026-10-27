@@ -18,3 +18,5 @@ pub mod documentation;
 pub mod assistance;
 
 pub mod editor;
+
+mod routing;

@@ -64,6 +64,7 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                     let command = match operation {
                         "editor_context" => "editor.context",
                         "complete" => "editor.complete",
+                        "semantic_tokens" => "editor.tokens",
                         "stop_editor" => "editor.stop",
                         "preview_archetype" => "archetypes.preview",
                         "preview_export" => "export.preview",

@@ -201,10 +201,13 @@ impl Wirecraft {
             });
             cx.subscribe(&self.editor, |this, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
+                    this.queue_tokens(cx);
                     this.persist_ui(cx);
                 }
             })
             .detach();
+            self.token_ticket = None;
+            self.queue_tokens(cx);
             Theme::global_mut(cx).mono_font_family = settings.appearance.editor_font.clone().into();
             self.rebuild();
             self.focus.focus(w);

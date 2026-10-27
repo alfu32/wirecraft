@@ -35,3 +35,5 @@ Ctrl-Space context (photos 021–025): the edited declaration is a processing no
 Implementation and verification tracking: [walkthrough parity](../walkthrough.md).
 
 Additional evidence: [working C ticker project](example-c.orch) and [reference plan/specification PDF](ticker-print.pdf); hashes and inspection notes are recorded in [artifacts.json](artifacts.json). Treat the project as an immutable reference; generation/execution checks use temporary copies and external clang, never its legacy TCC launcher.
+
+Evidence 026–038 was supplied in the conversation on 2026-10-27. The manifest preserves supplied order and hashes; exact capture timestamps were unavailable. It covers assembled export, context commands, semantic colors, stuck pointer/resize state, capability annotations and WebServer composite routing. The untracked root `example.orch` remains unchanged; a routing test fixture copies its graph/code/layout, omitting user avatar data.

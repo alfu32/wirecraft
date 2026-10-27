@@ -174,6 +174,12 @@ fn technical_sheets_and_documentation_export_real_paginated_content() {
     let temp = tempfile::tempdir().unwrap();
     let mut service = Service::new(Document::new("Walkthrough Report"), None);
     service.execute(Request::new("threadwork.create_entity",json!({"name":"Far Worker","attributes":{"layout":{"x":2500.,"y":300.},"text":{"source":"int value = 42;","specification":"Returns a value & preserves <constraints>."}}}))).unwrap();
+    service
+        .execute(Request::new(
+            "threadwork.create_entity",
+            json!({"name":"Near Worker","attributes":{"layout":{"x":0.,"y":0.}}}),
+        ))
+        .unwrap();
     let options = json!({"format":"A4","scale":1,"split":true,"overlapMm":5.});
     let preview = service
         .execute(Request::new(
@@ -333,6 +339,11 @@ fn combined_pdf_includes_plan_and_documentation_and_auto_never_silently_crops() 
         result["pages"].as_u64().unwrap(),
         1 + result["summary"]["documentationPages"].as_u64().unwrap()
     );
+    s.execute(Request::new(
+        "threadwork.create_entity",
+        json!({"name":"Near","attributes":{"layout":{"x":0.}}}),
+    ))
+    .unwrap();
     s.execute(Request::new(
         "threadwork.create_entity",
         json!({"name":"Outside","attributes":{"layout":{"x":100_000.}}}),

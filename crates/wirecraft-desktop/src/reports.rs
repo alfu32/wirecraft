@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 #[serde(default)]
 pub struct ExportState {
     pub documentation: bool,
+    pub plan_page_preview: bool,
     pub rasterized: bool,
     pub printer: String,
     pub sheet: wirecraft_core::sheets::SheetOptions,
@@ -41,7 +42,7 @@ impl Wirecraft {
     }
 
     pub(super) fn export_arguments(&self) -> Value {
-        json!({"nodeId":self.parent,"kind":if self.export_settings.documentation{"documentation"}else{"plan"},"options":if self.export_settings.documentation{serde_json::to_value(&self.export_settings.document).unwrap()}else{serde_json::to_value(&self.export_settings.sheet).unwrap()},"page":self.export_page,"generation":self.export_generation,"rasterized":self.export_settings.rasterized,"sheetOptions":self.export_settings.sheet,"documentOptions":self.export_settings.document})
+        json!({"nodeId":self.parent,"kind":if self.export_settings.documentation{"documentation"}else{"plan"},"options":if self.export_settings.documentation{serde_json::to_value(&self.export_settings.document).unwrap()}else{serde_json::to_value(&self.export_settings.sheet).unwrap()},"page":self.export_page,"overview":!self.export_settings.documentation && !self.export_settings.plan_page_preview,"generation":self.export_generation,"rasterized":self.export_settings.rasterized,"sheetOptions":self.export_settings.sheet,"documentOptions":self.export_settings.document})
     }
     pub(super) fn refresh_preview(&mut self) {
         self.export_generation += 1;
@@ -246,19 +247,19 @@ impl Wirecraft {
             .id("sheet-preview")
             .flex_1()
             .min_h_0()
-            .overflow_y_scroll()
+            .overflow_hidden()
             .p_4()
             .bg(crate::chrome::color(0x303943))
             .flex()
+            .items_center()
             .justify_center();
         if let Some(image) = &self.export_image {
             preview = preview.child(
                 img(image.clone())
                     .id("export-preview-image")
-                    .w(px(900.))
-                    .h(px(700.))
-                    .flex_none()
-                    .max_w(px(1000.))
+                    .size_full()
+                    .min_w_0()
+                    .min_h_0()
                     .object_fit(ObjectFit::Contain)
                     .with_loading(||div().p_4().child("Rendering preview…").into_any_element())
                     .with_fallback(||div().p_4().child("Preview decoding failed. Export remains available; see application log.").into_any_element()),
@@ -317,63 +318,63 @@ impl Wirecraft {
             })
             .when(!state.printer.is_empty(),|b|b.child(button("print-all","Print plan + documentation").on_click(cx.listener(|this,_,_,_|{let mut arguments=this.export_arguments();arguments["printer"]=json!(this.export_settings.printer);arguments["kind"]=json!("all");this.client.send("print.submit",arguments);}))))
             .child(div().flex_1()).child(div().text_xs().text_color(crate::chrome::color(0x91a5b7)).child("File export is always available. Print submits only to the selected CUPS queue."));
-        let body =
-            div()
-                .flex()
-                .flex_col()
-                .flex_1()
-                .min_w_0()
-                .min_h_0()
-                .child(
-                    div()
-                        .flex()
-                        .gap_2()
-                        .p_3()
-                        .child(
-                            button("plan-tab", "Plan")
-                                .when(!doc, |b| b.bg(crate::chrome::color(0x255452)))
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.export_settings.documentation = false;
-                                    this.export_page = 0;
-                                    this.refresh_preview();
-                                    this.persist_ui(cx);
-                                    cx.notify();
-                                })),
-                        )
-                        .child(
-                            button("documentation-tab", "Documentation")
-                                .when(doc, |b| b.bg(crate::chrome::color(0x255452)))
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.export_settings.documentation = true;
-                                    this.export_page = 0;
-                                    this.refresh_preview();
-                                    this.persist_ui(cx);
-                                    cx.notify();
-                                })),
-                        )
-                        .child(div().flex_1())
-                        .child(
-                            button("refresh-preview", "Refresh preview")
-                                .on_click(cx.listener(|this, _, _, _| this.refresh_preview())),
+        let body = div()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .p_3()
+                    .child(
+                        button("plan-tab", "Plan")
+                            .when(!doc, |b| b.bg(crate::chrome::color(0x255452)))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.export_settings.documentation = false;
+                                this.export_page = 0;
+                                this.refresh_preview();
+                                this.persist_ui(cx);
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        button("documentation-tab", "Documentation")
+                            .when(doc, |b| b.bg(crate::chrome::color(0x255452)))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.export_settings.documentation = true;
+                                this.export_page = 0;
+                                this.refresh_preview();
+                                this.persist_ui(cx);
+                                cx.notify();
+                            })),
+                    )
+                    .child(div().flex_1())
+                    .child(
+                        button("refresh-preview", "Refresh preview")
+                            .on_click(cx.listener(|this, _, _, _| this.refresh_preview())),
+                    ),
+            )
+            .child(controls)
+            .child(exports)
+            .child(preview)
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .p_3()
+                    .items_center()
+                    .flex_wrap()
+                    .child(
+                        button("pdf-all", "PDF All · Plan + Documentation").on_click(
+                            cx.listener(|this, _, w, cx| this.write_report("pdf", true, w, cx)),
                         ),
-                )
-                .child(controls)
-                .child(exports)
-                .child(preview)
-                .child(
-                    div()
-                        .flex()
-                        .gap_2()
-                        .p_3()
-                        .items_center()
-                        .flex_wrap()
-                        .child(
-                            button("pdf-all", "PDF All · Plan + Documentation").on_click(
-                                cx.listener(|this, _, w, cx| this.write_report("pdf", true, w, cx)),
-                            ),
-                        )
-                        .child(button("reset-print-settings", "Reset settings").on_click(
-                            cx.listener(|this, _, _, cx| {
+                    )
+                    .child(
+                        button("reset-print-settings", "Reset settings").on_click(cx.listener(
+                            |this, _, _, cx| {
                                 this.export_settings.sheet = Default::default();
                                 this.export_settings.document = Default::default();
                                 this.export_settings.rasterized = false;
@@ -381,23 +382,45 @@ impl Wirecraft {
                                 this.refresh_preview();
                                 this.persist_ui(cx);
                                 cx.notify();
+                            },
+                        )),
+                    )
+                    .child(
+                        button("remove-print-settings", "Remove stored settings").on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.export_settings
+                                    .printer_profiles
+                                    .remove(&this.export_settings.printer);
+                                this.export_settings.sheet = Default::default();
+                                this.export_settings.document = Default::default();
+                                this.refresh_preview();
+                                this.persist_ui(cx);
+                                cx.notify();
                             }),
-                        ))
-                        .child(
-                            button("remove-print-settings", "Remove stored settings").on_click(
-                                cx.listener(|this, _, _, cx| {
-                                    this.export_settings
-                                        .printer_profiles
-                                        .remove(&this.export_settings.printer);
-                                    this.export_settings.sheet = Default::default();
-                                    this.export_settings.document = Default::default();
-                                    this.refresh_preview();
-                                    this.persist_ui(cx);
-                                    cx.notify();
-                                }),
-                            ),
+                        ),
+                    )
+                    .when(!doc, |b| {
+                        b.child(
+                            button(
+                                "plan-preview-mode",
+                                if state.plan_page_preview {
+                                    "View: Individual sheet"
+                                } else {
+                                    "View: Entire drawing"
+                                },
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.export_settings.plan_page_preview =
+                                    !this.export_settings.plan_page_preview;
+                                this.export_page = 0;
+                                this.refresh_preview();
+                                this.persist_ui(cx);
+                                cx.notify();
+                            })),
                         )
-                        .child(
+                    })
+                    .when(doc || state.plan_page_preview, |b| {
+                        b.child(
                             button("previous-page", "Previous page").on_click(cx.listener(
                                 |this, _, _, _| {
                                     if this.export_page > 0 {
@@ -407,22 +430,29 @@ impl Wirecraft {
                                 },
                             )),
                         )
-                        .child(div().child(format!(
+                    })
+                    .child(div().child(if doc || state.plan_page_preview {
+                        format!(
                             "Page {} / {} · {}",
                             self.export_page + 1,
                             self.export_pages,
                             self.export_summary
-                        )))
-                        .child(button("next-page", "Next page").on_click(cx.listener(
+                        )
+                    } else {
+                        format!("Entire drawing · {}", self.export_summary)
+                    }))
+                    .when(doc || state.plan_page_preview, |b| {
+                        b.child(button("next-page", "Next page").on_click(cx.listener(
                             |this, _, _, _| {
                                 if this.export_page + 1 < this.export_pages {
                                     this.export_page += 1;
                                     this.refresh_preview();
                                 }
                             },
-                        ))),
-                )
-                .into_any_element();
+                        )))
+                    }),
+            )
+            .into_any_element();
         div()
             .flex()
             .flex_1()

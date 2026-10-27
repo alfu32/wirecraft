@@ -29,3 +29,14 @@ Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. 
 | Identity/OAuth | identity/DesktopOAuthClient.kt | Source | Future identity adapter | Isolated provider integration required | Pending; credentials never imported |
 | JVM plugins / TCC | ServiceLoader; TinyCcSourceValidator/lib | Source | Data retained; clangd/external tools | Dependency audit | JVM ABI deliberately unsupported; TCC excluded by user |
 | Linux package/config migration | release.yml; snapcraft.yaml; Preferences | Source | scripts/resources/CI | Build/install/MCP/native smoke in temp prefix | Linux optimized package/install/native milestone verified; clean-image installation and Windows/macOS unverified; Rust code checkpoint passed remote Ubuntu CI |
+
+## Follow-up evidence 026–038 (2026-10-27)
+
+| Workflow | Reference / implementation | Verification | Current gap |
+|---|---|---|---|
+| Assembled technical plan | photos 026–027; JVM SheetLayout/drawTechnicalSheet; core/sheets.rs, export.rs and desktop/reports.rs | plan_overview tests, walkthrough PDF/vector tests | native layout inspection pending; typography not pixel-identical |
+| Library capability representation | photos 034–036; drawDependencyAnnotations; core/drawing.rs, desktop/scene.rs | shared projection; dedicated callout tests pending | native inspection pending |
+| Separated composite routing | photos 037–038 and isolated WebServer fixture; core/routing.rs | fixture no-box-entry/no-overlap, six distinct boundary ports; nearer-side angular fan | native bridge/render checks pending; bounded search may report unroutable crowded imports |
+| Compiler coloring | photos 029–030; core/editor.rs, runtime/generated_analysis.rs, desktop/editor_tokens.rs | real clangd Unicode tokens, runtime, libs, members, buffers, seven generated files | native widget color inspection pending |
+| Scrollable context commands | photo 028; desktop/workbench.rs | workspace compilation | native menu traversal pending |
+| Pointer freeze | photos 031–033; vendor window_border.rs and desktop/interaction.rs | baseline five startup / three release cases pass; exact incident not reproduced | verify new capture/edge changes natively |

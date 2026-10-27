@@ -74,16 +74,20 @@ pub(crate) fn escape(s: &str) -> String {
 }
 /// Portable visible diagram. Composite visibility matches the desktop projection.
 pub fn svg(d: &Document, parent: &str) -> Result<String> {
-    svg_impl(d, parent, true)
+    svg_impl(d, parent, true, false)
 }
 pub fn drawing_svg(d: &Document, parent: &str) -> Result<String> {
-    svg_impl(d, parent, false)
+    svg_impl(d, parent, false, false)
 }
-fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
+/// Tight, transparent graph for a technical plan, independent of its world origin.
+pub fn plan_svg(d: &Document, parent: &str) -> Result<String> {
+    svg_impl(d, parent, false, true)
+}
+fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) -> Result<String> {
     d.node(parent)?;
     let drawing = crate::drawing::Drawing::new(d, parent);
-    let left = drawing.shapes.values().map(|s| s.rect.x).fold(0., f64::min) - 40.;
-    let top = drawing.shapes.values().map(|s| s.rect.y).fold(0., f64::min) - 70.;
+    let mut left = drawing.shapes.values().map(|s| s.rect.x).fold(0., f64::min) - 40.;
+    let mut top = drawing.shapes.values().map(|s| s.rect.y).fold(0., f64::min) - 70.;
     let right = drawing
         .shapes
         .values()
@@ -100,13 +104,44 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
         .map(|r| r.y + r.height)
         .fold(200., f64::max)
         + 40.;
-    let width = (right - left).max(600.);
+    let mut width = (right - left).max(600.);
     let table_y = bottom + 20.;
-    let height = if include_parts {
+    let mut height = if include_parts {
         table_y - top + (drawing.shapes.len() as f64 + 2.) * 24. + 70.
     } else {
         bottom - top + 20.
     };
+    if technical {
+        use crate::viewport::Rect;
+        let bounds = drawing
+            .shapes
+            .values()
+            .map(|s| s.rect)
+            .chain(drawing.annotations.values().map(|a| a.rect))
+            .chain(
+                drawing
+                    .edges
+                    .values()
+                    .flat_map(|e| e.points.iter())
+                    .map(|p| Rect {
+                        x: p[0],
+                        y: p[1],
+                        width: 0.,
+                        height: 0.,
+                    }),
+            )
+            .reduce(Rect::union)
+            .unwrap_or(Rect {
+                x: 0.,
+                y: 0.,
+                width: 400.,
+                height: 200.,
+            });
+        left = bounds.x - 20.;
+        top = bounds.y - 25.;
+        width = bounds.width + 40.;
+        height = bounds.height + 50.;
+    }
     let mut out = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"{left} {top} {width} {height}\"><title>{}</title><defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\"><path d=\"M0 0L10 5L0 10z\" fill=\"#334e68\"/></marker></defs><rect x=\"{left}\" y=\"{top}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/><g font-family=\"DejaVu Sans\" fill=\"#102a43\"><text x=\"{}\" y=\"{}\" font-size=\"22\">{}</text>",
         escape(d.project_name()),
@@ -114,6 +149,12 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
         top + 32.,
         escape(&d.qualified_name(parent))
     );
+    if technical {
+        out = format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"{left} {top} {width} {height}\"><title>{}</title><defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\"><path d=\"M0 0L10 5L0 10z\" fill=\"#334e68\"/></marker></defs><g font-family=\"DejaVu Sans\" fill=\"#102a43\">",
+            escape(d.project_name())
+        );
+    }
     let mut shapes = drawing.shapes.iter().collect::<Vec<_>>();
     shapes.sort_by_key(|(_, s)| s.depth);
     for (id, s) in &shapes {
@@ -141,7 +182,7 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
             .unwrap();
         }
     }
-    for edge in drawing.edges.values() {
+    for edge in drawing.edges.values().filter(|e| !e.annotation_only) {
         let points = edge
             .points
             .iter()
@@ -155,6 +196,21 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
             _ => "#334e68",
         };
         write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" {} marker-end=\"url(#arrow)\"/>",if edge.dashed{"stroke-dasharray=\"8 5\""}else{""}).unwrap();
+        for p in &edge.crossings {
+            if let Some(s) = edge
+                .points
+                .windows(2)
+                .find(|s| crate::viewport::distance_to_segment(*p, s[0], s[1]) < 0.1)
+            {
+                let dx = s[1][0] - s[0][0];
+                let dy = s[1][1] - s[0][1];
+                let len = dx.hypot(dy);
+                let (ux, uy) = (dx / len, dy / len);
+                let a = [p[0] - ux * 6., p[1] - uy * 6.];
+                let b = [p[0] + ux * 6., p[1] + uy * 6.];
+                write!(out,"<path d=\"M{} {}L{} {}\" stroke=\"white\" stroke-width=\"6\"/><path class=\"channel-bridge\" d=\"M{} {}C{} {},{} {},{} {}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\"/>",a[0],a[1],b[0],b[1],a[0],a[1],a[0]-uy*9.,a[1]+ux*9.,b[0]-uy*9.,b[1]+ux*9.,b[0],b[1]).unwrap();
+            }
+        }
         for (p, text) in [
             (edge.points.first(), &edge.source_label),
             (edge.points.last(), &edge.target_label),
@@ -164,10 +220,23 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool) -> Result<String> {
             }
         }
     }
+    for port in &drawing.boundary_ports {
+        write!(out,"<circle class=\"composite-port\" cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"#00897b\"/><text x=\"{}\" y=\"{}\" font-size=\"9\">{}</text>",port.point[0],port.point[1],port.point[0]+5.,port.point[1]-6.,escape(&port.label)).unwrap();
+    }
     for annotation in drawing.annotations.values() {
         let r = annotation.rect;
         let owner = drawing.shapes[&annotation.owner].rect;
-        write!(out,"<path d=\"M{} {}H{}\" stroke=\"#00897b\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"#e0f2f1\" stroke=\"#00897b\"/><text x=\"{}\" y=\"{}\" font-size=\"9\" fill=\"#00897b\">{}</text>",owner.x+owner.width,r.y+r.height/2.,r.x,r.x,r.y,r.width,r.height,r.x+4.,r.y+12.,escape(&annotation.label)).unwrap();
+        let color = if annotation.color_key == "typeStroke" {
+            "#00897b"
+        } else {
+            "#b88435"
+        };
+        if annotation.flag {
+            let y = r.y + 18.;
+            write!(out,"<path d=\"M{} {}V{y}h{}\" fill=\"none\" stroke=\"{color}\"/><circle cx=\"{}\" cy=\"{y}\" r=\"3\" fill=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"{color}\">{}</text>",r.x,owner.y,r.width,r.x,r.x+6.,y-4.,escape(&annotation.label)).unwrap();
+        } else {
+            write!(out,"<path d=\"M{} {}H{}\" stroke=\"{color}\"/><circle cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"{color}\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\" stroke=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"{color}\">{}</text>",owner.x+owner.width,r.y+r.height/2.,r.x,owner.x+owner.width,r.y+r.height/2.,r.x,r.y,r.width,r.height,r.x+5.,r.y+16.,escape(&annotation.label)).unwrap();
+        }
     }
     if include_parts {
         write!(out,"<path d=\"M{} {table_y}H{}\" stroke=\"#334e68\"/><text x=\"{}\" y=\"{}\" font-size=\"12\">Parts · Name / Role / Responsible / Revision</text>",left+20.,right-20.,left+20.,table_y+20.).unwrap();

@@ -223,5 +223,122 @@
     "sha256": "865a5abe47f82e277f095d9145d703b89be6d3d75b0060e15e3395f8ed329838",
     "feature": "Injected library and payload completion",
     "observed": "write_append_file Ctrl-Space lists argslib__* functions with signatures, typed ip_word input, Packet fields and pop/count helper suggestions inside the generated node function."
+  },
+  {
+    "sequence": 26,
+    "original": "codex-clipboard-Jm4wAI.png",
+    "file": "026-jvm-export-assembled-page-layout.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "a45ea849c0dc958b85523fa05886a79df5c5be94b69b5d7b399ab32f75b9a9f5",
+    "feature": "Export overview",
+    "observed": "Whole drawing, page contours, alignment and folding marks; global parts/title blocks."
+  },
+  {
+    "sequence": 27,
+    "original": "codex-clipboard-L29hzr.png",
+    "file": "027-wirecraft-export-cropped-tile-regression.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "1b4529affad58782e95c5c4785e63c125a04772c65a342833571747caa283646",
+    "feature": "Export regression",
+    "observed": "Old Wirecraft preview showed only a cropped A4 tile and blank origin area."
+  },
+  {
+    "sequence": 28,
+    "original": "codex-clipboard-J8psnD.png",
+    "file": "028-jvm-context-all-commands-and-archetypes.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "d20cf660a88ab5ce08c96cef18673dca88bb9988ca5403a26f79fe56c88ffc0c",
+    "feature": "Context menu",
+    "observed": "Application commands and nested C archetypes in designer right-click menu."
+  },
+  {
+    "sequence": 29,
+    "original": "codex-clipboard-oRpfYD.png",
+    "file": "029-jvm-c-editor-semantic-colors.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "39aad9fb2658e3089fdd6252bf0d3f794ec731bdf83542244bad1e351e6b617a",
+    "feature": "C semantic colors",
+    "observed": "Types, calls, parameters and fields colored inside generated function body."
+  },
+  {
+    "sequence": 30,
+    "original": "codex-clipboard-c2rKJV.png",
+    "file": "030-wirecraft-c-highlighting-regression.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "74f4633830c292c79a02527e07d514fef3f1e756f712b4c147331ce6ece6b868",
+    "feature": "Editor regression",
+    "observed": "Missing registered C grammar left mostly JSON-like strings and numbers."
+  },
+  {
+    "sequence": 31,
+    "original": "codex-clipboard-vnmCNa.png",
+    "file": "031-wirecraft-phantom-inspector-region.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "cdd819e690425418185f4002690c499ce0c18fcf2a19d131163227c081f5dd92",
+    "feature": "Pointer regression",
+    "observed": "Designer after editor switch; reported invisible reactive region."
+  },
+  {
+    "sequence": 32,
+    "original": "codex-clipboard-hvvxTG.png",
+    "file": "032-wirecraft-node-follows-released-pointer.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "e30938580276d4fbca0883cbfa56959b8aa78aa085bd0f47e9db21c890a0257f",
+    "feature": "Pointer regression",
+    "observed": "Reported picked node followed pointer after release."
+  },
+  {
+    "sequence": 33,
+    "original": "codex-clipboard-CKw2L6.png",
+    "file": "033-wirecraft-stuck-resize-cursor-and-draft-guard.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "a880a063cc49464165183e5742d4eb32ff5c11abbae75339af2b4d357eb6926d",
+    "feature": "Pointer regression",
+    "observed": "Vertical resize cursor over content; apply-draft guard; Escape later released UI."
+  },
+  {
+    "sequence": 34,
+    "original": "codex-clipboard-ZWB9zk.png",
+    "file": "034-jvm-dependency-provider-boxes-and-consumer-flags.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "2dd635fe278c5117eecba457a7eca703afce1342f6a7e56520ccce9e95a1d2b5",
+    "feature": "Dependency annotations",
+    "observed": "write_append_file has files and argslib incoming flagpoles; providers have dependant boxes."
+  },
+  {
+    "sequence": 35,
+    "original": "codex-clipboard-Z8QKpu.png",
+    "file": "035-jvm-library-dependants-four-callouts.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "362c5d1c0d8bfd3d3b41744c31448135f7294046f0a610cf39b32cd768deb427",
+    "feature": "Library dependants",
+    "observed": "includes_lib exposes includes5/includes3/includes2/includes6 separately; libraries have incoming flags."
+  },
+  {
+    "sequence": 36,
+    "original": "codex-clipboard-L8X9WS.png",
+    "file": "036-jvm-link-interaction-kind-selector.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "82d5d1c770f8932fcdbdcabc3d5970195cba63627be5efce45a31b09801bbce5",
+    "feature": "Link interactions",
+    "observed": "Data, library, source, runnable and type-usage capability distinctions control representation."
+  },
+  {
+    "sequence": 37,
+    "original": "codex-clipboard-ysRESL.png",
+    "file": "037-jvm-webserver-routes-and-composite-ports.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "f4dc95ba08893a0b10ab695936870969533b62a001bc3f4e4c53d7b5f261d18a",
+    "feature": "Routing reference",
+    "observed": "Separated routed channels avoid boxes; aligned crossings at routes boundary."
+  },
+  {
+    "sequence": 38,
+    "original": "codex-clipboard-HVQZyM.png",
+    "file": "038-wirecraft-webserver-overlapping-channel-regression.png",
+    "captured": "2026-10-27 (supplied order; capture time unavailable)",
+    "sha256": "4da11527cdd484cb0c9825993ab5b9632b2151e6f465b66b910c6bb4313d5ba0",
+    "feature": "Routing regression",
+    "observed": "Old dogleg routing overlaps channels; missing composite port alignment."
   }
 ]

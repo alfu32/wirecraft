@@ -1,6 +1,7 @@
 mod chrome;
 mod client;
 mod completion;
+mod editor_tokens;
 mod fonts;
 mod icons;
 mod inspector;
@@ -143,6 +144,11 @@ struct Wirecraft {
     completion: Option<completion::Pending>,
     completion_generation: u64,
     function_header: String,
+    token_timer: Option<Task<()>>,
+    token_ticket: Option<editor_tokens::Ticket>,
+    token_dirty: bool,
+    token_inflight: bool,
+    token_generation: u64,
     tables: inspector::Tables,
     advanced: bool,
     editor_committed: bool,
@@ -150,6 +156,7 @@ struct Wirecraft {
     submitted_editor: Option<Value>,
     submitted_revision: Option<u64>,
     menu: Option<String>,
+    context_origin: Option<Point<Pixels>>,
     query: Entity<InputState>,
     palette_index: usize,
     palette_scroll: ScrollHandle,
@@ -293,6 +300,11 @@ impl Wirecraft {
             completion: None,
             completion_generation: 0,
             function_header: String::new(),
+            token_timer: None,
+            token_ticket: None,
+            token_dirty: false,
+            token_inflight: false,
+            token_generation: 0,
             tables: inspector::Tables::default(),
             advanced: false,
             editor_committed: false,
@@ -300,6 +312,7 @@ impl Wirecraft {
             submitted_editor: None,
             submitted_revision: None,
             menu: None,
+            context_origin: None,
             query,
             palette_index: 0,
             palette_scroll: ScrollHandle::new(),
@@ -339,12 +352,19 @@ impl Wirecraft {
             cx.subscribe(input, |this, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
                     this.completion = None;
+                    this.queue_tokens(cx);
                     this.persist_ui(cx);
                     cx.notify();
                 }
             })
             .detach();
         }
+        cx.observe_window_activation(window, |this, window, cx| {
+            if !window.is_window_active() {
+                this.cancel_pointer_gesture(cx);
+            }
+        })
+        .detach();
         cx.on_app_quit(|this, cx| {
             this.persist_ui(cx);
             let _ = this.client.sender.send(Message::Shutdown);
@@ -361,7 +381,15 @@ impl Wirecraft {
                 self.status = "Connected".into();
                 self.tool("mcp.status");
             }
-            Update::Error { message, commit } => {
+            Update::Error {
+                message,
+                commit,
+                command,
+            } => {
+                if command.as_deref() == Some("editor.tokens") {
+                    self.tokens_failed(message, cx);
+                    return;
+                }
                 self.completion = None;
                 self.status = message;
                 if self.move_pending {
@@ -456,6 +484,9 @@ impl Wirecraft {
                 if command == "editor.complete" {
                     self.accept_completions(&value, cx);
                 }
+                if command == "editor.tokens" {
+                    self.accept_tokens(value.clone(), cx);
+                }
                 if command == "editor.context"
                     && value["revision"].as_u64() == Some(self.snapshot.revision)
                     && value["nodeId"].as_str() == self.editor_entity.as_deref()
@@ -542,9 +573,8 @@ impl Wirecraft {
                         && !self.initial_document_id.is_empty()
                         && self.initial_document_id != snapshot.document.id);
                 if snapshot.revision != self.snapshot.revision || document_changed {
+                    self.cancel_pointer_gesture(cx);
                     self.clear_drag_preview();
-                    self.drag_start = None;
-                    self.pending_pick = None;
                     self.move_pending = false;
                 }
                 self.connected_document = true;
@@ -727,6 +757,9 @@ impl Wirecraft {
             .send(Message::SaveUi(serde_json::to_value(state).unwrap()));
     }
     fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.token_inflight {
+            self.token_ticket = None;
+        }
         self.completion = None;
         self.function_header.clear();
         if let Some(n) = self
@@ -823,6 +856,7 @@ impl Wirecraft {
             self.properties
                 .update(cx, |state, cx| state.set_value("{}", window, cx));
         }
+        self.queue_tokens(cx);
     }
     fn editor_fingerprint(&self, cx: &App) -> Value {
         json!({"nodeId":self.editor_entity,"name":self.name.read(cx).value().to_string(),"text":self.editor.read(cx).value().to_string(),"section":self.section,"properties":self.merged_properties(cx),"tables":self.tables.draft(cx)})
@@ -1059,6 +1093,7 @@ impl Wirecraft {
     }
     fn select_mode(&mut self, _: &SelectMode, _: &mut Window, cx: &mut Context<Self>) {
         self.menu = None;
+        self.cancel_pointer_gesture(cx);
         self.mode = Mode::Select;
         self.link_source = None;
         cx.notify();
@@ -1286,7 +1321,9 @@ impl Wirecraft {
         self.client.send(command, json!({}));
     }
 }
-fn button(id: &'static str, label: impl Into<SharedString>) -> Stateful<Div> {
+fn button(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Stateful<Div> {
+    let id: SharedString = id.into();
+    let icon = icons::for_button(&id);
     div()
         .id(id)
         .px_3()
@@ -1298,9 +1335,7 @@ fn button(id: &'static str, label: impl Into<SharedString>) -> Stateful<Div> {
         .flex()
         .items_center()
         .gap_2()
-        .when(!icons::for_button(id).is_empty(), |b| {
-            b.child(icons::icon(icons::for_button(id)))
-        })
+        .when(!icon.is_empty(), |b| b.child(icons::icon(icon)))
         .child(label.into())
 }
 impl Render for Wirecraft {
@@ -1691,7 +1726,7 @@ impl Render for Wirecraft {
         } else {
             content = content.child(self.render_mcp(cx));
         }
-        div().on_mouse_move(cx.listener(Self::pointer_moved)).on_mouse_up(MouseButton::Left,cx.listener(Self::pointer_up)).on_mouse_up_out(MouseButton::Left,cx.listener(Self::pointer_up)).on_mouse_up(MouseButton::Middle,cx.listener(Self::pointer_up)).on_mouse_up_out(MouseButton::Middle,cx.listener(Self::pointer_up)).on_mouse_up(MouseButton::Right,cx.listener(Self::pointer_up)).on_mouse_up_out(MouseButton::Right,cx.listener(Self::pointer_up)).capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_completion(window,cx)).children(self.render_menu(cx))
+        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.tab=="Editor" && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).child(div().px_3().py_2().bg(crate::chrome::color(0x171d25)).child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
     }
 }
 fn main() -> anyhow::Result<()> {
@@ -1736,6 +1771,7 @@ fn main() -> anyhow::Result<()> {
     let settings = wirecraft_runtime::config::Settings::load(&state_dir.join("settings.json"))?;
     let initial_settings = settings.clone();
     let (client, rx, worker) = Client::start(state_dir.clone(), settings, project);
+    editor_tokens::register_languages();
     gpui::Application::new()
         .with_assets(icons::Assets)
         .run(move |cx| {

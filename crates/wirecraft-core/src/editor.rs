@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeSet;
 pub struct BodyContext {
     pub file: VirtualFile,
+    pub companions: Vec<VirtualFile>,
     pub source: SourceMap,
     pub header: String,
     pub symbols: Vec<Value>,
@@ -18,7 +19,9 @@ impl BodyContext {
     pub fn project(&self, name: &str) -> GeneratedProject {
         GeneratedProject {
             name: name.into(),
-            files: vec![self.file.clone()],
+            files: std::iter::once(self.file.clone())
+                .chain(self.companions.iter().cloned())
+                .collect(),
             capability: "c17-editor-context".into(),
         }
     }
@@ -52,9 +55,8 @@ pub fn body_context(
         }
     }
     let project = C17::generate(&candidate, &candidate.root_node_id)?;
-    let file = project
-        .files
-        .into_iter()
+    let mut files = project.files.into_iter();
+    let file = files
         .next()
         .ok_or_else(|| Error::new("unsupported", "Compiler produced no C unit"))?;
     let source = file
@@ -136,6 +138,7 @@ pub fn body_context(
     }
     Ok(BodyContext {
         file,
+        companions: files.collect(),
         source,
         header,
         symbols,

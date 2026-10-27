@@ -32,7 +32,7 @@ impl Scene {
             s.nodes
                 .insert(id.clone(), (shape.name.clone(), shape.kind, shape.rect));
         }
-        for (id, edge) in &drawing.edges {
+        for (id, edge) in drawing.edges.iter().filter(|(_, e)| !e.annotation_only) {
             for endpoint in [&edge.source, &edge.target] {
                 s.incident
                     .entry(endpoint.clone())
@@ -46,20 +46,31 @@ impl Scene {
             drawing
                 .edges
                 .iter()
+                .filter(|(_, e)| !e.annotation_only)
                 .map(|(id, edge)| (id.as_str(), edge.points.as_slice())),
         );
         for (id, annotation) in &drawing.annotations {
             s.index.insert(
                 id.clone(),
                 Rect {
-                    x: annotation.rect.x - 22.,
-                    width: annotation.rect.width + 22.,
+                    x: annotation.rect.x - 24.,
+                    width: annotation.rect.width + 24.,
+                    height: if annotation.flag {
+                        drawing.shapes[&annotation.owner].rect.y - annotation.rect.y
+                    } else {
+                        annotation.rect.height
+                    },
                     ..annotation.rect
                 },
             );
         }
         s.drawing = drawing;
         s
+    }
+    pub fn contains_entity(&self, id: &str) -> bool {
+        self.nodes.contains_key(id)
+            || self.links.contains_key(id)
+            || self.drawing.annotations.values().any(|a| a.target == id)
     }
     pub fn query(&self, rect: Rect) -> Vec<String> {
         let mut ids = self.index.query(rect);
@@ -206,6 +217,9 @@ impl Scene {
         delta: [f64; 2],
     ) -> Vec<[f64; 2]> {
         let mut points = edge.points.clone();
+        if points.len() < 2 {
+            return points;
+        }
         // The cached scene is already routed at its own drag offset. Preserve that
         // obstacle-aware path when no newer pointer delta needs a cheap preview.
         if delta == [0., 0.] {
@@ -456,9 +470,61 @@ impl Scene {
                     }
                 }
                 if let Some(end) = points.last() {
-                    builder.move_to(screen([end[0] - 8., end[1] - 4.]));
+                    let prev = points[points.len() - 2];
+                    let dx = end[0] - prev[0];
+                    let dy = end[1] - prev[1];
+                    let length = dx.hypot(dy).max(0.001);
+                    let (ux, uy) = (dx / length, dy / length);
+                    builder.move_to(screen([
+                        end[0] - ux * 8. - uy * 4.,
+                        end[1] - uy * 8. + ux * 4.,
+                    ]));
                     builder.line_to(screen(*end));
-                    builder.line_to(screen([end[0] - 8., end[1] + 4.]));
+                    builder.line_to(screen([
+                        end[0] - ux * 8. + uy * 4.,
+                        end[1] - uy * 8. - ux * 4.,
+                    ]));
+                }
+                for p in &edge.crossings {
+                    if let Some(s) = points.windows(2).find(|s| {
+                        wirecraft_core::viewport::distance_to_segment(*p, s[0], s[1]) < 0.1
+                    }) {
+                        let dx = s[1][0] - s[0][0];
+                        let dy = s[1][1] - s[0][1];
+                        let len = dx.hypot(dy);
+                        let (ux, uy) = (dx / len, dy / len);
+                        let a = [p[0] - ux * 6., p[1] - uy * 6.];
+                        let b = [p[0] + ux * 6., p[1] + uy * 6.];
+                        let background = if self
+                            .drawing
+                            .shapes
+                            .values()
+                            .any(|s| s.composite && s.expanded && s.rect.contains(*p))
+                        {
+                            0x202c38
+                        } else {
+                            0x10161e
+                        };
+                        let mut mask = PathBuilder::stroke(px((6. * view.zoom as f32).max(3.)));
+                        mask.move_to(screen(a));
+                        mask.line_to(screen(b));
+                        if let Ok(path) = mask.build() {
+                            window.paint_path(path, rgb(self.color(background)));
+                        }
+                        let mut bridge = PathBuilder::stroke(px(1.5));
+                        bridge.move_to(screen(a));
+                        bridge.cubic_bezier_to(
+                            screen(b),
+                            screen([a[0] - uy * 9., a[1] + ux * 9.]),
+                            screen([b[0] - uy * 9., b[1] + ux * 9.]),
+                        );
+                        if let Ok(path) = bridge.build() {
+                            window.paint_path(
+                                path,
+                                rgb(self.appearance.color(edge.color_key, 0x9cb5c8)),
+                            );
+                        }
+                    }
                 }
                 if let Ok(path) = builder.build() {
                     window.paint_path(
@@ -514,6 +580,35 @@ impl Scene {
                 self.paint_shape(id, shape, view, selected, moving, drag, &screen, window, cx);
             }
         }
+        for port in &self.drawing.boundary_ports {
+            if !visible.contains(&port.owner) && !visible.contains(&port.edge) {
+                continue;
+            }
+            let offset = if moving.contains(&port.owner) {
+                drag
+            } else {
+                [0., 0.]
+            };
+            let p = screen([port.point[0] + offset[0], port.point[1] + offset[1]]);
+            window.paint_quad(quad(
+                Bounds::new(p - point(px(3.), px(3.)), size(px(6.), px(6.))),
+                px(3.),
+                rgb(self.color(0x70bdb3)),
+                px(0.),
+                rgb(self.color(0x70bdb3)),
+                BorderStyle::Solid,
+            ));
+            if view.zoom >= 0.35 {
+                self.label(
+                    &port.label,
+                    p + point(px(5.), px(-12.)),
+                    (9. * view.zoom as f32).max(5.),
+                    0x70bdb3,
+                    window,
+                    cx,
+                );
+            }
+        }
         for id in &visible {
             if let Some(annotation) = self.drawing.annotations.get(id) {
                 let mut r = annotation.rect;
@@ -535,18 +630,54 @@ impl Scene {
                 let mut owner = self.drawing.shapes[&annotation.owner].rect;
                 owner.x += offset[0];
                 owner.y += offset[1];
-                let mut connector = PathBuilder::stroke(px(1.));
-                connector.move_to(screen([owner.x + owner.width, r.y + r.height / 2.]));
-                connector.line_to(screen([r.x, r.y + r.height / 2.]));
-                if let Ok(path) = connector.build() {
-                    window.paint_path(path, rgb(self.color(0x45baa8)));
+                let stroke = if selected {
+                    self.color(0x70d5c6)
+                } else {
+                    self.appearance.color(
+                        annotation.color_key,
+                        if annotation.color_key == "typeStroke" {
+                            0x45baa8
+                        } else {
+                            0xe3b664
+                        },
+                    )
+                };
+                let mut connector = PathBuilder::stroke(px(if selected { 2. } else { 1. }));
+                let anchor = if annotation.flag {
+                    [r.x, r.y + 18.]
+                } else {
+                    [owner.x + owner.width, r.y + r.height / 2.]
+                };
+                if annotation.flag {
+                    connector.move_to(screen([r.x, owner.y]));
+                    connector.line_to(screen(anchor));
+                    connector.line_to(screen([r.x + r.width, anchor[1]]));
+                } else {
+                    connector.move_to(screen(anchor));
+                    connector.line_to(screen([r.x, anchor[1]]));
+                    window.paint_quad(quad(
+                        rect,
+                        px(1.),
+                        rgb(self.color(if annotation.color_key == "typeStroke" {
+                            0x173b3a
+                        } else {
+                            0x202c38
+                        })),
+                        px(if selected { 2. } else { 1. }),
+                        rgb(stroke),
+                        BorderStyle::Solid,
+                    ));
                 }
+                if let Ok(path) = connector.build() {
+                    window.paint_path(path, rgb(stroke));
+                }
+                let dot = screen(anchor);
                 window.paint_quad(quad(
-                    rect,
-                    px(1.),
-                    rgb(self.color(0x173b3a)),
-                    px(if selected { 2. } else { 1. }),
-                    rgb(self.color(if selected { 0x70d5c6 } else { 0x45baa8 })),
+                    Bounds::new(dot - point(px(3.), px(3.)), size(px(6.), px(6.))),
+                    px(3.),
+                    rgb(stroke),
+                    px(0.),
+                    rgb(stroke),
                     BorderStyle::Solid,
                 ));
                 if view.zoom >= 0.3 {
@@ -554,7 +685,7 @@ impl Scene {
                         &annotation.label,
                         rect.origin + point(px(4. * view.zoom as f32), px(2. * view.zoom as f32)),
                         (10. * view.zoom as f32).max(5.),
-                        0x58c6a4,
+                        stroke,
                         window,
                         cx,
                     );

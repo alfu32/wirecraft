@@ -4,6 +4,7 @@ use crate::{
     analysis::{Relation, relation, stereotype},
     generation::{GeneratedProject, SourceMap, VirtualFile},
 };
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub struct C17;
@@ -78,6 +79,9 @@ impl C17 {
                     n,
                     "Cross-technology C compilation requires an explicit FFI/aggregate adapter",
                 ));
+            }
+            if n.is_link() || matches!(n.kind, NodeKind::Note) {
+                continue;
             }
             if !["none", "single-file"]
                 .contains(&document.effective(id, "fileLayoutStrategyId").as_str())
@@ -158,13 +162,7 @@ impl C17 {
                 ));
             }
             let ctype = if let Some(expression) = &link.type_expression {
-                if expression["constructorId"]
-                    .as_str()
-                    .is_some_and(|s| !s.is_empty())
-                {
-                    return Err(unsupported(n, "Constructed link types are pending"));
-                }
-                type_name(document, expression["typeId"].as_str().unwrap_or(""))?
+                expression_type(document, expression)?
             } else if !link.type_definition_id.trim().is_empty() {
                 type_name(document, &link.type_definition_id)?
             } else if !link.type_name.trim().is_empty()
@@ -451,6 +449,24 @@ fn emit_types(d: &Document, scope: &BTreeSet<String>, out: &mut Emitter) -> Resu
         }
     }
     Ok(())
+}
+// Collections use the same erased runtime value as the source C runner.
+fn expression_type(d: &Document, expression: &Value) -> Result<String> {
+    match expression["constructorId"].as_str().unwrap_or("") {
+        "" => type_name(d, expression["typeId"].as_str().unwrap_or("")),
+        "array" => {
+            let args = expression["arguments"]
+                .as_array()
+                .filter(|v| v.len() == 1)
+                .ok_or_else(|| Error::new("invalid_input", "Array type requires one argument"))?;
+            expression_type(d, &args[0])?;
+            Ok("ThreadworkArray".into())
+        }
+        other => Err(Error::new(
+            "unsupported",
+            format!("C type constructor {other} is not supported"),
+        )),
+    }
 }
 fn type_name(d: &Document, id: &str) -> Result<String> {
     if let Some(n) = d.nodes.get(id) {

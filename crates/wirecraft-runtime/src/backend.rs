@@ -173,7 +173,7 @@ impl Application {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
             }
-            "editor.context" | "editor.complete" => {
+            "editor.context" | "editor.complete" | "editor.tokens" => {
                 let node = required(a, "nodeId")?.to_string();
                 let section = a["section"].as_str().unwrap_or("source").to_string();
                 let draft = a["text"].as_str().map(str::to_string);
@@ -241,11 +241,12 @@ impl Application {
                         .await?,
                     );
                 }
-                let mut result = editor
-                    .as_ref()
-                    .unwrap()
-                    .complete(&context, &text, offset)
-                    .await?;
+                let session = editor.as_ref().unwrap();
+                let mut result = if r.command == "editor.tokens" {
+                    session.semantic_tokens(&context, &text).await?
+                } else {
+                    session.complete(&context, &text, offset).await?
+                };
                 if self.revision() != revision {
                     return Err(Error::new(
                         "stale_result",

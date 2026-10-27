@@ -12,6 +12,7 @@ pub struct GeneratedAnalysis {
     uri: String,
     version: i64,
     file: VirtualFile,
+    staged: Vec<String>,
 }
 impl GeneratedAnalysis {
     pub async fn start(
@@ -22,10 +23,11 @@ impl GeneratedAnalysis {
         let directory = tempfile::Builder::new()
             .prefix("wirecraft-c17-analysis-")
             .tempdir()?;
+        let staged = stage_files(&project, directory.path())?;
         let file = project.files.into_iter().next().ok_or_else(|| {
             Error::new("invalid_input", "Generated project has no translation unit")
         })?;
-        let path = directory.path().join("network.c");
+        let path = directory.path().join(&file.path);
         let uri = url::Url::from_file_path(&path)
             .map_err(|_| Error::new("invalid_input", "Invalid generated URI"))?
             .to_string();
@@ -36,6 +38,7 @@ impl GeneratedAnalysis {
             uri,
             version: 0,
             file,
+            staged,
         };
         analysis.synchronize(None).await?;
         Ok(analysis)
@@ -45,7 +48,7 @@ impl GeneratedAnalysis {
             self.file = file;
         }
         self.version += 1;
-        let path = self.directory.path().join("network.c");
+        let path = self.directory.path().join(&self.file.path);
         let content = self.file.content.clone();
         tokio::task::spawn_blocking(move || {
             wirecraft_core::store::atomic_write(&path, content.as_bytes())
@@ -63,11 +66,25 @@ impl GeneratedAnalysis {
         }
     }
     pub async fn update(&mut self, project: GeneratedProject) -> Result<()> {
+        let next = stage_files(&project, self.directory.path())?;
+        for old in &self.staged {
+            if !next.contains(old) {
+                let _ = std::fs::remove_file(self.directory.path().join(old));
+            }
+        }
+        self.staged = next;
         let file = project
             .files
             .into_iter()
             .next()
             .ok_or_else(|| Error::new("invalid_input", "Generated project is empty"))?;
+        if file.path != self.file.path {
+            self.session.close(&self.uri).await?;
+            self.uri = url::Url::from_file_path(self.directory.path().join(&file.path))
+                .map_err(|_| Error::new("invalid_input", "Invalid generated URI"))?
+                .to_string();
+            self.version = 0;
+        }
         self.synchronize(Some(file)).await
     }
     pub async fn diagnostics(&self) -> Result<Value> {
@@ -216,6 +233,149 @@ impl GeneratedAnalysis {
         });
         Ok(
             json!({"items":items,"isIncomplete":response["isIncomplete"].as_bool().unwrap_or(false),"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"pid":self.session.pid(),"version":self.version}),
+        )
+    }
+}
+
+fn stage_files(project: &GeneratedProject, directory: &std::path::Path) -> Result<Vec<String>> {
+    use base64::Engine;
+    let mut paths = std::collections::BTreeSet::new();
+    for file in &project.files {
+        wirecraft_core::generation::safe_relative_path(&file.path)?;
+        if !paths.insert(file.path.clone()) {
+            return Err(Error::new(
+                "invalid_input",
+                "Duplicate generated analysis path",
+            ));
+        }
+        let data = if let Some(binary) = &file.binary_content {
+            base64::engine::general_purpose::STANDARD
+                .decode(binary)
+                .map_err(|e| Error::new("invalid_input", e.to_string()))?
+        } else {
+            file.content.as_bytes().to_vec()
+        };
+        wirecraft_core::store::atomic_write(&directory.join(&file.path), &data)?;
+    }
+    Ok(paths.into_iter().collect())
+}
+
+impl GeneratedAnalysis {
+    pub async fn semantic_tokens(
+        &self,
+        context: &wirecraft_core::editor::BodyContext,
+        text: &str,
+    ) -> Result<Value> {
+        use crate::lsp::{offset, position};
+        let provider = &self.session.capabilities["semanticTokensProvider"];
+        if !provider.is_object() {
+            return Err(Error::new(
+                "unsupported",
+                "Language server does not advertise semantic tokens",
+            ));
+        }
+        let response = self
+            .session
+            .request(
+                "textDocument/semanticTokens/full",
+                json!({"textDocument":{"uri":self.uri}}),
+            )
+            .await?;
+        let data = response["data"]
+            .as_array()
+            .ok_or_else(|| Error::new("invalid_response", "Missing semantic token data"))?;
+        if data.len() % 5 != 0 {
+            return Err(Error::new(
+                "invalid_response",
+                "Invalid semantic token tuple count",
+            ));
+        }
+        let types = provider["legend"]["tokenTypes"]
+            .as_array()
+            .ok_or_else(|| Error::new("invalid_response", "Missing semantic token legend"))?;
+        let modifiers = provider["legend"]["tokenModifiers"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let mut line = 0usize;
+        let mut column = 0usize;
+        let mut tokens = Vec::new();
+        for tuple in data.chunks_exact(5) {
+            let values = tuple
+                .iter()
+                .map(|v| {
+                    v.as_u64()
+                        .and_then(|n| usize::try_from(n).ok())
+                        .ok_or_else(|| {
+                            Error::new("invalid_response", "Invalid semantic token value")
+                        })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            line = line
+                .checked_add(values[0])
+                .ok_or_else(|| Error::new("invalid_response", "Semantic line overflow"))?;
+            column = if values[0] == 0 {
+                column
+                    .checked_add(values[1])
+                    .ok_or_else(|| Error::new("invalid_response", "Semantic column overflow"))?
+            } else {
+                values[1]
+            };
+            if line + 1 < context.source.generated_start_line
+                || line + 1 > context.source.generated_end_line
+            {
+                continue;
+            }
+            let end_column = column
+                .checked_add(values[2])
+                .ok_or_else(|| Error::new("invalid_response", "Semantic range overflow"))?;
+            let (Ok(start), Ok(end)) = (
+                offset(&self.file.content, line, column, &self.session.encoding),
+                offset(&self.file.content, line, end_column, &self.session.encoding),
+            ) else {
+                continue;
+            };
+            let p = position(&self.file.content, start, "utf-32")?;
+            let q = position(&self.file.content, end, "utf-32")?;
+            let local_line = line - (context.source.generated_start_line - 1);
+            let (Some(a), Some(b)) = (
+                (p["character"].as_u64().unwrap() as usize)
+                    .checked_sub(context.source.generated_column_offset),
+                (q["character"].as_u64().unwrap() as usize)
+                    .checked_sub(context.source.generated_column_offset),
+            ) else {
+                continue;
+            };
+            let (Ok(start), Ok(end)) = (
+                offset(text, local_line, a, "utf-32"),
+                offset(text, local_line, b, "utf-32"),
+            ) else {
+                continue;
+            };
+            if start >= end {
+                continue;
+            }
+            let mut kind = types
+                .get(values[3])
+                .and_then(Value::as_str)
+                .unwrap_or("variable");
+            if context
+                .symbols
+                .iter()
+                .any(|s| s["kind"] == 3 && s["label"].as_str() == Some(&text[start..end]))
+            {
+                kind = "function";
+            }
+            let flags = modifiers
+                .iter()
+                .enumerate()
+                .filter(|(bit, _)| *bit < usize::BITS as usize && values[4] & (1usize << bit) != 0)
+                .map(|(_, s)| s.clone())
+                .collect::<Vec<_>>();
+            tokens.push(json!({"startByte":start,"endByte":end,"kind":kind,"modifiers":flags,"range":{"start":{"line":local_line,"character":a},"end":{"line":local_line,"character":b}}}));
+        }
+        Ok(
+            json!({"tokens":tokens,"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"version":self.version,"pid":self.session.pid(),"generatedBytes":self.file.content.len(),"generatedFiles":self.staged.len()}),
         )
     }
 }

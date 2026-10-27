@@ -27,7 +27,15 @@ impl Wirecraft {
     ) {
         self.focus.focus(window);
         let local = self.local(event.position);
-        if event.button == MouseButton::Middle || event.button == MouseButton::Right {
+        if event.button == MouseButton::Right {
+            self.cancel_pointer_gesture(cx);
+            self.context_origin = Some(event.position);
+            self.menu = Some("Context".into());
+            self.tool("archetypes.list");
+            cx.notify();
+            return;
+        }
+        if event.button == MouseButton::Middle {
             self.pan_start = Some((local, self.viewport));
             return;
         }
@@ -248,8 +256,7 @@ impl Wirecraft {
             return;
         }
         let id = self.selected.first().unwrap();
-        if !self.scene.nodes.contains_key(id)
-            && !self.scene.links.contains_key(id)
+        if !self.scene.contains_entity(id)
             && id != &self.snapshot.document.root_node_id
             && let Some(parent) = self
                 .snapshot
@@ -308,6 +315,26 @@ impl Wirecraft {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if event.pressed_button.is_none()
+            && (self.panel_drag.is_some()
+                || self.pan_start.is_some()
+                || self.drag_start.is_some()
+                || self.resize_start.is_some()
+                || self.selection_start.is_some())
+        {
+            let release = MouseUpEvent {
+                position: event.position,
+                modifiers: event.modifiers,
+                button: if self.pan_start.is_some() {
+                    MouseButton::Middle
+                } else {
+                    MouseButton::Left
+                },
+                ..Default::default()
+            };
+            self.pointer_up(&release, window, cx);
+            return;
+        }
         self.move_panel(event, window, cx);
         if self.pan_start.is_some()
             || self.drag_start.is_some()
@@ -335,6 +362,45 @@ impl Wirecraft {
         {
             self.up(event, window, cx);
         }
+    }
+    pub(super) fn cancel_pointer_gesture(&mut self, cx: &mut Context<Self>) {
+        if self.selection_start.is_some() {
+            self.selected = self.selection_base.clone();
+        }
+        self.pan_start = None;
+        self.drag_start = None;
+        self.resize_start = None;
+        self.selection_start = None;
+        self.selection_end = None;
+        self.pending_pick = None;
+        self.panel_drag = None;
+        if !self.move_pending {
+            self.clear_drag_preview();
+        }
+        cx.notify();
+    }
+    pub(super) fn pointer_capture(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let entity = cx.entity().downgrade();
+        canvas(
+            |_, _, _| (),
+            move |_, _, window, _| {
+                let moved = entity.clone();
+                window.on_mouse_event(move |event: &MouseMoveEvent, phase, w, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = moved.update(cx, |this, cx| this.pointer_moved(event, w, cx));
+                    }
+                });
+                let released = entity.clone();
+                window.on_mouse_event(move |event: &MouseUpEvent, phase, w, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = released.update(cx, |this, cx| this.pointer_up(event, w, cx));
+                    }
+                });
+            },
+        )
+        .absolute()
+        .inset_0()
+        .size_full()
     }
     pub(super) fn clear_drag_preview(&mut self) {
         self.reroute_timer = None;

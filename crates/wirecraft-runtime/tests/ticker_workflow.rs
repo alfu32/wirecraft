@@ -317,6 +317,67 @@ async fn compiler_context_completes_runtime_channels_libraries_and_members_witho
 }
 
 #[tokio::test]
+async fn full_generated_ast_maps_semantic_tokens_into_unicode_body_and_stages_companions() {
+    let d = reference();
+    let id = d
+        .nodes
+        .values()
+        .find(|n| n.name == "write_append_file")
+        .unwrap()
+        .id
+        .clone();
+    let app = Application::new(Service::new(d, None), "semantic-fixture".into(), None);
+    let text = "/*🙂*/ Packet item = {0};\nitem.timestamp = NULL;\nprintf(\"%s\", argslib__option(\"file\"));\npush(ip_word, &item);";
+    let result = app
+        .execute(Request::new(
+            "editor.tokens",
+            json!({"nodeId":id,"section":"source","text":text,"generation":42}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result["generation"], 42);
+    assert_eq!(result["revision"], 0);
+    assert_eq!(result["generatedFiles"], 7);
+    assert!(result["generatedBytes"].as_u64().unwrap() > text.len() as u64 * 20);
+    let tokens = result["tokens"].as_array().unwrap();
+    for (identifier, kind) in [
+        ("Packet", "type"),
+        ("timestamp", "property"),
+        ("printf", "function"),
+        ("argslib__option", "function"),
+        ("push", "function"),
+        ("ip_word", "parameter"),
+    ] {
+        assert!(
+            tokens.iter().any(|t| {
+                let a = t["startByte"].as_u64().unwrap() as usize;
+                let b = t["endByte"].as_u64().unwrap() as usize;
+                assert!(
+                    a < b
+                        && b <= text.len()
+                        && text.is_char_boundary(a)
+                        && text.is_char_boundary(b)
+                );
+                &text[a..b] == identifier
+                    && (t["kind"] == kind || (kind == "type" && t["kind"] == "class"))
+            }),
+            "Missing {identifier}:{kind}: {tokens:?}"
+        );
+    }
+    let mut stale = Request::new(
+        "editor.tokens",
+        json!({"nodeId":id,"section":"source","text":text}),
+    );
+    stale.expected_revision = Some(999);
+    assert_eq!(app.execute(stale).await.unwrap_err().code, "conflict");
+    assert_eq!(app.service.lock().unwrap().revision, 0);
+    let pid = result["pid"].as_u64().unwrap();
+    app.shutdown().await;
+    #[cfg(target_os = "linux")]
+    assert!(!Path::new(&format!("/proc/{pid}")).exists());
+}
+
+#[tokio::test]
 async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() {
     let d = reference();
     let id = d

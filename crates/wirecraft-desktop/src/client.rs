@@ -35,6 +35,7 @@ pub enum Update {
     Error {
         message: String,
         commit: bool,
+        command: Option<String>,
     },
     Connected {
         endpoint: String,
@@ -60,6 +61,7 @@ impl Client {
                     let _ = updates.send_blocking(Update::Error {
                         message: e.to_string(),
                         commit: false,
+                        command: None,
                     });
                 }
             })
@@ -234,8 +236,8 @@ fn worker(
                     intelligence.started = false;
                     intelligence.versions.clear();
                 }
-                let editor_query =
-                    ["editor.context", "editor.complete"].contains(&command.as_str());
+                let editor_query = ["editor.context", "editor.complete", "editor.tokens"]
+                    .contains(&command.as_str());
                 match backend.call_with_revision(&request) {
                     Ok((value, response_revision)) => {
                         if command == "settings.replace" {
@@ -255,6 +257,7 @@ fn worker(
                         updates.send_blocking(Update::Error {
                             message: e.to_string(),
                             commit,
+                            command: Some(command),
                         })?;
                     }
                 }
@@ -281,6 +284,7 @@ fn worker(
                     updates.send_blocking(Update::Error {
                         message: e.to_string(),
                         commit: false,
+                        command: None,
                     })?;
                 }
             },
@@ -292,6 +296,7 @@ fn worker(
                     updates.send_blocking(Update::Error {
                         message: format!("Session state: {e}"),
                         commit: false,
+                        command: None,
                     })?;
                 }
             }
