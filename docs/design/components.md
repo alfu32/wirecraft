@@ -24,7 +24,7 @@ An Exterior is a node of kind `Node` with `stereotype: "Exterior"`, placed direc
   - Derived names must be unique, so a design cannot publish two input ports (or two output ports) with the same name. Every Exterior link needs an explicit type.
   - An Exterior may appear only directly under the root. Composite boundaries keep their existing boundary ports.
 - **Drawing.** An Exterior is a circle, not a box, so it reads as the open connection to the outside:
-  - **Size and stroke.** Diameter 28 world units with a heavier stroke than entity boxes. It stays clearly distinct from the small hollow via circles that mark unconnected crossings.
+  - **Size and stroke.** Diameter 70 world units, the minimum height of a processing node (2.8 squares of the 25-unit grid), so a circle sits level with the entity it connects to. The stroke is heavier than entity boxes. At that size it cannot be mistaken for the small hollow via circles that mark unconnected crossings. Its link attaches at the circle's vertical center, where a single-port node places its port.
   - **Cap.** The circle carries the port cap of the link end it hosts, on the rim facing its link, mirrored by side like any other port (see `core::drawing::port_glyphs`). An input Exterior shows the hollow output cap, because the link starts there. An output Exterior shows the filled, notched input cap, because the link ends there.
   - **Direction mark.** Inside the circle, a chevron points along the flow: away from the link side for an output, toward it for an input. This keeps the direction readable when zoomed out, below the cap's legible size.
   - **Label.** The derived name is drawn beside the circle, opposite the link side, together with the port type.
