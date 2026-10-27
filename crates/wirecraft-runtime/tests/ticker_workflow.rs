@@ -401,6 +401,10 @@ async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() 
             "complete",
             json!({"nodeId":id,"section":"source","text":"tm__str","offset":7}),
         ),
+        (
+            "semantic_tokens",
+            json!({"nodeId":id,"section":"source","text":"Packet packet = {0}; packet.timestamp = NULL;"}),
+        ),
     ] {
         let value:Value=client.post(&url).bearer_auth("ticker-mcp-token").json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"wirecraft.workbench","arguments":{"operation":operation,"arguments":arguments}}})).send().await.unwrap().json().await.unwrap();
         assert_eq!(value["result"]["isError"], false, "{value}");
@@ -413,6 +417,16 @@ async fn real_mcp_editor_context_and_vector_documentation_use_shared_services() 
                     .any(|i| i["label"].as_str().unwrap_or("").trim() == "tm__strftime"),
                 "{value}"
             );
+        }
+        if operation == "semantic_tokens" {
+            assert!(
+                value["result"]["structuredContent"]["tokens"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|t| t["kind"] == "property")
+            );
+            assert_eq!(value["result"]["structuredContent"]["generatedFiles"], 7);
         }
     }
     let temp = tempfile::tempdir().unwrap();

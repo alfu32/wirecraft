@@ -101,28 +101,46 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
     for (i, p) in ports.iter().enumerate() {
         sides.entry((p.owner.clone(), p.right)).or_default().push(i);
     }
-    for ((owner, right), mut ids) in sides {
-        let r = drawing.shapes[&owner].rect;
-        let c = center(r);
-        // atan2 against the outward side normal gives a stable top-to-bottom
-        // angular fan, rather than alphabetic or link creation order.
-        let angle = |p: &Port| (p.other[1] - c[1]).atan2((p.other[0] - c[0]).abs());
-        ids.sort_by(|a, b| {
-            angle(&ports[*a])
-                .total_cmp(&angle(&ports[*b]))
-                .then_with(|| ports[*a].edge.cmp(&ports[*b].edge))
-        });
-        let inset = if drawing.shapes[&owner].composite {
-            64_f64.min(r.height / 3.)
-        } else {
-            12_f64.min(r.height / 4.)
-        };
-        let count = ids.len();
-        for (i, id) in ids.into_iter().enumerate() {
-            ports[id].point = [
-                if right { r.x + r.width } else { r.x },
-                r.y + inset + (r.height - 2. * inset) * (i + 1) as f64 / (count + 1) as f64,
-            ];
+    for _ in 0..3 {
+        for ((owner, right), side_ids) in &sides {
+            let mut ids = side_ids.clone();
+            let r = drawing.shapes[owner].rect;
+            let c = center(r);
+            // atan2 against the outward side normal gives a stable top-to-bottom
+            // angular fan, rather than alphabetic or link creation order.
+            let angle = |p: &Port| (p.other[1] - c[1]).atan2((p.other[0] - c[0]).abs());
+            ids.sort_by(|a, b| {
+                angle(&ports[*a])
+                    .total_cmp(&angle(&ports[*b]))
+                    .then_with(|| ports[*a].edge.cmp(&ports[*b].edge))
+            });
+            let inset = if drawing.shapes[owner].composite {
+                64_f64.min(r.height / 3.)
+            } else {
+                12_f64.min(r.height / 4.)
+            };
+            let count = ids.len();
+            for (i, id) in ids.into_iter().enumerate() {
+                ports[id].point = [
+                    if *right { r.x + r.width } else { r.x },
+                    r.y + inset + (r.height - 2. * inset) * (i + 1) as f64 / (count + 1) as f64,
+                ];
+            }
+        }
+        // Refine the fan against the allocated counterpart points, not just box
+        // centers. Fixed passes preserve deterministic behavior for symmetric fans.
+        for (path, _) in paths.values() {
+            let source = ports[*path.first().unwrap()].point;
+            let target = ports[*path.last().unwrap()].point;
+            for (i, index) in path.iter().enumerate() {
+                ports[*index].other = if i == 0 {
+                    target
+                } else if i + 1 == path.len() {
+                    source
+                } else {
+                    ports[*index].other
+                };
+            }
         }
     }
     let mut occupied: Vec<(Point, Point)> = vec![];
@@ -210,7 +228,14 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
         }
         simplify(&mut points);
         occupied.extend(points.windows(2).map(|p| (p[0], p[1])));
-        drawing.edges.get_mut(&id).unwrap().points = points;
+        let edge = drawing.edges.get_mut(&id).unwrap();
+        if points.len() < 2 {
+            edge.route_error = Some(format!(
+                "No clear channel for {}; move overlapping boxes or increase spacing",
+                edge.name
+            ));
+        }
+        edge.points = points;
     }
     // Cut orthogonal corners into 45 degree runs, without reducing the obstacle
     // clearance. Routing uses the reserved Manhattan lanes; these short diagonal
@@ -266,14 +291,13 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
     for edge in drawing.edges.values_mut().filter(|e| !e.annotation_only) {
         for s in edge.points.windows(2) {
             for &(a, b) in &previous {
-                if let Some(p) = intersection(s[0], s[1], a, b) {
-                    if !edge
+                if let Some(p) = intersection(s[0], s[1], a, b)
+                    && !edge
                         .crossings
                         .iter()
                         .any(|q| (p[0] - q[0]).abs() + (p[1] - q[1]).abs() < 1.)
-                    {
-                        edge.crossings.push(p);
-                    }
+                {
+                    edge.crossings.push(p);
                 }
             }
         }

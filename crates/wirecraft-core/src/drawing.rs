@@ -24,6 +24,7 @@ pub struct Shape {
 pub struct Edge {
     pub name: String,
     pub annotation_only: bool,
+    pub route_error: Option<String>,
     pub source_label: String,
     pub target_label: String,
     pub points: Vec<[f64; 2]>,
@@ -215,6 +216,7 @@ impl Drawing {
                 Edge {
                     name: n.name.clone(),
                     annotation_only: false,
+                    route_error: None,
                     source_label: format!(
                         "{}{}{}",
                         l.source_port_name,
@@ -275,6 +277,49 @@ impl Drawing {
             }
         }
         let mut annotations = BTreeMap::new();
+        for n in d.nodes.values() {
+            let Some(shape) = shapes.get(&n.id) else {
+                continue;
+            };
+            let usages = n
+                .type_definition
+                .as_ref()
+                .and_then(|v| v["fields"].as_array())
+                .into_iter()
+                .flatten()
+                .filter_map(|field| {
+                    let id = field["typeId"].as_str()?;
+                    let provider = d.nodes.get(id)?;
+                    Some((
+                        id.to_string(),
+                        format!(
+                            "{}: {}",
+                            provider.name,
+                            field["name"].as_str().unwrap_or("")
+                        ),
+                    ))
+                })
+                .collect::<Vec<_>>();
+            for (i, (target, label)) in usages.iter().enumerate() {
+                annotations.insert(
+                    format!("type-input:{}:{i}", n.id),
+                    Annotation {
+                        owner: n.id.clone(),
+                        target: target.clone(),
+                        flag: true,
+                        color_key: "typeStroke",
+                        rect: Rect {
+                            x: shape.rect.x + 36.,
+                            y: shape.rect.y - usages.len() as f64 * 24. - 26. + i as f64 * 24.,
+                            width: (label.chars().count() as f64 * 7. + 16.).max(80.),
+                            height: 26.,
+                        },
+                        label: label.clone(),
+                    },
+                );
+            }
+        }
+
         for (type_id, usages) in references {
             if let Some(shape) = shapes.get(&type_id) {
                 for (i, (target, label)) in usages.into_iter().enumerate() {
@@ -308,12 +353,13 @@ impl Drawing {
                 Edge {
                     name: n.name.clone(),
                     annotation_only: true,
+                    route_error: None,
                     source_label: String::new(),
                     target_label: String::new(),
                     points: vec![],
                     crossings: vec![],
                     relation: relation(d, n),
-                    color_key: "linkDependency",
+                    color_key: capability_color(relation(d, n)),
                     dashed: true,
                     source: a,
                     target: b,
@@ -335,7 +381,7 @@ impl Drawing {
                         owner: owner.clone(),
                         target: n.id.clone(),
                         flag: false,
-                        color_key: "linkDependency",
+                        color_key: capability_color(relation(d, n)),
                         rect: Rect {
                             x: shape.rect.x + shape.rect.width + 24.,
                             y: shape.rect.y + 8. + i as f64 * 30.,
@@ -363,7 +409,7 @@ impl Drawing {
                         owner: owner.clone(),
                         target: n.id.clone(),
                         flag: true,
-                        color_key: "linkDependency",
+                        color_key: capability_color(relation(d, n)),
                         rect: Rect {
                             x: shape.rect.x + 36.,
                             y: shape.rect.y - count as f64 * 24. - 26. + i as f64 * 24.,
@@ -384,5 +430,14 @@ impl Drawing {
         };
         crate::routing::route_drawing(d, &mut drawing);
         drawing
+    }
+}
+
+fn capability_color(relation: Option<Relation>) -> &'static str {
+    match relation {
+        Some(Relation::Source) => "linkSource",
+        Some(Relation::Runnable) => "linkRunnable",
+        Some(Relation::TypeUsage) => "typeStroke",
+        _ => "linkDependency",
     }
 }

@@ -42,6 +42,20 @@ impl Scene {
             s.links
                 .insert(id.clone(), (edge.name.clone(), edge.points.clone()));
         }
+        for (id, edge) in &drawing.edges {
+            if edge.route_error.is_some() {
+                let r = drawing.shapes[&edge.source].rect;
+                s.index.insert(
+                    id.clone(),
+                    Rect {
+                        x: r.x,
+                        y: r.y - 20.,
+                        width: 600.,
+                        height: 24.,
+                    },
+                );
+            }
+        }
         s.routes = RouteIndex::new(
             drawing
                 .edges
@@ -369,6 +383,7 @@ impl Scene {
         selected: &BTreeSet<String>,
         moving: &BTreeSet<String>,
         drag: [f64; 2],
+        errors: &BTreeSet<String>,
         window: &mut Window,
         cx: &mut App,
     ) {
@@ -433,12 +448,34 @@ impl Scene {
         ordered.sort_by_key(|(_, shape)| shape.depth);
         for (id, shape) in &ordered {
             if shape.composite && shape.expanded {
-                self.paint_shape(id, shape, view, selected, moving, drag, &screen, window, cx);
+                self.paint_shape(
+                    id,
+                    shape,
+                    view,
+                    selected,
+                    moving,
+                    drag,
+                    errors.contains(*id),
+                    &screen,
+                    window,
+                    cx,
+                );
             }
         }
         for id in &visible {
             if let Some((name, _)) = self.links.get(id) {
                 let edge = &self.drawing.edges[id];
+                if let Some(error) = &edge.route_error {
+                    let r = self.drawing.shapes[&edge.source].rect;
+                    self.label(
+                        error,
+                        screen([r.x, r.y - 16.]),
+                        (10. * view.zoom as f32).max(7.),
+                        0xe37272,
+                        window,
+                        cx,
+                    );
+                }
                 let shifted = self.preview_route(edge, moving, drag);
                 let points = &shifted;
                 let mut builder =
@@ -577,7 +614,18 @@ impl Scene {
         }
         for (id, shape) in &ordered {
             if !shape.composite || !shape.expanded {
-                self.paint_shape(id, shape, view, selected, moving, drag, &screen, window, cx);
+                self.paint_shape(
+                    id,
+                    shape,
+                    view,
+                    selected,
+                    moving,
+                    drag,
+                    errors.contains(*id),
+                    &screen,
+                    window,
+                    cx,
+                );
             }
         }
         for port in &self.drawing.boundary_ports {
@@ -719,6 +767,7 @@ impl Scene {
         selected: &BTreeSet<String>,
         moving: &BTreeSet<String>,
         drag: [f64; 2],
+        code_error: bool,
         screen: &impl Fn([f64; 2]) -> Point<Pixels>,
         window: &mut Window,
         cx: &mut App,
@@ -823,7 +872,7 @@ impl Scene {
                 rgb(self.color(0x70d5c6)),
             ));
         }
-        if shape.diagnostics > 0 {
+        if shape.diagnostics > 0 || code_error {
             window.paint_quad(quad(
                 Bounds::new(
                     rect.top_right() - point(px(12.), px(-4.)),

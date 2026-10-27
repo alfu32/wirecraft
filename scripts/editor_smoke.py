@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   assert document()['nodes'][node]['text']['source']==next(n['text']['source'] for n in reference['nodes'] if n['id']==node)
   xd('key','ctrl+z');wait(lambda:(ui().get('draft') or {}).get('text','').endswith('argslib__get_ar'))
   xd('key','ctrl+space');time.sleep(1);xd('type','--clearmodifiers','x');time.sleep(.5);shot('025-completion-stale-dismissed')
-  assert (ui()['draft']['text']).endswith('argslib__get_arx')
+  assert (ui()['draft']['text']).endswith('argslib__get_arx'),repr(ui()['draft']['text'][-120:])
   click(620,253);wait(lambda:ui().get('draft') is None)
   click(600,350);xd('key','ctrl+End');xd('key','Return');xd('type','--clearmodifiers','/* Apply shortcut smoke */');xd('key','ctrl+Return')
   wait(lambda:document()['nodes'][node]['text']['source'].endswith('/* Apply shortcut smoke */'));wait(lambda:ui().get('draft') is None)

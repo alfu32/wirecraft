@@ -134,3 +134,87 @@ fn nearer_side_ports_follow_angular_order_and_detour_around_obstacles() {
     assert!(drawing.edges[&upper].points[0][1] < drawing.edges[&mid].points[0][1]);
     assert!(drawing.edges[&mid].points[0][1] < drawing.edges[&lower].points[0][1]);
 }
+
+#[test]
+fn dependency_callouts_are_separate_from_data_routes_and_error_dots_exclude_warnings() {
+    let d = wirecraft_core::store::load(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/migration/threadworks/example-c.orch"),
+    )
+    .unwrap();
+    let drawing = Drawing::new(&d, "root");
+    let includes = d.nodes.values().find(|n| n.name == "includes_lib").unwrap();
+    let sink = d
+        .nodes
+        .values()
+        .find(|n| n.name == "write_append_file")
+        .unwrap();
+    let boxes = drawing
+        .annotations
+        .values()
+        .filter(|a| a.owner == includes.id && !a.flag)
+        .collect::<Vec<_>>();
+    assert_eq!(boxes.len(), 4);
+    for a in boxes {
+        assert!(
+            a.rect.x
+                > drawing.shapes[&includes.id].rect.x + drawing.shapes[&includes.id].rect.width
+        );
+        assert!(a.label.ends_with(": includes_lib"));
+    }
+    let flags = drawing
+        .annotations
+        .values()
+        .filter(|a| a.owner == sink.id && a.flag)
+        .collect::<Vec<_>>();
+    assert_eq!(flags.len(), 2);
+    assert!(flags.iter().any(|a| a.label == "files: file_lib"));
+    assert!(
+        flags
+            .iter()
+            .any(|a| a.label == "argslib: proc_self_argv_lib")
+    );
+    assert!(
+        flags
+            .iter()
+            .all(|a| a.rect.y < drawing.shapes[&sink.id].rect.y)
+    );
+    for edge in drawing.edges.values().filter(|e| e.annotation_only) {
+        assert!(edge.points.is_empty());
+    }
+    assert_routes(&drawing);
+    let mut d = Document::new("diagnostics");
+    let id = box_at(&mut d, "root", "Body", 0., 0.);
+    d.nodes.get_mut(&id).unwrap().diagnostics = vec![
+        json!({"severity":"Warning"}),
+        json!({"severity":"Info"}),
+        json!({"severity":2}),
+    ];
+    assert_eq!(Drawing::new(&d, "root").shapes[&id].diagnostics, 0);
+    d.nodes
+        .get_mut(&id)
+        .unwrap()
+        .diagnostics
+        .push(json!({"severity":"Error","textSection":"Source"}));
+    assert_eq!(Drawing::new(&d, "root").shapes[&id].diagnostics, 1);
+}
+
+#[test]
+fn obstructed_endpoints_report_failure_instead_of_silently_drawing_through_a_box() {
+    let mut d = Document::new("overlap");
+    let a = box_at(&mut d, "root", "A", 0., 0.);
+    let b = box_at(&mut d, "root", "B", 0., 0.);
+    d.patch(
+        &b,
+        &json!({"layout":{"x":-100.,"y":-100.,"width":400.,"height":400.}}),
+    )
+    .unwrap();
+    let link = wire(&mut d, &a, &b, "overlap");
+    let drawing = Drawing::new(&d, "root");
+    assert!(drawing.edges[&link].route_error.is_some());
+    assert!(
+        wirecraft_core::export::drawing_svg(&d, "root")
+            .unwrap()
+            .contains("routing-error")
+    );
+}

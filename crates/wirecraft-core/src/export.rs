@@ -183,6 +183,11 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
         }
     }
     for edge in drawing.edges.values().filter(|e| !e.annotation_only) {
+        if let Some(error) = &edge.route_error {
+            let r = drawing.shapes[&edge.source].rect;
+            write!(out,"<text class=\"routing-error\" x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"#bd5555\">{}</text>",r.x,r.y-8.,escape(error)).unwrap();
+        }
+
         let points = edge
             .points
             .iter()

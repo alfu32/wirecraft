@@ -389,7 +389,7 @@ fn technical_block(
             (row + 1).to_string(),
             n.name.clone(),
             crate::analysis::stereotype(d, n).into(),
-            modified.into(),
+            modified,
             revision.into(),
             if responsible == "none" {
                 String::new()

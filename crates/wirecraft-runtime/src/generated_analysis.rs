@@ -23,7 +23,7 @@ impl GeneratedAnalysis {
         let directory = tempfile::Builder::new()
             .prefix("wirecraft-c17-analysis-")
             .tempdir()?;
-        let staged = stage_files(&project, directory.path())?;
+        let (project, staged) = stage_project(project, directory.path().to_owned(), vec![]).await?;
         let file = project.files.into_iter().next().ok_or_else(|| {
             Error::new("invalid_input", "Generated project has no translation unit")
         })?;
@@ -66,12 +66,12 @@ impl GeneratedAnalysis {
         }
     }
     pub async fn update(&mut self, project: GeneratedProject) -> Result<()> {
-        let next = stage_files(&project, self.directory.path())?;
-        for old in &self.staged {
-            if !next.contains(old) {
-                let _ = std::fs::remove_file(self.directory.path().join(old));
-            }
-        }
+        let (project, next) = stage_project(
+            project,
+            self.directory.path().to_owned(),
+            self.staged.clone(),
+        )
+        .await?;
         self.staged = next;
         let file = project
             .files
@@ -259,6 +259,23 @@ fn stage_files(project: &GeneratedProject, directory: &std::path::Path) -> Resul
     }
     Ok(paths.into_iter().collect())
 }
+async fn stage_project(
+    project: GeneratedProject,
+    directory: std::path::PathBuf,
+    old: Vec<String>,
+) -> Result<(GeneratedProject, Vec<String>)> {
+    tokio::task::spawn_blocking(move || {
+        let staged = stage_files(&project, &directory)?;
+        for path in old {
+            if !staged.contains(&path) {
+                let _ = std::fs::remove_file(directory.join(path));
+            }
+        }
+        Ok((project, staged))
+    })
+    .await
+    .map_err(|e| Error::new("internal", e.to_string()))?
+}
 
 impl GeneratedAnalysis {
     pub async fn semantic_tokens(
@@ -300,7 +317,7 @@ impl GeneratedAnalysis {
         let mut line = 0usize;
         let mut column = 0usize;
         let mut tokens = Vec::new();
-        for tuple in data.chunks_exact(5) {
+        for tuple in data.as_chunks::<5>().0 {
             let values = tuple
                 .iter()
                 .map(|v| {
@@ -374,8 +391,9 @@ impl GeneratedAnalysis {
                 .collect::<Vec<_>>();
             tokens.push(json!({"startByte":start,"endByte":end,"kind":kind,"modifiers":flags,"range":{"start":{"line":local_line,"character":a},"end":{"line":local_line,"character":b}}}));
         }
+        let diagnostics = self.diagnostics().await?;
         Ok(
-            json!({"tokens":tokens,"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"version":self.version,"pid":self.session.pid(),"generatedBytes":self.file.content.len(),"generatedFiles":self.staged.len()}),
+            json!({"tokens":tokens,"diagnostics":diagnostics["diagnostics"],"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"version":self.version,"pid":self.session.pid(),"generatedBytes":self.file.content.len(),"generatedFiles":self.staged.len()}),
         )
     }
 }

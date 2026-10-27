@@ -85,30 +85,37 @@ impl OwnedBackend {
         self.call_with_revision(request).map(|(value, _)| value)
     }
     fn call_with_revision(&self, request: &Request) -> anyhow::Result<(Value, u64)> {
-        let value: Value = self
-            .client
-            .post(format!("{}/api", self.endpoint))
-            .bearer_auth(&self.token)
-            .json(request)
-            .send()?
-            .error_for_status()?
-            .json()?;
-        if value["ok"] != true {
-            anyhow::bail!(
-                "{}: {}",
-                value["error"]["code"].as_str().unwrap_or("error"),
-                value["error"]["message"]
-                    .as_str()
-                    .unwrap_or("Backend request failed")
-            );
-        }
-        Ok((
-            value["result"].clone(),
-            value["revision"]
-                .as_u64()
-                .ok_or_else(|| anyhow::anyhow!("API response omitted revision"))?,
-        ))
+        call_at(&self.client, &self.endpoint, &self.token, request)
     }
+}
+fn call_at(
+    client: &reqwest::blocking::Client,
+    endpoint: &str,
+    token: &str,
+    request: &Request,
+) -> anyhow::Result<(Value, u64)> {
+    let value: Value = client
+        .post(format!("{endpoint}/api"))
+        .bearer_auth(token)
+        .json(request)
+        .send()?
+        .error_for_status()?
+        .json()?;
+    if value["ok"] != true {
+        anyhow::bail!(
+            "{}: {}",
+            value["error"]["code"].as_str().unwrap_or("error"),
+            value["error"]["message"]
+                .as_str()
+                .unwrap_or("Backend request failed")
+        );
+    }
+    Ok((
+        value["result"].clone(),
+        value["revision"]
+            .as_u64()
+            .ok_or_else(|| anyhow::anyhow!("API response omitted revision"))?,
+    ))
 }
 impl Drop for OwnedBackend {
     fn drop(&mut self) {
@@ -213,6 +220,7 @@ fn worker(
         settings,
         ..Default::default()
     };
+    let mut analyses: Vec<std::thread::JoinHandle<()>> = vec![];
     loop {
         match rx.recv_timeout(Duration::from_millis(300)) {
             Ok(message @ (Message::Execute(_) | Message::Commit(_))) => {
@@ -222,6 +230,38 @@ fn worker(
                     _ => unreachable!(),
                 };
                 let command = request.command.clone();
+                if command == "editor.tokens" {
+                    // Automatic coloring must not hold up draft persistence,
+                    // commits or pointer commands while clangd parses a body.
+                    // The UI admits one token request at a time; replies retain
+                    // their entity/text/revision tickets and are checked there.
+                    analyses.retain(|job| !job.is_finished());
+                    let client = backend.client.clone();
+                    let endpoint = backend.endpoint.clone();
+                    let token = backend.token.clone();
+                    let updates = updates.clone();
+                    analyses.push(
+                        std::thread::Builder::new()
+                            .name("wirecraft-editor-tokens".into())
+                            .spawn(move || {
+                                let update = match call_at(&client, &endpoint, &token, &request) {
+                                    Ok((value, revision)) => Update::Result {
+                                        command,
+                                        value,
+                                        revision: Some(revision),
+                                        commit: false,
+                                    },
+                                    Err(e) => Update::Error {
+                                        message: e.to_string(),
+                                        command: Some(command),
+                                        commit: false,
+                                    },
+                                };
+                                let _ = updates.send_blocking(update);
+                            })?,
+                    );
+                    continue;
+                }
                 if command == "editor.analyze_generated" {
                     request.arguments["executable"] = json!(
                         std::env::var("WIRECRAFT_CLANGD").unwrap_or_else(|_| intelligence
@@ -315,6 +355,12 @@ fn worker(
             revision = Some(status);
             updates.send_blocking(Update::Snapshot(Box::new(snapshot)))?;
         }
+    }
+    // Stop the owned server first, so outstanding analysis connections close;
+    // no detached analysis thread or language process survives this worker.
+    drop(backend);
+    for job in analyses {
+        let _ = job.join();
     }
     Ok(())
 }

@@ -605,8 +605,16 @@ impl Wirecraft {
     ) -> Option<AnyElement> {
         let group = self.menu.as_deref()?;
         let context_menu = group.starts_with("Context");
+        let padding = gpui_component::window_paddings(window);
+        let content_size = size(
+            window.viewport_size().width - padding.left - padding.right,
+            window.viewport_size().height - padding.top - padding.bottom,
+        );
         let mut panel = div()
             .id("command-panel")
+            .occlude()
+            .overflow_hidden()
+            .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
             .w(px(520.))
             .max_h(px(650.))
             .flex()
@@ -900,7 +908,12 @@ impl Wirecraft {
             panel = panel.child(
                 div()
                     .id("command-list")
-                    .flex_1()
+                    .h(px(if context_menu {
+                        (f32::from(content_size.height) - 32.).min(650.) - 74.
+                    } else {
+                        550.
+                    }))
+                    .flex_shrink_0()
                     .min_h_0()
                     .overflow_y_scroll()
                     .track_scroll(&self.palette_scroll)
@@ -918,6 +931,7 @@ impl Wirecraft {
                                 let id = c.id;
                                 div()
                                     .id(id)
+                                    .flex_shrink_0()
                                     .flex()
                                     .items_center()
                                     .gap_3()
@@ -962,7 +976,7 @@ impl Wirecraft {
         }
         if context_menu {
             let origin = self.context_origin.unwrap_or(point(px(40.), px(100.)));
-            let bounds = window.viewport_size();
+            let bounds = content_size;
             let height = (f32::from(bounds.height) - 32.).min(650.);
             let left = f32::from(origin.x)
                 .min(f32::from(bounds.width) - 532.)
@@ -974,6 +988,8 @@ impl Wirecraft {
                 div()
                     .absolute()
                     .inset_0()
+                    .occlude()
+                    .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
@@ -1613,6 +1629,7 @@ impl Wirecraft {
                             &BTreeSet::new(),
                             &BTreeSet::new(),
                             [0., 0.],
+                            &BTreeSet::new(),
                             w,
                             cx,
                         );
