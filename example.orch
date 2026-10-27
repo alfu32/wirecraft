@@ -1,0 +1,2050 @@
+{
+    "id": "document_1793013577112",
+    "name": "WebServer",
+    "rootNodeId": "root",
+    "nodes": [
+        {
+            "id": "root",
+            "name": "WebServer",
+            "kind": "Processor",
+            "parentId": null,
+            "children": [
+                "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+                "node_afca91af-9db7-4648-894e-948214e6b2d8",
+                "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+                "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+                "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+                "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+                "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+                "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+                "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+                "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+                "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+                "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+                "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+                "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+                "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+                "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+                "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8"
+            ],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "c",
+                "technologyId": "c-native",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T14:26:02.074859263Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+            "name": "socket_accept",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [
+                "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+                "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+                "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8"
+            ],
+            "outgoingLinks": [
+                "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+                "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd"
+            ],
+            "layout": {
+                "x": 250.0,
+                "y": 305.0,
+                "width": 200.0,
+                "height": 138.0,
+                "closedWidth": 200.0,
+                "closedHeight": 138.0,
+                "openWidth": 200.0,
+                "openHeight": 138.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:09:44.217580864Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "input_in",
+                    "name": "in",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "IMPLEMENTATION",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:12:54.564349361Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:28.009712855Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:35.158933431Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "IMPLEMENTATION"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+            "name": "router",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [
+                "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5"
+            ],
+            "outgoingLinks": [
+                "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+                "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+                "link_1a170b1e-0115-44b9-9440-78eac48c77ce"
+            ],
+            "layout": {
+                "x": 764.0,
+                "y": 318.0,
+                "width": 200.0,
+                "height": 138.0,
+                "closedWidth": 200.0,
+                "closedHeight": 138.0,
+                "openWidth": 200.0,
+                "openHeight": 138.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:07:24.343802033Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "input_in",
+                    "name": "in",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'router' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "IMPLEMENTATION",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:12:56.876300881Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:22.476006624Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:32.958121103Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "IMPLEMENTATION"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+            "name": "Request",
+            "kind": "Type",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 732.0,
+                "y": -413.0,
+                "width": 220.0,
+                "height": 86.0,
+                "closedWidth": 220.0,
+                "closedHeight": 86.0,
+                "openWidth": 220.0,
+                "openHeight": 86.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T14:25:24.204743658Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": {
+                "fields": [
+                    {
+                        "name": "header",
+                        "typeId": "char *",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "body",
+                        "typeId": "char *",
+                        "isReference": false,
+                        "typeExpression": null
+                    }
+                ],
+                "qualifier": "object",
+                "genericTypeIds": []
+            },
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "TESTING",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:13:05.623513924Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:18.160006967Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:39.023962690Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "TESTING"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+            "name": "Response",
+            "kind": "Type",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 732.0,
+                "y": -266.0,
+                "width": 220.0,
+                "height": 86.0,
+                "closedWidth": 220.0,
+                "closedHeight": 86.0,
+                "openWidth": 220.0,
+                "openHeight": 86.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T14:25:50.857898515Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": {
+                "fields": [
+                    {
+                        "name": "header",
+                        "typeId": "char *",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "body",
+                        "typeId": "char *",
+                        "isReference": false,
+                        "typeExpression": null
+                    }
+                ],
+                "qualifier": "object",
+                "genericTypeIds": []
+            },
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "TESTING",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:13:15.208336751Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:19.542718491Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:40.291439401Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "TESTING"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+            "name": "ReqRep",
+            "kind": "Type",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 732.0,
+                "y": -93.0,
+                "width": 220.0,
+                "height": 268.0,
+                "closedWidth": 220.0,
+                "closedHeight": 268.0,
+                "openWidth": 220.0,
+                "openHeight": 268.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:08:10.010831415Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": {
+                "fields": [
+                    {
+                        "name": "id",
+                        "typeId": "string",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "request",
+                        "typeId": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+                        "isReference": false,
+                        "typeExpression": null
+                    },
+                    {
+                        "name": "response",
+                        "typeId": "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+                        "isReference": false,
+                        "typeExpression": null
+                    }
+                ],
+                "qualifier": "object",
+                "genericTypeIds": []
+            },
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'ReqRep' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "TESTING",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:14:29.586825517Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:17.044081665Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:37.741160440Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "TESTING"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+            "name": "request",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:21:08.569729472Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+                "sourcePortName": "out",
+                "targetNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'request' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+            "name": "awitResponseLoop",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T14:26:03.903316653Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+                "sourcePortName": "out",
+                "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "data",
+                "typeExpression": {
+                    "typeId": "",
+                    "constructorId": "array",
+                    "arguments": [
+                        {
+                            "typeId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                            "constructorId": "",
+                            "arguments": []
+                        }
+                    ]
+                }
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'awitResponseLoop' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+            "name": "socket_respond",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [
+                "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+                "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+                "link_4cc82930-d2e5-431c-a48c-8b676d08ad57"
+            ],
+            "outgoingLinks": [
+                "link_47dfe6fa-791b-4863-99ff-002db0ff8f88"
+            ],
+            "layout": {
+                "x": 791.0,
+                "y": 719.0,
+                "width": 200.0,
+                "height": 138.0,
+                "closedWidth": 200.0,
+                "closedHeight": 138.0,
+                "openWidth": 200.0,
+                "openHeight": 138.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:07:40.251940701Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "input_in",
+                    "name": "in",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'socket_respond' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "IMPLEMENTATION",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:18:51.543616506Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:31.442193153Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "IMPLEMENTATION"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+            "name": "routeHomeAboutResponse",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:23:25.299535725Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+                "sourcePortName": "out",
+                "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [
+                    "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+                ],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeHomeAboutResponse' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+            "name": "routeHomeVersionResponse",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:24:49.746163127Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+                "sourcePortName": "out",
+                "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [
+                    "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+                ],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeHomeVersionResponse' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+            "name": "routeApiUserDetailsResponse",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:24:57.190649813Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+                "sourcePortName": "out",
+                "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [
+                    "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+                ],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeApiUserDetailsResponse' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+            "name": "routeHomeAboutRequest",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:24:19.176840124Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+                "sourcePortName": "out",
+                "targetNodeId": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [
+                    "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+                ],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeHomeAboutRequest' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+            "name": "routeHomeVersionRequest",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:24:03.317919367Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+                "sourcePortName": "out",
+                "targetNodeId": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [
+                    "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+                ],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeHomeVersionRequest' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+            "name": "routeApiUserDetailsRequest",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:24:35.940509226Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+                "sourcePortName": "out",
+                "targetNodeId": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+                "compositeBoundaryIds": [
+                    "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+                ],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeApiUserDetailsRequest' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+            "name": "response",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "direct-file-system-homomorphism",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:23:06.661210784Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+                "sourcePortName": "out",
+                "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "data",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'response' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        },
+        {
+            "id": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+            "name": "routes",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [
+                "node_10886e3b-8eac-4654-92e5-8461794ca831",
+                "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+                "node_be823219-b2e9-43bf-bb78-005e6e9119e9"
+            ],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 1571.0,
+                "y": 409.0,
+                "width": 822.0,
+                "height": 580.0,
+                "closedWidth": 200.0,
+                "closedHeight": 228.0,
+                "openWidth": 822.0,
+                "openHeight": 580.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:07:47.443970777Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routes' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "IMPLEMENTATION",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:26:28.620849358Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:21.026192074Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:34.024863763Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "IMPLEMENTATION"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+            "name": "routeApiUserDetails",
+            "kind": "Processor",
+            "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+            "children": [],
+            "incomingLinks": [
+                "link_1a170b1e-0115-44b9-9440-78eac48c77ce"
+            ],
+            "outgoingLinks": [
+                "link_4cc82930-d2e5-431c-a48c-8b676d08ad57"
+            ],
+            "layout": {
+                "x": 1903.0,
+                "y": 833.0,
+                "width": 298.0,
+                "height": 108.0,
+                "closedWidth": 298.0,
+                "closedHeight": 108.0,
+                "openWidth": 298.0,
+                "openHeight": 108.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:08:00.885230133Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "input_in",
+                    "name": "in",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeApiUserDetails' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "/api/user",
+            "status": "FUNCTIONAL",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:16:43.530798189Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:25.377343173Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:29.226455905Z",
+                    "initStatus": "FUNCTIONAL",
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:41.624285275Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+            "name": "routeHomeAbout",
+            "kind": "Processor",
+            "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+            "children": [],
+            "incomingLinks": [
+                "link_7392aa1b-0044-4e3a-a41b-84063ff15470"
+            ],
+            "outgoingLinks": [
+                "link_d40b1933-7e41-4f24-924d-f7fd683cedfd"
+            ],
+            "layout": {
+                "x": 1751.0,
+                "y": 495.0,
+                "width": 270.0,
+                "height": 108.0,
+                "closedWidth": 270.0,
+                "closedHeight": 108.0,
+                "openWidth": 270.0,
+                "openHeight": 108.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:07:52.291858831Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "input_in",
+                    "name": "in",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeHomeAbout' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "/home/about",
+            "status": "FUNCTIONAL",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:12:59.800867392Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:42.691024152Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+            "name": "routeHomeVersion",
+            "kind": "Processor",
+            "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+            "children": [],
+            "incomingLinks": [
+                "link_ea685463-77d8-4af7-87d0-b4b485ff73bc"
+            ],
+            "outgoingLinks": [
+                "link_1eb6b930-6980-40be-8710-8ed323817aa7"
+            ],
+            "layout": {
+                "x": 1906.0,
+                "y": 652.0,
+                "width": 307.0,
+                "height": 108.0,
+                "closedWidth": 307.0,
+                "closedHeight": 108.0,
+                "openWidth": 307.0,
+                "openHeight": 108.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T16:07:56.466935685Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                },
+                {
+                    "id": "input_in",
+                    "name": "in",
+                    "direction": "Input",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [
+                {
+                    "severity": "Error",
+                    "message": "C compilation supports only the single-file layout; 'routeHomeVersion' resolves to 'direct-file-system-homomorphism'.",
+                    "nodeId": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+                    "textSection": null,
+                    "line": null,
+                    "column": null,
+                    "sourcePluginId": "c-compiler"
+                }
+            ],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "/home/version",
+            "status": "FUNCTIONAL",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:16:42.278545287Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:43.690713218Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "FUNCTIONAL"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+            "name": "base_lib",
+            "kind": "Processor",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [
+                "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8"
+            ],
+            "layout": {
+                "x": 155.0,
+                "y": 18.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "single-file",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "#include <stdio.h>\n#include <net.h>",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:31:14.546601588Z",
+                "user": "alfu64"
+            },
+            "ports": [
+                {
+                    "id": "output_out",
+                    "name": "out",
+                    "direction": "Output",
+                    "dataType": "",
+                    "metadata": {}
+                }
+            ],
+            "link": null,
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": "IMPLEMENTATION",
+            "statusChanges": [
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:29:17.242951872Z",
+                    "initStatus": null,
+                    "endStatus": "BUSINESS"
+                },
+                {
+                    "userId": "alfu64",
+                    "changedDate": "2026-10-26T13:31:14.546557084Z",
+                    "initStatus": "BUSINESS",
+                    "endStatus": "IMPLEMENTATION"
+                }
+            ],
+            "assignee": null
+        },
+        {
+            "id": "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+            "name": "base_lib -> socket_accept",
+            "kind": "Link",
+            "parentId": "root",
+            "children": [],
+            "incomingLinks": [],
+            "outgoingLinks": [],
+            "layout": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 200.0,
+                "height": 70.0,
+                "closedWidth": 200.0,
+                "closedHeight": 70.0,
+                "openWidth": 200.0,
+                "openHeight": 70.0,
+                "isExpanded": true
+            },
+            "fileLayoutStrategyId": "none",
+            "text": {
+                "initialization": "",
+                "initializationLanguageId": "",
+                "source": "",
+                "sourceLanguageId": "",
+                "specification": "",
+                "specificationLanguageId": "markdown",
+                "tests": "",
+                "testsLanguageId": "json",
+                "aiInstructions": "",
+                "aiInstructionsLanguageId": "markdown"
+            },
+            "binaryContent": null,
+            "technology": {
+                "languageId": "",
+                "technologyId": "",
+                "compilerId": "",
+                "fileExtension": "",
+                "contentType": ""
+            },
+            "revision": {
+                "name": "",
+                "date": ""
+            },
+            "responsible": null,
+            "modified": {
+                "date": "2026-10-26T13:30:07.539172603Z",
+                "user": "alfu64"
+            },
+            "ports": [],
+            "link": {
+                "sourceNodeId": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+                "sourcePortName": "out",
+                "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+                "targetPortName": "in",
+                "transportKind": "in-process",
+                "typeName": "",
+                "payloadDefinition": "",
+                "typeDefinitionId": "",
+                "compositeBoundaryIds": [],
+                "interactionKind": "lib",
+                "typeExpression": null
+            },
+            "typeDefinition": null,
+            "diagnostics": [],
+            "metadata": {},
+            "pluginData": {},
+            "nameDetail": "",
+            "status": null,
+            "statusChanges": [],
+            "assignee": null
+        }
+    ],
+    "metadata": {},
+    "masterRevision": {
+        "name": "",
+        "date": ""
+    },
+    "users": [
+        {
+            "identifier": "alfu64",
+            "avatar": "",
+            "avatarData": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAHxUlEQVR4Xt1ba2xURRSuGk00PmL0h8bHP+NPjUb9wT81GqOwu8UqohIjBDUmPhJ8IJpU0MT44Adx9+5SHgIFw/sRqLUCEYgiAYtAgYJU20ArBdq993bbbvc1znfb3c6ce/fu697tbr/kpN27c2fmnDlz5pwzZ2tqXER9Pbs65NEeC3rV+YpP3aJ4wycVrxrnxGwoFvRpbQGvujngUT/ifx+m/VY0wLTfqz6leMKNnBnVgsFi6AoXxDKlVp9Cx6sYhOr6bwl4tU/5Sl+wYMBJag/61Dc31LHr6BwmBEue6buZq/ZCruZhi8lmaMUrGtu2IML2B4fYsR1R1r53hJ3dF2PdJ+LGX3w+tj3K9ilDbOv8CFs+UzP1QaiLa8VcLohr6JzKBsWnzeDM91hMzqCtHw+wo1ui7NK5BCsUqRRjvWcS7M+NUbbx/QFT3wId9nvDD9K5uYpQ7eCdfMV/tpgMW/mqxg41DjO1J0l5KgmXOxJsf2iILa0zj6kYhjW8sCzawC3zk3zAi3QSP8zSjNWODafo3B3FYH+KHWgYYqHnTUIAtYSm6rfTOTuGgE/9gA+SEAflBsnYt9GIu4xT9J9PGrbCQgidgWn6/XTuJYHVsKu4hf+ODtb4hs4unil8fzsGLvPjO0dYaLpJCL1BX/gBykdRAPN8lVdQ5pu/GmQjg+Vd9Wz473SCrZ6tUyH0O2IceUffUuZh5CoNkStJ9uPbRAjcJ/F7+u6hPOWNsT2f6RD7HSpXqRhSU2zDe+TI9KnHlk+7fBPlLSfGrL1k8E5UMPNpQAiwTZIQvOHVlD9b4JxXyFFXiWqfDeELScPzFOcf9GovUT6zgjo5MHjVhs7Dcai/KATVXxe5g/Jqwqh7O/7iWq5O5T7jncIB7jmKvChebSXlV8JYYJPx7WH0JvScLxHxkZSxgIIQkv5a7RHKdwbwp0WJwcOrdvxzMEa0QG2hfBtAPC+GtPDtowPVqfoUOz6TXOaUpYNkJDMESSGwmSy4cDxOtWCtxDzSWPzh+XQDhLRuR3XlxuZ5koMUDTyr3poRgJHDEyRUTWd+vjizd0TSAu7ozckIACqR+ZJb/lKTGevfNWdw4KLmA/qeU4gNpVjDC5JztMdgHlkU0fghjVUK+roSJibShO9ygb7jJFq+GRT7jvnrLt3IV197VBzw6NbSjN8fa4ZNTKQpn61F33ES7XvkbYCtD7d3vvgQubeiwe1m41waiIwTvssF+o6T0C8m5f596pc1ozc2ow8QQCAbWyyQmBAHwJ4j+85oYwc3BQCsmSMtUDMM4Kn0g+0LIrR9QUDOX5w89lzL19K+MzK7dnBbADs/l5yiDgggln6wL2A/OTsk+cKunCWv9r+HYgaJz+Bhom02uC0AZJSF/hMQQOYBbmaKRecR2dvCdkrGmUE0Nu/ibbPBbQHgVkrsXxLA6d3FZ3x2L5ZVXdSmX/3y1kDbbHBbALiCyyqAjt9itH1eiEe5kzFDXuWetvFV7m6TtWMZb4t3rOC2ADp+l7ekJAA71bQDLjfFfmBpcSRmkDJZX/b3fmthuy0A8JhVAMVqQNMi+Ybm4Cqzw4NnYpumL6xPHLcFYKsBxdiAYT1ldTOTk/AO3qWg7ZyGrQ34a1vhp0DbT3KHhdDJZrPAaRunYXUKjKQ/wFoXCgRPdNL5Ei43KWgbp3FgqXQixZEHROGS8WDbJ+YJ2UG/lJRTz/x/PMsGvTd3eyqAXFQodtZL9upcDaqx0g9WvMxjgezzN6F1k6xOVitKQTWmdbO87SiDuahQrH5dOo2asAU+FDtEWUq+WP+OzAzsQS5Qm4HkiQjxu3yoEKjdcjQY9IYX1YRq1YfEh6jJmaw41UIMtk99PJ0QvZx+iIKkyQr4HoIAoovrzl9vpMWMIkRBMiUlRSoUw5rJX9k1nhSt1aeIAsgVs1cjcLUv8hjwaDMzAjCE4FXb01+iFC3SV8BxUOFA/oHcEQ6EpvbcIAkA5aeihJA4mCygwVrAG14iMQ+g9pZ/2SVqAUrRqh0JHt+te0ta/Vhoav+9lH8DqL0VJWU4NuZ4paqAY13kybZGAJckvNFh8YVKLorKBTg+DS9KiRpdee7KXZRvCbg6VoQfNaAkNVcquxIB1adF1kGPOo/yawlaKIEiRNThVRNQ3CHywKk1NJddS3m1xJh3+IvYAYoQUYJWDTDve1UPTtfuo3za4nuffht/sVPsCDe8lS4EJFlIdZjZ6ckXqLrmHfSKncGhQB1eJcJi5TmF6ylfBQFV17yjfrFTXHSgDq9SAIOHewgT8z41SPkpCqMng9ZNB0B6CYNPJFDMQa09KOBRFdgyykvRaKjtu5t3fJwOhC2BUrRyA1duRzZE6Tk/RiWqfTag6hqFx+YBVaMUDdVYbgOBDXx74t6mSS/a4BUCFB4rWX4UuWnegFGQ5HSVGeJ5hLQkqhOpteCjrhSg8Bh+NR84aTEZozAC9QEoS0FlRjGAK4s0FjI5NpcvOn7XkLeT4zRQe0ury60I3uSuhREjzMZK4oYG94P44ST+4jPiDhhWFDGses1qb0sUMxYgl29fLozFEOsU4aLFDeIRawTxfNaQdqKBCkyuEbODPnWvkvuX4vlSlFMTDJwpk1PJQB2e4tGeRjUWGOB0zoI5KzrLaRfy9lyYT2Syty7gfzkzUlttquYdAAAAAElFTkSuQmCC",
+            "source": "local",
+            "userId": "",
+            "emailAddress": "",
+            "username": "",
+            "fullName": "",
+            "role": "",
+            "refreshedAt": "2026-10-27T00:53:03.557187091Z"
+        }
+    ]
+}
