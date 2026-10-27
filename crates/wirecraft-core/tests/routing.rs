@@ -102,8 +102,8 @@ fn imported_webserver_routes_avoid_boxes_separate_lanes_and_use_boundary_ports()
                 route.windows(2).any(|s| {
                     (s[0][1] - p.point[1]).abs() < 1e-6
                         && (s[1][1] - p.point[1]).abs() < 1e-6
-                        && s[0][0].min(s[1][0]) <= p.point[0] - 19.9
-                        && s[0][0].max(s[1][0]) >= p.point[0] + 19.9
+                        && s[0][0].min(s[1][0]) <= p.point[0] - 45.9
+                        && s[0][0].max(s[1][0]) >= p.point[0] + 45.9
                 }),
                 "Composite crossing lost its aligned port stubs: {route:?}"
             );
@@ -162,7 +162,7 @@ fn nearer_side_ports_follow_angular_order_and_detour_around_obstacles() {
     let drawing = Drawing::new(&d, "root");
     assert_routes(&drawing);
     for id in [&lower, &upper, &mid] {
-        assert_eq!(drawing.edges[id].points[0][0], 500.);
+        assert_eq!(drawing.edges[id].points[0][0], 480.);
         assert_eq!(drawing.edges[id].points.last().unwrap()[0], 100.);
     }
     assert!(drawing.edges[&upper].points[0][1] < drawing.edges[&mid].points[0][1]);
@@ -238,7 +238,7 @@ fn dependency_callouts_are_separate_from_data_routes_and_issue_dots_include_warn
 }
 
 #[test]
-fn obstructed_endpoints_report_failure_instead_of_silently_drawing_through_a_box() {
+fn obstructed_layout_keeps_a_best_effort_route_without_error_labels() {
     let mut d = Document::new("overlap");
     let a = box_at(&mut d, "root", "A", 0., 0.);
     let b = box_at(&mut d, "root", "B", 0., 0.);
@@ -249,9 +249,11 @@ fn obstructed_endpoints_report_failure_instead_of_silently_drawing_through_a_box
     .unwrap();
     let link = wire(&mut d, &a, &b, "overlap");
     let drawing = Drawing::new(&d, "root");
-    assert!(drawing.edges[&link].route_error.is_some());
+    let edge = &drawing.edges[&link];
+    assert!(edge.route_error.is_none());
+    assert!(edge.points.len() >= 2);
     assert!(
-        wirecraft_core::export::drawing_svg(&d, "root")
+        !wirecraft_core::export::drawing_svg(&d, "root")
             .unwrap()
             .contains("routing-error")
     );
@@ -286,14 +288,14 @@ fn open_routes_choose_substantial_diagonals_in_all_quadrants_and_vector_exports(
         }
         let first = points.first().unwrap();
         let last = points.last().unwrap();
-        let dx = (last[0] - first[0]).abs() - 40.;
+        let dx = (last[0] - first[0]).abs() - 92.;
         let dy = (last[1] - first[1]).abs();
         let possible = dx.min(dy) * std::f64::consts::SQRT_2;
         assert!(
             (diagonal - possible).abs() < 1e-6,
             "Diagonal does not span the available displacement: {points:?}"
         );
-        let optimum = 40. + dx.max(dy) - dx.min(dy) + possible;
+        let optimum = 92. + dx.max(dy) - dx.min(dy) + possible;
         assert!(
             (total - optimum).abs() < 1e-6,
             "Route has unnecessary H/V detours: {points:?}"
@@ -308,5 +310,136 @@ fn open_routes_choose_substantial_diagonals_in_all_quadrants_and_vector_exports(
             svg.contains(&polyline),
             "Vector export must use the shared route"
         );
+    }
+}
+
+#[test]
+fn feedback_reserves_tight_local_envelopes_and_first_ports_before_other_channels() {
+    let mut d = Document::new("Feedback priority");
+    let a = box_at(&mut d, "root", "A", 500., 300.);
+    let left = box_at(&mut d, "root", "Left", 0., 300.);
+    let right = box_at(&mut d, "root", "Right", 1100., 300.);
+    let feedback = wire(&mut d, &a, &a, "feedback");
+    d.nodes.get_mut(&feedback).unwrap().layout.y = 10000.;
+    let incoming = wire(&mut d, &left, &a, "incoming");
+    let outgoing = wire(&mut d, &a, &right, "outgoing");
+    let drawing = Drawing::new(&d, "root");
+    assert_routes(&drawing);
+    let edge = &drawing.edges[&feedback];
+    let r = drawing.shapes[&a].rect;
+    for p in &edge.points {
+        assert!(
+            p[0] >= r.x - 46. - 1e-6
+                && p[0] <= r.x + r.width + 66. + 1e-6
+                && p[1] >= r.y - 46. - 1e-6
+                && p[1] <= r.y + r.height + 46. + 1e-6,
+            "Feedback escaped its local envelope: {:?}",
+            edge.points
+        );
+    }
+    assert!(edge.points[0][1] < drawing.edges[&outgoing].points[0][1]);
+    assert!(edge.points.last().unwrap()[1] < drawing.edges[&incoming].points.last().unwrap()[1]);
+    let second = wire(&mut d, &a, &a, "second-feedback");
+    let drawing = Drawing::new(&d, "root");
+    assert_routes(&drawing);
+    for id in [&feedback, &second] {
+        for p in &drawing.edges[id].points {
+            assert!(
+                p[0] >= r.x - 61.
+                    && p[0] <= r.x + r.width + 81.
+                    && p[1] >= r.y - 61.
+                    && p[1] <= r.y + r.height + 61.,
+                "Nested feedback grew across the drawing: {:?}",
+                drawing.edges[id].points
+            );
+        }
+    }
+}
+#[test]
+fn endpoint_caps_match_original_templates_and_horizontal_leads_are_46_units() {
+    use wirecraft_core::drawing::port_glyphs;
+    let (output, input) = port_glyphs(&[[120., 50.], [600., 50.]]);
+    assert_eq!(
+        output,
+        vec![
+            [100.2, 45.2],
+            [115.2, 45.2],
+            [120., 50.],
+            [115.2, 54.8],
+            [100.2, 54.8]
+        ]
+    );
+    assert_eq!(
+        input,
+        vec![
+            [580.2, 45.2],
+            [585., 50.],
+            [580.2, 54.8],
+            [600., 54.8],
+            [600., 45.2]
+        ]
+    );
+    let (reverse_output, reverse_input) = port_glyphs(&[[120., 50.], [0., 50.]]);
+    for (right, left) in output.iter().zip(reverse_output) {
+        assert!((left[0] - (240. - right[0])).abs() < 1e-6);
+        assert!((left[1] - (100. - right[1])).abs() < 1e-6);
+    }
+    assert_eq!(
+        reverse_input,
+        vec![
+            [19.8, 54.8],
+            [15., 50.],
+            [19.8, 45.2],
+            [0., 45.2],
+            [0., 54.8]
+        ]
+    );
+    let mut d = Document::new("Lead lengths");
+    let a = box_at(&mut d, "root", "A", 0., 0.);
+    let b = box_at(&mut d, "root", "B", 600., 400.);
+    let edge = wire(&mut d, &a, &b, "channel");
+    let drawing = Drawing::new(&d, "root");
+    let points = &drawing.edges[&edge].points;
+    for p in [points[..2].to_vec(), points[points.len() - 2..].to_vec()] {
+        assert!((p[0][1] - p[1][1]).abs() < 1e-6);
+        assert!((p[0][0] - p[1][0]).abs() >= 46. - 1e-6);
+    }
+}
+#[test]
+fn pcb_crossings_have_two_hollow_vias_with_a_backside_connector_and_unbroken_peer() {
+    use wirecraft_core::drawing::{flow_arrow, trace_geometry};
+    let horizontal = [[0., 100.], [200., 100.]];
+    let trace = trace_geometry(&horizontal, &[[100., 100.]]);
+    assert_eq!(trace.vias.len(), 1);
+    let pair = &trace.vias[0];
+    assert_eq!(pair.before, [88., 100.]);
+    assert_eq!(pair.after, [112., 100.]);
+    assert_eq!(pair.radius, 2.5);
+    assert_eq!(
+        trace.fragments,
+        vec![
+            vec![[0., 100.], [85.5, 100.]],
+            vec![[114.5, 100.], [200., 100.]]
+        ]
+    );
+    assert_eq!(pair.backside, [[90.5, 100.], [109.5, 100.]]);
+    let vertical = [[100., 0.], [100., 200.]];
+    let peer = trace_geometry(&vertical, &[]);
+    assert_eq!(peer.fragments, vec![vertical.to_vec()]);
+    assert!(peer.vias.is_empty());
+    let arrow = flow_arrow(&trace.fragments);
+    assert_eq!(arrow.len(), 3);
+    assert!(arrow.iter().all(|p| p[0] > 114.5));
+    let bend = trace_geometry(&[[0., 0.], [100., 0.], [100., 100.]], &[[100., 0.]]);
+    assert_eq!(bend.vias[0].before, [88., 0.]);
+    assert_eq!(bend.vias[0].after, [100., 12.]);
+    assert_eq!(
+        bend.vias[0].backside,
+        vec![[90.5, 0.], [100., 0.], [100., 9.5]]
+    );
+    let diagonal = trace_geometry(&[[0., 0.], [200., 200.]], &[[100., 100.]]);
+    assert_eq!(diagonal.vias.len(), 1);
+    for p in [diagonal.vias[0].before, diagonal.vias[0].after] {
+        assert!((p[0] - p[1]).abs() < 1e-6);
     }
 }

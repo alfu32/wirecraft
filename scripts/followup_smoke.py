@@ -130,6 +130,13 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   web=api('export.preview',{'kind':'plan','options':{'format':'Auto'},'overview':True})
   assert web['svg'].count('class="composite-port"')==6
   assert 'routing-error' not in web['svg']
+  command('Zoom Extents')
+  accept=next(n for n in document()['nodes'].values() if n['name']=='socket_accept')['layout']
+  target=point(accept['x']+accept['width']/2,accept['y']+accept['height']/2)
+  xd('mousemove','--window',window,*target,'click','--repeat',4,'--delay',100,4);time.sleep(.5)
+  xd('mousemove','--window',window,*target);xd('mousedown',2);xd('mousemove','--window',window,850,510);xd('mouseup',2);time.sleep(.5);shot('self-loop-and-port-caps')
+  detail=point(accept['x']+accept['width']+20,accept['y']+accept['height']/2)
+  xd('mousemove','--window',window,*detail,'click','--repeat',2,'--delay',100,4);time.sleep(.5);shot('port-caps-and-vias-detail')
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0
   print(json.dumps({'semanticColors':'passed','contextMenuScrollAndNestedInsert':'passed','dependencyCallouts':'captured','planOverview':'passed','webserverCompositeRouting':'passed','compilerIssueReveal':'passed','hoverPopups':'captured','artifacts':str(ARTIFACT)}))
  finally:

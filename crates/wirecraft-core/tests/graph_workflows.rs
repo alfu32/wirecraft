@@ -174,12 +174,12 @@ fn composite_projection_keeps_absolute_children_and_collapses_boundary_links() {
     let open = Drawing::new(&d, "root");
     assert_eq!(open.shapes[&child].rect.x, 200.);
     assert_eq!(open.shapes[&child].depth, 1);
-    assert_eq!(open.edges[&link].points[0][0], 400.);
+    assert_eq!(open.edges[&link].points[0][0], 420.);
     d.patch(&composite, &json!({"layout":{"isExpanded":false}}))
         .unwrap();
     let closed = Drawing::new(&d, "root");
     assert!(!closed.shapes.contains_key(&child));
-    assert_eq!(closed.edges[&link].points[0][0], 300.);
+    assert_eq!(closed.edges[&link].points[0][0], 320.);
     let focused = Drawing::new(&d, &composite);
     assert!(focused.shapes.contains_key(&child));
     assert!(!focused.shapes.contains_key(&peer));

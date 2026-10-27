@@ -1,7 +1,7 @@
 {
   "sourceRevision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
   "sourcePath": "app-desktop/src/main/kotlin/com/threadwork/app/ui/ThreadworkDesktopApp.kt",
-  "extractedMethodsSha256": "95a421bf31f359394ad5e0f46cee34592a93fe4a96d2ae9f75bb132f12d0e2c9",
+  "extractedMethodsSha256": "7f2d62b1cedb4ba45918b581169e4505d16feaa90f47a95d7b747bfda79751ab",
   "cases": [
     {
       "name": "wide-diagonal",
@@ -181,6 +181,52 @@
       ]
     },
     {
+      "name": "chamfered-obstacle-lane",
+      "start": [
+        0,
+        0
+      ],
+      "end": [
+        200,
+        0
+      ],
+      "obstacles": [
+        [
+          80,
+          -30,
+          40,
+          60
+        ]
+      ],
+      "occupied": [],
+      "expectedRoute": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -20
+        ],
+        [
+          20,
+          -40
+        ],
+        [
+          180,
+          -40
+        ],
+        [
+          200,
+          -20
+        ],
+        [
+          200,
+          0
+        ]
+      ]
+    },
+    {
       "name": "obstacle-switches-diagonal",
       "start": [
         0,
@@ -249,6 +295,116 @@
         [
           400,
           240
+        ]
+      ]
+    }
+  ],
+  "portCaps": [
+    {
+      "side": 1,
+      "outgoing": true,
+      "filled": false,
+      "points": [
+        [
+          80.2,
+          95.2
+        ],
+        [
+          95.2,
+          95.2
+        ],
+        [
+          100.0,
+          100.0
+        ],
+        [
+          95.2,
+          104.8
+        ],
+        [
+          80.2,
+          104.8
+        ]
+      ]
+    },
+    {
+      "side": -1,
+      "outgoing": true,
+      "filled": false,
+      "points": [
+        [
+          119.8,
+          104.8
+        ],
+        [
+          104.8,
+          104.8
+        ],
+        [
+          100.0,
+          100.0
+        ],
+        [
+          104.8,
+          95.2
+        ],
+        [
+          119.8,
+          95.2
+        ]
+      ]
+    },
+    {
+      "side": 1,
+      "outgoing": false,
+      "filled": true,
+      "points": [
+        [
+          119.8,
+          104.8
+        ],
+        [
+          115.0,
+          100.0
+        ],
+        [
+          119.8,
+          95.2
+        ],
+        [
+          100.0,
+          95.2
+        ],
+        [
+          100.0,
+          104.8
+        ]
+      ]
+    },
+    {
+      "side": -1,
+      "outgoing": false,
+      "filled": true,
+      "points": [
+        [
+          80.2,
+          95.2
+        ],
+        [
+          85.0,
+          100.0
+        ],
+        [
+          80.2,
+          104.8
+        ],
+        [
+          100.0,
+          104.8
+        ],
+        [
+          100.0,
+          95.2
         ]
       ]
     }

@@ -50,21 +50,36 @@ pub fn port_glyphs(points: &[[f64; 2]]) -> (Vec<[f64; 2]>, Vec<[f64; 2]>) {
     let u = unit(a, points[1]);
     let b = *points.last().unwrap();
     let v = unit(points[points.len() - 2], b);
+    // Exact 0.6-scaled JVM portCapPoints templates, expressed in each
+    // endpoint's local direction. Outputs sit 20 units outside the box;
+    // inputs stay at its boundary. The five-sided caps are not diamonds.
+    let transform = |origin: [f64; 2], unit: [f64; 2], x: f64, y: f64| {
+        [
+            origin[0] + unit[0] * x - unit[1] * y,
+            origin[1] + unit[1] * x + unit[0] * y,
+        ]
+    };
     (
-        vec![
-            a,
-            [a[0] + u[0] * 8. - u[1] * 4., a[1] + u[1] * 8. + u[0] * 4.],
-            [a[0] + u[0] * 14., a[1] + u[1] * 14.],
-            [a[0] + u[0] * 8. + u[1] * 4., a[1] + u[1] * 8. - u[0] * 4.],
-            a,
-        ],
-        vec![
-            b,
-            [b[0] - v[0] * 14. - v[1] * 5., b[1] - v[1] * 14. + v[0] * 5.],
-            [b[0] - v[0] * 10., b[1] - v[1] * 10.],
-            [b[0] - v[0] * 14. + v[1] * 5., b[1] - v[1] * 14. - v[0] * 5.],
-            b,
-        ],
+        [
+            (-19.8, -4.8),
+            (-4.8, -4.8),
+            (0., 0.),
+            (-4.8, 4.8),
+            (-19.8, 4.8),
+        ]
+        .into_iter()
+        .map(|(x, y)| transform(a, u, x, y))
+        .collect(),
+        [
+            (-19.8, -4.8),
+            (-15., 0.),
+            (-19.8, 4.8),
+            (0., 4.8),
+            (0., -4.8),
+        ]
+        .into_iter()
+        .map(|(x, y)| transform(b, v, x, y))
+        .collect(),
     )
 }
 #[derive(Clone)]
@@ -478,4 +493,143 @@ fn capability_color(relation: Option<Relation>) -> &'static str {
         Some(Relation::TypeUsage) => "typeStroke",
         _ => "linkDependency",
     }
+}
+
+/// A layer-change pair around an unconnected crossing. The muted connector is
+/// painted first, underneath every foreground trace; circles remain hollow.
+#[derive(Clone)]
+pub struct ViaPair {
+    pub before: [f64; 2],
+    pub after: [f64; 2],
+    pub radius: f64,
+    pub backside: Vec<[f64; 2]>,
+}
+pub struct TraceGeometry {
+    pub fragments: Vec<Vec<[f64; 2]>>,
+    pub vias: Vec<ViaPair>,
+}
+pub fn trace_geometry(points: &[[f64; 2]], crossings: &[[f64; 2]]) -> TraceGeometry {
+    let mut geometry = TraceGeometry {
+        fragments: vec![],
+        vias: vec![],
+    };
+    if points.len() < 2 {
+        return geometry;
+    }
+    let mut distances = vec![0.];
+    for p in points.windows(2) {
+        distances.push(distances.last().unwrap() + (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]));
+    }
+    let total = *distances.last().unwrap();
+    if total < 1e-6 {
+        return geometry;
+    }
+    let at = |distance: f64| {
+        let i = distances
+            .partition_point(|v| *v < distance)
+            .saturating_sub(1)
+            .min(points.len() - 2);
+        let length = distances[i + 1] - distances[i];
+        let along = (distance - distances[i]).clamp(0., length);
+        if length > 1e-9 {
+            [
+                points[i][0] + ((points[i + 1][0] - points[i][0]) / length) * along,
+                points[i][1] + ((points[i + 1][1] - points[i][1]) / length) * along,
+            ]
+        } else {
+            points[i]
+        }
+    };
+    let slice = |a: f64, b: f64| {
+        let mut result = vec![at(a)];
+        for (i, distance) in distances.iter().enumerate() {
+            if *distance > a + 1e-6 && *distance < b - 1e-6 {
+                result.push(points[i]);
+            }
+        }
+        result.push(at(b));
+        result
+    };
+    let mut cuts = vec![];
+    for crossing in crossings {
+        for (i, p) in points.windows(2).enumerate() {
+            let len = distances[i + 1] - distances[i];
+            if len > 1e-9 && crate::viewport::distance_to_segment(*crossing, p[0], p[1]) < 0.01 {
+                let along = ((crossing[0] - p[0][0]) * (p[1][0] - p[0][0])
+                    + (crossing[1] - p[0][1]) * (p[1][1] - p[0][1]))
+                    / len;
+                let t = distances[i] + along.clamp(0., len);
+                if t > 1. && t < total - 1. {
+                    cuts.push(t);
+                }
+                break;
+            }
+        }
+    }
+    cuts.sort_by(f64::total_cmp);
+    cuts.dedup_by(|a, b| (*a - *b).abs() < 0.01);
+    let mut cursor = 0.;
+    for (i, &t) in cuts.iter().enumerate() {
+        let room = t
+            .min(total - t)
+            .min(if i > 0 { (t - cuts[i - 1]) / 2. } else { total })
+            .min(cuts.get(i + 1).map(|v| (v - t) / 2.).unwrap_or(total));
+        let radius = 2.5_f64.min(room / 5.);
+        let offset = 12_f64.min(room - radius - 0.5);
+        if offset <= radius {
+            continue;
+        }
+        let left = t - offset - radius;
+        let right = t + offset + radius;
+        if left > cursor + 1e-6 {
+            geometry.fragments.push(slice(cursor, left));
+        }
+        geometry.vias.push(ViaPair {
+            before: at(t - offset),
+            after: at(t + offset),
+            radius,
+            backside: slice(t - offset + radius, t + offset - radius),
+        });
+        cursor = right;
+    }
+    if cursor < total - 1e-6 {
+        geometry.fragments.push(slice(cursor, total));
+    }
+    geometry
+}
+/// The reference flow arrow sits three quarters along the visible copper.
+/// Keeping it on a foreground fragment avoids drawing over a layer crossing.
+pub fn flow_arrow(fragments: &[Vec<[f64; 2]>]) -> Vec<[f64; 2]> {
+    let length = |a: [f64; 2], b: [f64; 2]| (b[0] - a[0]).hypot(b[1] - a[1]);
+    let total = fragments
+        .iter()
+        .flat_map(|p| p.windows(2))
+        .map(|p| length(p[0], p[1]))
+        .sum::<f64>();
+    let mut remaining = total * 0.75;
+    for p in fragments.iter().flat_map(|p| p.windows(2)) {
+        let len = length(p[0], p[1]);
+        if len < 1e-6 {
+            continue;
+        }
+        if remaining <= len {
+            let u = [(p[1][0] - p[0][0]) / len, (p[1][1] - p[0][1]) / len];
+            let extent = 10_f64.min(len / 2.);
+            let remaining = remaining.clamp(extent, len - extent);
+            let center = [p[0][0] + u[0] * remaining, p[0][1] + u[1] * remaining];
+            return vec![
+                [center[0] + u[0] * extent, center[1] + u[1] * extent],
+                [
+                    center[0] - u[0] * extent - u[1] * (extent / 2.),
+                    center[1] - u[1] * extent + u[0] * (extent / 2.),
+                ],
+                [
+                    center[0] - u[0] * extent + u[1] * (extent / 2.),
+                    center[1] - u[1] * extent - u[0] * (extent / 2.),
+                ],
+            ];
+        }
+        remaining -= len;
+    }
+    vec![]
 }

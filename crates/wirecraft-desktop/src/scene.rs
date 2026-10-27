@@ -42,27 +42,20 @@ impl Scene {
             s.links
                 .insert(id.clone(), (edge.name.clone(), edge.points.clone()));
         }
-        for (id, edge) in &drawing.edges {
-            if edge.route_error.is_some() {
-                let r = drawing.shapes[&edge.source].rect;
-                s.index.insert(
-                    id.clone(),
-                    Rect {
-                        x: r.x,
-                        y: r.y - 20.,
-                        width: 600.,
-                        height: 24.,
-                    },
-                );
+        let mut indexed_paths = Vec::new();
+        for (id, edge) in drawing.edges.iter().filter(|(_, e)| !e.annotation_only) {
+            indexed_paths.push((id.as_str(), edge.points.clone()));
+            let (mut output, mut input) = wirecraft_core::drawing::port_glyphs(&edge.points);
+            if let Some(first) = output.first().copied() {
+                output.push(first);
+                indexed_paths.push((id.as_str(), output));
+            }
+            if let Some(first) = input.first().copied() {
+                input.push(first);
+                indexed_paths.push((id.as_str(), input));
             }
         }
-        s.routes = RouteIndex::new(
-            drawing
-                .edges
-                .iter()
-                .filter(|(_, e)| !e.annotation_only)
-                .map(|(id, edge)| (id.as_str(), edge.points.as_slice())),
-        );
+        s.routes = RouteIndex::new(indexed_paths.iter().map(|(id, p)| (*id, p.as_slice())));
         for (id, annotation) in &drawing.annotations {
             s.index.insert(
                 id.clone(),
@@ -89,6 +82,8 @@ impl Scene {
     pub fn query(&self, rect: Rect) -> Vec<String> {
         let mut ids = self.index.query(rect);
         ids.extend(self.routes.query(rect));
+        ids.sort();
+        ids.dedup();
         ids
     }
     pub fn pick(&self, world: [f64; 2], tolerance: f64, include_links: bool) -> Option<String> {
@@ -129,7 +124,16 @@ impl Scene {
                     p.windows(2).any(|s| {
                         wirecraft_core::viewport::distance_to_segment(world, s[0], s[1])
                             <= tolerance
-                    })
+                    }) || {
+                        let (output, input) = wirecraft_core::drawing::port_glyphs(p);
+                        [output, input].iter().any(|glyph| {
+                            glyph
+                                .iter()
+                                .map(|p| Rect::from_points(*p, *p))
+                                .reduce(Rect::union)
+                                .is_some_and(|r| r.contains(world))
+                        })
+                    }
                 })
             })
         {
@@ -197,16 +201,14 @@ impl Scene {
                 rects.push(r);
             }
             if let Some(edge) = self.drawing.edges.get(id) {
-                rects.extend(
-                    self.preview_route(edge, moving, delta)
-                        .into_iter()
-                        .map(|p| Rect {
-                            x: p[0],
-                            y: p[1],
-                            width: 0.,
-                            height: 0.,
-                        }),
-                );
+                let points = self.preview_route(edge, moving, delta);
+                let (output, input) = wirecraft_core::drawing::port_glyphs(&points);
+                rects.extend(points.into_iter().chain(output).chain(input).map(|p| Rect {
+                    x: p[0],
+                    y: p[1],
+                    width: 0.,
+                    height: 0.,
+                }));
             }
         }
         for annotation in self
@@ -462,47 +464,64 @@ impl Scene {
                 );
             }
         }
+        let traces = visible
+            .iter()
+            .filter(|id| self.links.contains_key(*id))
+            .map(|id| {
+                let edge = &self.drawing.edges[id];
+                let points = self.preview_route(edge, moving, drag);
+                let trace = wirecraft_core::drawing::trace_geometry(&points, &edge.crossings);
+                (id.clone(), (points, trace))
+            })
+            .collect::<BTreeMap<_, _>>();
+        // Backside connectors precede every foreground trace: the crossing
+        // conductor stays continuous, without a background-colored erase mask.
+        for (_, trace) in traces.values() {
+            let mut path = PathBuilder::stroke(px(1.2));
+            for via in &trace.vias {
+                for (i, p) in via.backside.iter().enumerate() {
+                    if i == 0 {
+                        path.move_to(screen(*p));
+                    } else {
+                        path.line_to(screen(*p));
+                    }
+                }
+            }
+            if let Ok(path) = path.build() {
+                window.paint_path(path, rgba(0x7b858d88));
+            }
+        }
         for id in &visible {
             if self.links.contains_key(id) {
                 let edge = &self.drawing.edges[id];
-                if let Some(error) = &edge.route_error {
-                    let r = self.drawing.shapes[&edge.source].rect;
-                    self.label(
-                        error,
-                        screen([r.x, r.y - 16.]),
-                        (10. * view.zoom as f32).max(7.),
-                        0xe37272,
-                        window,
-                        cx,
-                    );
-                }
-                let shifted = self.preview_route(edge, moving, drag);
-                let points = &shifted;
+                let (points, trace) = &traces[id];
                 let mut builder =
                     PathBuilder::stroke(px(if selected.contains(id) { 3. } else { 1.5 }));
-                if edge.dashed {
-                    for segment in points.windows(2) {
-                        let a = screen(segment[0]);
-                        let b = screen(segment[1]);
-                        let delta = b - a;
-                        let length =
-                            (f32::from(delta.x).powi(2) + f32::from(delta.y).powi(2)).sqrt();
-                        if length < 0.1 {
-                            continue;
+                for fragment in &trace.fragments {
+                    if edge.dashed {
+                        for segment in fragment.windows(2) {
+                            let a = screen(segment[0]);
+                            let b = screen(segment[1]);
+                            let delta = b - a;
+                            let length =
+                                (f32::from(delta.x).powi(2) + f32::from(delta.y).powi(2)).sqrt();
+                            if length < 0.1 {
+                                continue;
+                            }
+                            let mut start = 0.;
+                            while start < length {
+                                builder.move_to(a + delta * (start / length));
+                                builder.line_to(a + delta * ((start + 6.).min(length) / length));
+                                start += 10.;
+                            }
                         }
-                        let mut start = 0.;
-                        while start < length {
-                            builder.move_to(a + delta * (start / length));
-                            builder.line_to(a + delta * ((start + 6.).min(length) / length));
-                            start += 10.;
-                        }
-                    }
-                } else {
-                    for (i, p) in points.iter().enumerate() {
-                        if i == 0 {
-                            builder.move_to(screen(*p));
-                        } else {
-                            builder.line_to(screen(*p));
+                    } else {
+                        for (i, p) in fragment.iter().enumerate() {
+                            if i == 0 {
+                                builder.move_to(screen(*p));
+                            } else {
+                                builder.line_to(screen(*p));
+                            }
                         }
                     }
                 }
@@ -516,52 +535,40 @@ impl Scene {
                         }),
                     );
                 }
-                for p in &edge.crossings {
-                    if let Some(s) = points.windows(2).find(|s| {
-                        wirecraft_core::viewport::distance_to_segment(*p, s[0], s[1]) < 0.1
-                    }) {
-                        let dx = s[1][0] - s[0][0];
-                        let dy = s[1][1] - s[0][1];
-                        let len = dx.hypot(dy);
-                        let (ux, uy) = (dx / len, dy / len);
-                        let a = [p[0] - ux * 6., p[1] - uy * 6.];
-                        let b = [p[0] + ux * 6., p[1] + uy * 6.];
-                        let background = if self
-                            .drawing
-                            .shapes
-                            .values()
-                            .any(|s| s.composite && s.expanded && s.rect.contains(*p))
-                        {
-                            0x202c38
-                        } else {
-                            0x10161e
-                        };
-                        let mut mask = PathBuilder::stroke(px((6. * view.zoom as f32).max(3.)));
-                        mask.move_to(screen(a));
-                        mask.line_to(screen(b));
-                        if let Ok(path) = mask.build() {
-                            window.paint_path(path, rgb(self.color(background)));
-                        }
-                        let mut bridge = PathBuilder::stroke(px(1.5));
-                        bridge.move_to(screen(a));
-                        bridge.cubic_bezier_to(
-                            screen(b),
-                            screen([a[0] - uy * 9., a[1] + ux * 9.]),
-                            screen([b[0] - uy * 9., b[1] + ux * 9.]),
-                        );
-                        if let Ok(path) = bridge.build() {
-                            window.paint_path(
-                                path,
-                                rgb(self.appearance.color(edge.color_key, 0x9cb5c8)),
-                            );
-                        }
-                    }
-                }
                 let color = if selected.contains(id) {
                     self.appearance.color("selection", 0x70d5c6)
                 } else {
                     self.appearance.color(edge.color_key, 0xd0d5db)
                 };
+                for via in &trace.vias {
+                    for p in [via.before, via.after] {
+                        let p = screen(p);
+                        let radius = px((via.radius * view.zoom) as f32);
+                        window.paint_quad(quad(
+                            Bounds::new(p - point(radius, radius), size(radius * 2., radius * 2.)),
+                            radius,
+                            rgba(0x00000000),
+                            px(1.2),
+                            rgb(color),
+                            BorderStyle::Solid,
+                        ));
+                    }
+                }
+                let arrow = wirecraft_core::drawing::flow_arrow(&trace.fragments);
+                let mut polygon = PathBuilder::fill();
+                for (i, p) in arrow.iter().enumerate() {
+                    if i == 0 {
+                        polygon.move_to(screen(*p));
+                    } else {
+                        polygon.line_to(screen(*p));
+                    }
+                }
+                if !arrow.is_empty() {
+                    polygon.close();
+                    if let Ok(path) = polygon.build() {
+                        window.paint_path(path, rgb(color));
+                    }
+                }
                 let (output, input) = wirecraft_core::drawing::port_glyphs(points);
                 let mut symbol = PathBuilder::stroke(px(1.2));
                 for (i, p) in output.iter().enumerate() {
@@ -570,6 +577,9 @@ impl Scene {
                     } else {
                         symbol.line_to(screen(*p));
                     }
+                }
+                if !output.is_empty() {
+                    symbol.close();
                 }
                 if let Ok(path) = symbol.build() {
                     window.paint_path(path, rgb(color));
@@ -633,9 +643,10 @@ impl Scene {
                 [0., 0.]
             };
             let p = screen([port.point[0] + offset[0], port.point[1] + offset[1]]);
+            let radius = px((5. * view.zoom) as f32);
             window.paint_quad(quad(
-                Bounds::new(p - point(px(3.), px(3.)), size(px(6.), px(6.))),
-                px(3.),
+                Bounds::new(p - point(radius, radius), size(radius * 2., radius * 2.)),
+                radius,
                 rgb(self.color(0x70bdb3)),
                 px(0.),
                 rgb(self.color(0x70bdb3)),
@@ -1017,9 +1028,15 @@ mod tests {
             .unwrap();
         assert_eq!([r.x, r.y, r.width, r.height], [150., 125., 400., 80.]);
         let r = s
-            .selection_bounds(&BTreeSet::from([wire]), &selection, [50., 25.])
+            .selection_bounds(&BTreeSet::from([wire.clone()]), &selection, [50., 25.])
             .unwrap();
-        assert_eq!([r.x, r.y, r.width, r.height], [250., 165., 200., 0.]);
+        for (actual, expected) in [r.x, r.y, r.width, r.height]
+            .into_iter()
+            .zip([250.2, 160.2, 199.8, 9.6])
+        {
+            assert!((actual - expected).abs() < 1e-6);
+        }
+        assert_eq!(s.pick([210., 140.], 1., true), Some(wire));
     }
     #[test]
     fn links_inside_composite_remain_pickable() {
@@ -1070,13 +1087,16 @@ mod tests {
         let obstacle = d.create("root", "Obstacle", NodeKind::Processor).unwrap();
         d.patch(
             &obstacle,
-            &json!({"layout":{"x":260,"y":90,"width":80,"height":100}}),
+            &json!({"layout":{"x":280,"y":90,"width":50,"height":100}}),
         )
         .unwrap();
         let s = Scene::new(&d, "root");
         let edge = &s.drawing.edges[&wire];
+        let obstacle = s.drawing.shapes[&obstacle].rect;
         assert!(
-            edge.points.len() > 4,
+            edge.points
+                .windows(2)
+                .all(|p| !obstacle.intersects_segment(p[0], p[1])),
             "fixture must route around the obstacle"
         );
         assert_eq!(

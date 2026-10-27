@@ -106,3 +106,6 @@ The original generated JVM class/plugin compiler ABI becomes a portable `Templat
 ## 0.6.1 routing correction
 
 The 0.5.0 description above was an approximation: its search was orthogonal and diagonals were post-routing cuts. Source-derived lane/long-diagonal candidates now participate in Euclidean length/bend/crossing scoring before the final path is reserved. Bounded visibility fallback has all four segment axes/eight directions. Hard box/overlap constraints remain deliberate extensions to the JVM's soft penalties. See routing.md for reference provenance, precision differences and verification scope. No global post-routing chamfer changes reservations afterwards.
+
+
+The user's follow-up to 0.6.1 sets the current fallback/display policy: self-links reserve compact local contours first, ports use the original hollow/filled five-point caps with 20-unit output offsets and 46-unit horizontal leads, and crossings use two hollow vias with gray polylines painted behind foreground traces. Clear routing remains preferred, but exhausted searches draw best effort instead of hiding links or showing routing-error labels. This supersedes the older visible-finding/bridge convention. See routing.md for source-derived goldens and deliberate differences.

@@ -185,39 +185,51 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
             .unwrap();
         }
     }
+    // Muted connectors lie behind all foreground conductors.
+    out.push_str("<g class=\"backside-traces\" fill=\"none\" stroke=\"#7b858d\" stroke-opacity=\"0.53\" stroke-width=\"1.2\">");
     for edge in drawing.edges.values().filter(|e| !e.annotation_only) {
-        if let Some(error) = &edge.route_error {
-            let r = drawing.shapes[&edge.source].rect;
-            write!(out,"<text class=\"routing-error\" x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"#bd5555\">{}</text>",r.x,r.y-8.,escape(error)).unwrap();
+        let trace = crate::drawing::trace_geometry(&edge.points, &edge.crossings);
+        for via in trace.vias {
+            let mut path = String::new();
+            for (i, p) in via.backside.iter().enumerate() {
+                write!(path, "{}{} {}", if i == 0 { "M" } else { "L" }, p[0], p[1]).unwrap();
+            }
+            write!(out, "<path class=\"backside-trace\" d=\"{path}\"/>").unwrap();
         }
-
-        let points = edge
-            .points
-            .iter()
-            .map(|p| format!("{},{}", p[0], p[1]))
-            .collect::<Vec<_>>()
-            .join(" ");
+    }
+    out.push_str("</g>");
+    for edge in drawing.edges.values().filter(|e| !e.annotation_only) {
+        let trace = crate::drawing::trace_geometry(&edge.points, &edge.crossings);
         let color = match edge.relation {
             Some(crate::analysis::Relation::Error) => "#bd5555",
             Some(crate::analysis::Relation::Dependency) => "#b88435",
             Some(crate::analysis::Relation::TypeUsage) => "#00897b",
             _ => "#334e68",
         };
-        write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" {}/>",if edge.dashed{"stroke-dasharray=\"8 5\""}else{""}).unwrap();
-        for p in &edge.crossings {
-            if let Some(s) = edge
-                .points
-                .windows(2)
-                .find(|s| crate::viewport::distance_to_segment(*p, s[0], s[1]) < 0.1)
-            {
-                let dx = s[1][0] - s[0][0];
-                let dy = s[1][1] - s[0][1];
-                let len = dx.hypot(dy);
-                let (ux, uy) = (dx / len, dy / len);
-                let a = [p[0] - ux * 6., p[1] - uy * 6.];
-                let b = [p[0] + ux * 6., p[1] + uy * 6.];
-                write!(out,"<path d=\"M{} {}L{} {}\" stroke=\"white\" stroke-width=\"6\"/><path class=\"channel-bridge\" d=\"M{} {}C{} {},{} {},{} {}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\"/>",a[0],a[1],b[0],b[1],a[0],a[1],a[0]-uy*9.,a[1]+ux*9.,b[0]-uy*9.,b[1]+ux*9.,b[0],b[1]).unwrap();
+        for fragment in &trace.fragments {
+            let points = fragment
+                .iter()
+                .map(|p| format!("{},{}", p[0], p[1]))
+                .collect::<Vec<_>>()
+                .join(" ");
+            write!(out,"<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.5\" {}/>",if edge.dashed{"stroke-dasharray=\"8 5\""}else{""}).unwrap();
+        }
+        for via in &trace.vias {
+            for p in [via.before, via.after] {
+                write!(out,"<circle class=\"crossing-via\" cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.2\"/>",p[0],p[1],via.radius).unwrap();
             }
+        }
+        let arrow = crate::drawing::flow_arrow(&trace.fragments)
+            .iter()
+            .map(|p| format!("{},{}", p[0], p[1]))
+            .collect::<Vec<_>>()
+            .join(" ");
+        if !arrow.is_empty() {
+            write!(
+                out,
+                "<polygon class=\"flow-arrow\" points=\"{arrow}\" fill=\"{color}\"/>"
+            )
+            .unwrap();
         }
         let (output, input) = crate::drawing::port_glyphs(&edge.points);
         for (class, points, filled) in [("output-port", output, false), ("input-port", input, true)]
@@ -233,7 +245,7 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
             write!(
                 out,
                 "<polygon class=\"{class}\" points=\"{points}\" stroke=\"{color}\" fill=\"{}\"/>",
-                if filled { color } else { "white" }
+                if filled { color } else { "none" }
             )
             .unwrap();
         }
@@ -257,7 +269,7 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
     for port in &drawing.boundary_ports {
         let owner = drawing.shapes[&port.owner].rect;
         let right = port.point[0] > owner.x + owner.width / 2.;
-        write!(out,"<circle class=\"composite-port\" cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"#00897b\"/><text x=\"{}\" y=\"{}\" text-anchor=\"{}\" font-size=\"9\">{}</text>",port.point[0],port.point[1],port.point[0]+if right{9.}else{-9.},port.point[1]-6.,if right{"start"}else{"end"},escape(&port.label)).unwrap();
+        write!(out,"<circle class=\"composite-port\" cx=\"{}\" cy=\"{}\" r=\"5\" fill=\"#00897b\"/><text x=\"{}\" y=\"{}\" text-anchor=\"{}\" font-size=\"9\">{}</text>",port.point[0],port.point[1],port.point[0]+if right{9.}else{-9.},port.point[1]-6.,if right{"start"}else{"end"},escape(&port.label)).unwrap();
     }
 
     for annotation in drawing.annotations.values() {
@@ -270,9 +282,9 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
         };
         if annotation.flag {
             let y = r.y + 18.;
-            write!(out,"<path d=\"M{} {}V{y}h{}\" fill=\"none\" stroke=\"{color}\"/><circle cx=\"{}\" cy=\"{y}\" r=\"3\" fill=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"{color}\">{}</text>",r.x,owner.y,r.width,r.x,r.x+6.,y-4.,escape(&annotation.label)).unwrap();
+            write!(out,"<path d=\"M{} {}V{y}h{}\" fill=\"none\" stroke=\"{color}\"/><circle cx=\"{}\" cy=\"{y}\" r=\"5\" fill=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"{color}\">{}</text>",r.x,owner.y,r.width,r.x,r.x+6.,y-4.,escape(&annotation.label)).unwrap();
         } else {
-            write!(out,"<path d=\"M{} {}H{}\" stroke=\"{color}\"/><circle cx=\"{}\" cy=\"{}\" r=\"3\" fill=\"{color}\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\" stroke=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"{color}\">{}</text>",owner.x+owner.width,r.y+r.height/2.,r.x,owner.x+owner.width,r.y+r.height/2.,r.x,r.y,r.width,r.height,r.x+5.,r.y+16.,escape(&annotation.label)).unwrap();
+            write!(out,"<path d=\"M{} {}H{}\" stroke=\"{color}\"/><circle cx=\"{}\" cy=\"{}\" r=\"5\" fill=\"{color}\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\" stroke=\"{color}\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"{color}\">{}</text>",owner.x+owner.width,r.y+r.height/2.,r.x,owner.x+owner.width,r.y+r.height/2.,r.x,r.y,r.width,r.height,r.x+5.,r.y+16.,escape(&annotation.label)).unwrap();
         }
     }
     if include_parts {
