@@ -112,4 +112,4 @@ The user's follow-up to 0.6.1 sets the current fallback/display policy: self-lin
 
 ## 0.6.2 same-side feedback
 
-A feedback pair occupies the less crowded horizontal side before either port is counted, with right-side tie preference. Count visible side ports/provider boxes, exclude top flags, then include each placed pair for subsequent feedback links. Input above output stays adjacent and routes as a local external U, retaining original cap templates and long horizontal leads. Shared projection feeds both desktop and vector exports; no persistence/schema changes.
+A feedback pair occupies the less crowded horizontal side before either port is counted, with right-side tie preference. Count visible side ports/provider boxes, exclude top flags, then include each placed pair for subsequent feedback links. Input above output stays adjacent and routes as a local external U, retaining original cap templates and long horizontal leads. Short 45-degree corners preserve a vertical leg even for closely spaced ports; separate-side loops do not inflate each other’s envelope ranks. Shared projection feeds both desktop and vector exports; no persistence/schema changes.

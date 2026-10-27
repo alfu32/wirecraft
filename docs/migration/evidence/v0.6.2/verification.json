@@ -1,0 +1,100 @@
+{
+  "version": "0.6.2",
+  "sourceRevision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
+  "implementationCommit": "a1f46bfe767163f43a0fd9da135b9ee603cd418c",
+  "platform": "Linux x86_64, XWayland/Vulkan",
+  "checks": {
+    "format": "passed: cargo fmt --all -- --check",
+    "rustTests": {
+      "passed": 90,
+      "failed": 0,
+      "ignored": 0,
+      "command": "cargo test --workspace --locked -- --include-ignored",
+      "optionalTools": {
+        "WIRECRAFT_TEST_KOTLINC": "/tmp/wirecraft-toolchains/kotlin-2.2.0/kotlinc/bin/kotlinc",
+        "WIRECRAFT_TEST_PHP": "/tmp/wirecraft-toolchains/php",
+        "WIRECRAFT_TEST_QJS": "/tmp/wirecraft-toolchains/quickjs-2026-06-04/qjs"
+      }
+    },
+    "strictClippy": "passed: cargo clippy --workspace --all-targets --locked -- -D warnings; upstream widget dependency warnings remain",
+    "optimizedBuild": "passed: scripts/package-linux.sh release",
+    "installedCommand": "python3 scripts/package_smoke.py dist/wirecraft-0.6.2-linux-x86_64.tar.gz --followup --canvas",
+    "installedPackage": {
+      "package": "passed",
+      "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.6.2-linux-x86_64.tar.gz",
+      "installedBackend": true,
+      "mcpTools": 37,
+      "pdfExport": true,
+      "workbenchMcp": true,
+      "nativeC17Graph": true,
+      "generatedClangd": true,
+      "semanticTokensAndHover": true,
+      "installedDraft": false,
+      "installedStartup": false,
+      "installedGesture": false,
+      "installedFollowup": true,
+      "installedDesktop": false,
+      "installedWalkthrough": false,
+      "installedEditor": false,
+      "installedCanvas": true
+    },
+    "installedNativeSuites": [
+      {
+        "canvas": "passed",
+        "wheelZoomAnchored": true,
+        "middleDragPan": true,
+        "directionalWindows": true,
+        "addRemoveReplace": true,
+        "treeSelectionAndReparent": true,
+        "selectionContoursAndBounds": true,
+        "groupDragSingleUndo": true,
+        "descendantsMoveOnce": true,
+        "releaseOutsideCanvas": true,
+        "debouncedPreviewWithoutMutation": true,
+        "cycleRejected": true,
+        "panPreservesDraft": true,
+        "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
+      },
+      {
+        "semanticColors": "passed",
+        "contextMenuScrollAndNestedInsert": "passed",
+        "dependencyCallouts": "captured",
+        "planOverview": "passed",
+        "webserverCompositeRouting": "passed",
+        "compilerIssueReveal": "passed",
+        "hoverPopups": "captured",
+        "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+      }
+    ],
+    "finalNativeCapture": {
+      "semanticColors": "passed",
+      "contextMenuScrollAndNestedInsert": "passed",
+      "dependencyCallouts": "captured",
+      "planOverview": "passed",
+      "webserverCompositeRouting": "passed",
+      "compilerIssueReveal": "passed",
+      "hoverPopups": "captured",
+      "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+    },
+    "nativeRetry": "First run passed canvas, then failed the X11 menu-text screenshot check. Entire installed run passed on retry. The final capture run restores an exact temporary viewport to avoid synthetic pan/session-persistence framing races; self-loop images were visually inspected."
+  },
+  "binarySha256": {
+    "wirecraft": "814e1a210e6d15db49a8a1947e6c5cb2e71f6bb9f224a58379bd56820a0d7bef",
+    "wirecraft-desktop": "63e83bcd9dde07334272a02c7652d74d1182eff0bb573a221edc50eb1a90ecf6"
+  },
+  "behaviors": [
+    "Less crowded horizontal side measured before adding either port; right on ties",
+    "Earlier feedback pairs count for subsequent pairs",
+    "Provider boxes count on right; top dependency flags excluded",
+    "Adjacent input-above-output pair, local U, vertical leg retained with short 45-degree corners",
+    "Original hollow/filled caps and at least 46-unit horizontal leads",
+    "Shared desktop and SVG/PDF geometry; no project schema change"
+  ],
+  "preserved": "Tests use temporary project/state and owned PIDs. Live instances and user example.orch/example.copy.orch changes are preserved.",
+  "limitations": [
+    "Full migration remains unfinished; see status.md and parity.md",
+    "Crowded impossible layouts retain best-effort paths as requested",
+    "Only Linux desktop/package was exercised; Windows/macOS and physical printing remain unverified",
+    "Other native suites from 0.6.1 are historical, not rerun in this patch"
+  ]
+}

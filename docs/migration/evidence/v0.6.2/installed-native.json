@@ -1,0 +1,47 @@
+[
+  {
+    "canvas": "passed",
+    "wheelZoomAnchored": true,
+    "middleDragPan": true,
+    "directionalWindows": true,
+    "addRemoveReplace": true,
+    "treeSelectionAndReparent": true,
+    "selectionContoursAndBounds": true,
+    "groupDragSingleUndo": true,
+    "descendantsMoveOnce": true,
+    "releaseOutsideCanvas": true,
+    "debouncedPreviewWithoutMutation": true,
+    "cycleRejected": true,
+    "panPreservesDraft": true,
+    "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"
+  },
+  {
+    "semanticColors": "passed",
+    "contextMenuScrollAndNestedInsert": "passed",
+    "dependencyCallouts": "captured",
+    "planOverview": "passed",
+    "webserverCompositeRouting": "passed",
+    "compilerIssueReveal": "passed",
+    "hoverPopups": "captured",
+    "artifacts": "/home/alfu64/Development/wirecraft/target/followup-smoke"
+  },
+  {
+    "package": "passed",
+    "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.6.2-linux-x86_64.tar.gz",
+    "installedBackend": true,
+    "mcpTools": 37,
+    "pdfExport": true,
+    "workbenchMcp": true,
+    "nativeC17Graph": true,
+    "generatedClangd": true,
+    "semanticTokensAndHover": true,
+    "installedDraft": false,
+    "installedStartup": false,
+    "installedGesture": false,
+    "installedFollowup": true,
+    "installedDesktop": false,
+    "installedWalkthrough": false,
+    "installedEditor": false,
+    "installedCanvas": true
+  }
+]

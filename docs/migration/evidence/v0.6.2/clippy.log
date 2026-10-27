@@ -1,0 +1,57 @@
+    Checking wirecraft-core v0.6.2 (/home/alfu64/Development/wirecraft/crates/wirecraft-core)
+warning: use of deprecated module `std::usize`: all constants in this module replaced by associated constants on the type
+ --> vendor/gpui-component/src/highlighter/diagnostics.rs:4:5
+  |
+4 |     usize,
+  |     ^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/diagnostics.rs:218:27
+    |
+218 |             start: usize::MIN,
+    |                           ^^^
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/diagnostics.rs:219:25
+    |
+219 |             end: usize::MIN,
+    |                         ^^^
+
+warning: use of deprecated module `std::usize`: all constants in this module replaced by associated constants on the type
+  --> vendor/gpui-component/src/highlighter/highlighter.rs:11:5
+   |
+11 |     usize,
+   |     ^^^^^
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:123:27
+    |
+123 |             start: usize::MIN,
+    |                           ^^^
+
+warning: use of deprecated constant `std::usize::MAX`: replaced by the `MAX` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:124:25
+    |
+124 |             end: usize::MAX,
+    |                         ^^^
+
+warning: use of deprecated constant `std::usize::MAX`: replaced by the `MAX` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:125:31
+    |
+125 |             min_start: usize::MAX,
+    |                               ^^^
+
+warning: use of deprecated constant `std::usize::MIN`: replaced by the `MIN` associated constant on this type
+   --> vendor/gpui-component/src/highlighter/highlighter.rs:126:29
+    |
+126 |             max_end: usize::MIN,
+    |                             ^^^
+
+warning: `gpui-component` (lib) generated 8 warnings
+    Checking wirecraft-runtime v0.6.2 (/home/alfu64/Development/wirecraft/crates/wirecraft-runtime)
+    Checking wirecraft-desktop v0.6.2 (/home/alfu64/Development/wirecraft/crates/wirecraft-desktop)
+    Finished `dev` profile [unoptimized] target(s) in 3.51s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

@@ -41,3 +41,7 @@ The user's missing-language inventory takes precedence over the remaining C sour
 ## 0.6.1 routing and recovered-edit correction
 
 Implemented native 45-degree reference candidate scoring, compact self-link priority, original port templates and 46-unit leads, shared PCB via/backside geometry, and visible best-effort routing. Inspector names commit on Enter/blur and recovered drafts expose Apply/Discard in every view. Source-derived golden regeneration and all 88 Rust tests pass; native and installed release evidence is in `evidence/v0.6.1/`. Full migration scope remains open in parity.md; the next generation slice is C source capabilities.
+
+## 0.6.2 same-side feedback
+
+Completed the requested less-crowded-side port pairs (right on ties), local U with a retained vertical leg, long leads and original endpoint symbols. Verified 90 Rust tests plus optimized installed backend and native canvas/follow-up checks; capture retry and screenshots are recorded in `evidence/v0.6.2/`. Remaining migration work remains in the parity matrix.

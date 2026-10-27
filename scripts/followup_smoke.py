@@ -130,11 +130,14 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   web=api('export.preview',{'kind':'plan','options':{'format':'Auto'},'overview':True})
   assert web['svg'].count('class="composite-port"')==6
   assert 'routing-error' not in web['svg']
-  command('Zoom Extents')
   accept=next(n for n in document()['nodes'].values() if n['name']=='socket_accept')['layout']
-  target=point(accept['x']+accept['width']/2,accept['y']+accept['height']/2)
-  xd('mousemove','--window',window,*target,'click','--repeat',4,'--delay',100,4);time.sleep(.5)
-  xd('mousemove','--window',window,*target);xd('mousedown',2);xd('mousemove','--window',window,850,510);xd('mouseup',2);time.sleep(.5);shot('self-loop-and-port-caps')
+  # Restore an exact owned-fixture viewport for the geometry evidence. Rapid
+  # synthetic pan/zoom can race session persistence and capture another region.
+  xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0
+  capture_ui=ui();capture_ui['viewport']={'x':850-305-(accept['x']+accept['width']/2)*1.4,'y':510-172-(accept['y']+accept['height']/2)*1.4,'zoom':1.4}
+  (state/'ui.json').write_text(json.dumps(capture_ui));launch()
+  wait(lambda:abs(ui()['viewport']['zoom']-1.4)<.001)
+  shot('self-loop-and-port-caps')
   detail=point(accept['x']-50,accept['y']+accept['height']/2)
   xd('mousemove','--window',window,*detail,'click','--repeat',2,'--delay',100,4);time.sleep(.5);shot('port-caps-and-vias-detail')
   xd('key','ctrl+q');app.wait(timeout=10);assert app.returncode==0

@@ -73,4 +73,4 @@ Final workspace verification: 88 tests passed with optional real toolchains, for
 
 ## 0.6.2 same-side feedback
 
-User-specified local U replaces around-the-box self loops. Both ports use the less occupied side (right on ties), input above output, paired before ordinary channels. Tests cover all occupancy comparisons, multiple loops, provider boxes versus top flags, local no-box-entry/no-overlap geometry, and long leads. Native and release verification is recorded in status.md.
+User-specified local U replaces around-the-box self loops. Both ports use the less occupied side (right on ties), input above output, paired before ordinary channels. Tests cover all occupancy comparisons, multiple loops, provider boxes versus top flags, local no-box-entry/no-overlap geometry, and long leads. 90 Rust tests, formatting and strict Clippy passed. Installed backend/MCP/clangd, native canvas and follow-up checks pass (X11 screenshot retry noted); visually inspected same-side U captures and binary hashes are in [0.6.2 evidence](evidence/v0.6.2/verification.json).

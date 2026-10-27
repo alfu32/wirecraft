@@ -1,0 +1,14 @@
+{"canvas": "passed", "wheelZoomAnchored": true, "middleDragPan": true, "directionalWindows": true, "addRemoveReplace": true, "treeSelectionAndReparent": true, "selectionContoursAndBounds": true, "groupDragSingleUndo": true, "descendantsMoveOnce": true, "releaseOutsideCanvas": true, "debouncedPreviewWithoutMutation": true, "cycleRejected": true, "panPreservesDraft": true, "artifacts": "/home/alfu64/Development/wirecraft/target/canvas-smoke"}
+Traceback (most recent call last):
+  File "/home/alfu64/Development/wirecraft/scripts/followup_smoke.py", line 110, in <module>
+    xd('mousemove','--window',window,850,380);xd('click',3);time.sleep(.4);shot('context-top')
+                                                                           ^^^^^^^^^^^^^^^^^^^
+  File "/home/alfu64/Development/wirecraft/scripts/followup_smoke.py", line 51, in shot
+    raise RuntimeError('Owned window capture never displayed menu text')
+RuntimeError: Owned window capture never displayed menu text
+Traceback (most recent call last):
+  File "/home/alfu64/Development/wirecraft/scripts/package_smoke.py", line 72, in <module>
+    subprocess.run([sys.executable,str(root/'scripts'/script)],env=env,check=True)
+  File "/usr/local/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/bin/python3', '/home/alfu64/Development/wirecraft/scripts/followup_smoke.py']' returned non-zero exit status 1.
