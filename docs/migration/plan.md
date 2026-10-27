@@ -48,4 +48,4 @@ Completed the requested less-crowded-side port pairs (right on ties), local U wi
 
 ## 0.6.3 mixed-selection layout correction
 
-Filter links before all layout validation and bounds calculation in the shared service; preserve one-transaction undo and box-count validation. Verify all six operations and installed backend/API behavior. No UI-specific duplicate layout rules.
+Filter links before all layout validation and bounds calculation in the shared service; preserve one-transaction undo and box-count validation. Verified all six operations and installed backend/API behavior; exact commands/results are in `evidence/v0.6.3/verification.json`. No UI-specific duplicate layout rules.

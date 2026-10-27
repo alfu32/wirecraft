@@ -1,0 +1,70 @@
+{
+  "version": "0.6.3",
+  "sourceRevision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
+  "implementationCommit": "e4b7e08b865687f3a8ed15755e478db476fe1462",
+  "checks": {
+    "format": "passed: cargo fmt --all -- --check",
+    "relevantWorkflowTests": {
+      "passed": 7,
+      "failed": 0,
+      "command": "cargo test -p wirecraft-runtime --locked --test expanded_workflows",
+      "coverage": [
+        "All four alignments and both distributions with mixed box/link selection",
+        "Extreme link coordinates excluded from bounds",
+        "Selected links in a different parent ignored in parent checks",
+        "Response includes only boxes; link data unchanged",
+        "One undo restores entire document",
+        "Minimum box counts and atomic failures"
+      ]
+    },
+    "strictClippy": "passed: cargo clippy --workspace --all-targets --locked -- -D warnings; upstream widget warnings remain",
+    "optimizedBuild": "passed: scripts/package-linux.sh release",
+    "mixedSelectionHttp": {
+      "mixedSelectionHttp": "passed",
+      "operations": [
+        "left",
+        "right",
+        "top",
+        "bottom",
+        "distribute-horizontal",
+        "distribute-vertical"
+      ],
+      "linksUnchanged": true,
+      "responseContainsOnlyBoxes": true,
+      "singleUndo": true,
+      "temporaryFixture": true
+    },
+    "httpCommand": "python3 docs/migration/evidence/v0.6.3/layout_http.py target/release/wirecraft",
+    "installedPackage": {
+      "package": "passed",
+      "archive": "/home/alfu64/Development/wirecraft/dist/wirecraft-0.6.3-linux-x86_64.tar.gz",
+      "installedBackend": true,
+      "mcpTools": 37,
+      "pdfExport": true,
+      "workbenchMcp": true,
+      "nativeC17Graph": true,
+      "generatedClangd": true,
+      "semanticTokensAndHover": true,
+      "installedDraft": false,
+      "installedStartup": false,
+      "installedGesture": false,
+      "installedFollowup": false,
+      "installedDesktop": false,
+      "installedWalkthrough": false,
+      "installedEditor": false,
+      "installedCanvas": false
+    },
+    "installedCommand": "python3 scripts/package_smoke.py dist/wirecraft-0.6.3-linux-x86_64.tar.gz"
+  },
+  "binarySha256": {
+    "wirecraft": "436a354c18453b9032724de7c5c777ecb3c98ce03326eaa794d0113e3c35d508",
+    "wirecraft-desktop": "9c07e34d691a22376d59bcaa456ba6c4a56259390d01b5e01c08a4d280b40581"
+  },
+  "scope": "Shared application service fix; desktop still sends the complete selection. Links are filtered before box count, parent validation, bounds and updates. No schema change.",
+  "preserved": "Temporary fixtures and owned backend processes only; user example.orch/example.copy.orch and running applications preserved.",
+  "limitations": [
+    "Full workspace tests and native UI suites were not rerun for this patch; the targeted workflow suite and actual HTTP service checks passed",
+    "Only Linux optimized build/package checked",
+    "Broader migration gaps remain in status.md and parity.md"
+  ]
+}

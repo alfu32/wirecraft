@@ -6,6 +6,8 @@ Wirecraft **0.6.3** ignores selected links during alignment/distribution and ret
 
 All four edge alignments and both distribution operations filter links in the shared application service before counting boxes, checking parents or calculating bounds. Mixed selections work even when a selected link belongs to another parent or has extreme stored coordinates. Responses list only operated-on boxes; link data remains untouched. Alignment requires two boxes, distribution three; insufficient box selections fail atomically with explicit box-count messages. The operation remains one undo transaction. Desktop and API use the same service, without a project format change.
 
+Seven relevant workflow integration tests passed, covering all six layout operations and undo. Formatting, workspace strict Clippy, optimized packaging and installed backend/MCP/PDF/C17/clangd smoke passed. An isolated real HTTP fixture also passed all six mixed-selection commands, unchanged links, box-only response IDs and undo. Native UI and the full workspace suite were not rerun in this patch. [0.6.3 verification](evidence/v0.6.3/verification.json).
+
 ## Same-side feedback loops (0.6.2)
 
 Both self-link ports now share the side with fewer existing side ports, measured before adding either port; right wins ties. Provider/type callouts count on the right, while top dependency flags do not count. Subsequent feedback pairs include earlier pairs in their occupancy counts. Each pair stays adjacent, with input above output, and routes locally between those heights instead of around the box. Original endpoint symbols, 46-unit leads and priority over ordinary channels remain. Desktop and SVG/PDF use this shared geometry without changing project data.

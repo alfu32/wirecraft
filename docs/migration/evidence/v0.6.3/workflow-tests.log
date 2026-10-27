@@ -1,0 +1,16 @@
+   Compiling wirecraft-core v0.6.3 (/home/alfu64/Development/wirecraft/crates/wirecraft-core)
+   Compiling wirecraft-runtime v0.6.3 (/home/alfu64/Development/wirecraft/crates/wirecraft-runtime)
+    Finished `test` profile [unoptimized] target(s) in 9.69s
+     Running tests/expanded_workflows.rs (target/debug/deps/expanded_workflows-5dfe12fb94936215)
+
+running 7 tests
+test explicit_settings_import_preserves_ui_values_and_excludes_credentials ... ok
+test layout_minimum_selection_counts_only_boxes_and_failed_operations_are_atomic ... ok
+test alignment_distribution_cut_paste_and_undo_are_transactions ... ok
+test align_and_distribute_ignore_selected_links_in_bounds_parent_checks_and_results ... ok
+test all_bundled_archetypes_import_with_fresh_ids ... ok
+test literal_generation_source_maps_external_compiler_and_path_safety ... ok
+test real_svg_png_and_vector_pdf_exports ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+

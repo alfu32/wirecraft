@@ -77,4 +77,4 @@ User-specified local U replaces around-the-box self loops. Both ports use the le
 
 ## 0.6.3 box-only layout
 
-Align left/right/top/bottom and distribute horizontally/vertically ignore selected links in the shared service. Regression checks cover all six operations with mixed-parent links and extreme link bounds, box-only result IDs, untouched link data, one-step undo and minimum box counts. Release checks are recorded in status.md.
+Align left/right/top/bottom and distribute horizontally/vertically ignore selected links in the shared service. Regression checks cover all six operations with mixed-parent links and extreme link bounds, box-only result IDs, untouched link data, one-step undo and minimum box counts. Seven workflow tests, real HTTP mixed-selection operations and undo, formatting, strict Clippy and optimized installed backend checks passed. Native UI was not rerun; [0.6.3 verification](evidence/v0.6.3/verification.json).
