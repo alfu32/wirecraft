@@ -10,7 +10,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let mode = args.next().unwrap_or_else(|| "help".into());
     if mode == "help" || mode == "--help" {
         println!(
-            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY [--template-set ID] [--layout ID] [--compiler BUNDLE.json]\nwirecraft templates [ID]\nwirecraft export-compiler PROJECT.orch OUTPUT_DIRECTORY [TEMPLATE_SET]\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
+            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft update-references FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY [--template-set ID] [--layout ID] [--compiler BUNDLE.json]\nwirecraft templates [ID]\nwirecraft export-compiler PROJECT.orch OUTPUT_DIRECTORY [TEMPLATE_SET]\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
@@ -124,10 +124,35 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
             .next()
             .ok_or_else(|| anyhow::anyhow!("Missing project path"))?;
         let d = store::load(&PathBuf::from(path))?;
+        let mut diagnostics = d.validate();
+        diagnostics.extend(wirecraft_core::components::diagnostics(&d));
+        let valid = diagnostics.iter().all(|d| d.severity != "Error");
         println!(
             "{}",
-            json!({"valid":true,"nodes":d.nodes.len(),"diagnostics":d.validate()})
+            json!({"valid":valid,"nodes":d.nodes.len(),"diagnostics":diagnostics})
         );
+        return Ok(());
+    }
+    if mode == "update-references" {
+        let path = PathBuf::from(
+            args.next()
+                .ok_or_else(|| anyhow::anyhow!("Missing project path"))?,
+        );
+        let mut d = store::load(&path)?;
+        let ids: Vec<String> = d
+            .nodes
+            .values()
+            .filter(|n| wirecraft_core::components::is_reference(n))
+            .map(|n| n.id.clone())
+            .collect();
+        let mut pinned = vec![];
+        for id in &ids {
+            let r = wirecraft_core::components::pin(&mut d, id)?;
+            pinned.push(json!({"nodeId":id,"path":r.path,"sha256":r.sha256,"ports":r.ports}));
+        }
+        wirecraft_core::components::normalize(&mut d)?;
+        store::save(&d, &path)?;
+        println!("{}", json!({"updated":pinned}));
         return Ok(());
     }
     if mode == "new" {

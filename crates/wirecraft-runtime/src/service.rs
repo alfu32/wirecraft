@@ -77,7 +77,11 @@ impl Service {
         let mut document: Document = serde_json::from_value(v["document"].clone())?;
         document.repair()?;
         document.ensure_valid()?;
-        let mut service = Self::new(document, v["path"].as_str().map(PathBuf::from));
+        let path = v["path"].as_str().map(PathBuf::from);
+        if let Some(base) = path.as_deref().and_then(Path::parent) {
+            wirecraft_core::components::resolve(&mut document, base);
+        }
+        let mut service = Self::new(document, path);
         service.saved = v["saved"].clone();
         if serde_json::to_value(&service.document)? != service.saved {
             service.saved_state_id = u64::MAX;
@@ -151,6 +155,10 @@ impl Service {
                     .or(self.path.clone())
                     .ok_or_else(|| Error::new("invalid_input", "Save requires a path"))?;
                 store::save(&self.document, &path)?;
+                // Reference paths are relative to the file, which may have moved.
+                if let Some(base) = path.parent() {
+                    wirecraft_core::components::resolve(&mut self.document, base);
+                }
                 self.path = Some(path);
                 self.saved = serde_json::to_value(&self.document)?;
                 self.saved_state_id = self.state_id;
@@ -439,8 +447,10 @@ impl Service {
             }
             "list_users" => return Ok(json!({"users":self.document.users})),
             "validate_design" => {
-                let diagnostics = self.document.validate();
-                return Ok(json!({"valid":diagnostics.is_empty(),"diagnostics":diagnostics}));
+                let mut diagnostics = self.document.validate();
+                diagnostics.extend(wirecraft_core::components::diagnostics(&self.document));
+                let valid = diagnostics.iter().all(|d| d.severity != "Error");
+                return Ok(json!({"valid":valid,"diagnostics":diagnostics}));
             }
             "analyze_network" => return Ok(self.document.network_counts()),
             "list_technologies" => {
@@ -693,6 +703,118 @@ impl Service {
                 let id = candidate.create_link(required(a, "name")?, link)?;
                 entity(&candidate, &id)?
             }
+            "components.publish" => {
+                // An Exterior and its single link are created together, so the design
+                // never holds an Exterior without a name.
+                let entity = required(a, "nodeId")?;
+                candidate.node(entity)?;
+                let output = match required(a, "direction")? {
+                    "output" => true,
+                    "input" => false,
+                    _ => {
+                        return Err(Error::new(
+                            "invalid_input",
+                            "direction must be 'output' or 'input'",
+                        ));
+                    }
+                };
+                let base = a["name"].as_str().unwrap_or("port").trim().to_string();
+                let taken = |name: &str| {
+                    candidate.nodes.values().any(|n| {
+                        wirecraft_core::components::is_exterior(n)
+                            && n.name == format!("{name}{}", if output { "Out" } else { "In" })
+                    })
+                };
+                let mut name = base.clone();
+                let mut suffix = 2;
+                while taken(&name) {
+                    name = format!("{base}{suffix}");
+                    suffix += 1;
+                }
+                let root = candidate.root_node_id.clone();
+                let exterior = candidate.create(&root, &name, NodeKind::Node)?;
+                let diameter = wirecraft_core::components::EXTERIOR_DIAMETER;
+                candidate.patch(
+                    &exterior,
+                    &json!({"stereotype":wirecraft_core::components::EXTERIOR,"layout":{"x":a["x"].as_f64().unwrap_or(0.),"y":a["y"].as_f64().unwrap_or(0.),"width":diameter,"height":diameter}}),
+                )?;
+                let text = |key: &str| a[key].as_str().unwrap_or("").to_string();
+                let mut link = Link {
+                    type_name: text("typeName"),
+                    type_definition_id: text("typeDefinitionId"),
+                    payload_definition: text("payloadDefinition"),
+                    ..Link::default()
+                };
+                (link.source_node_id, link.target_node_id) = if output {
+                    (entity.to_string(), exterior.clone())
+                } else {
+                    (exterior.clone(), entity.to_string())
+                };
+                let link = candidate.create_link(&name, link)?;
+                json!({"exteriorId":exterior,"linkId":link})
+            }
+            "components.reference" => {
+                let base = self
+                    .path
+                    .as_deref()
+                    .and_then(Path::parent)
+                    .ok_or_else(|| {
+                        Error::new(
+                            "invalid_input",
+                            "Save the design first: a reference path is relative to its file",
+                        )
+                    })?
+                    .to_path_buf();
+                let requested = PathBuf::from(required(a, "path")?);
+                let relative = if requested.is_absolute() {
+                    let canonical = requested.canonicalize()?;
+                    canonical
+                        .strip_prefix(base.canonicalize()?)
+                        .map_err(|_| {
+                            Error::new(
+                                "invalid_input",
+                                "A referenced component must be inside the design's directory",
+                            )
+                        })?
+                        .to_path_buf()
+                } else {
+                    requested
+                };
+                let parent = a["parentId"]
+                    .as_str()
+                    .unwrap_or(&candidate.root_node_id)
+                    .to_string();
+                let id = candidate.create(&parent, "component", NodeKind::Node)?;
+                candidate.patch(
+                    &id,
+                    &json!({"stereotype":wirecraft_core::components::REFERENCE,"reference":{"path":relative.to_string_lossy()},"layout":{"x":a["x"].as_f64().unwrap_or(0.),"y":a["y"].as_f64().unwrap_or(0.)}}),
+                )?;
+                wirecraft_core::components::resolve(&mut candidate, &base);
+                let pinned = wirecraft_core::components::pin(&mut candidate, &id)?;
+                let name = a["name"].as_str().unwrap_or(&pinned.name).to_string();
+                candidate.patch(&id, &json!({"name":name}))?;
+                json!({"nodeId":id,"reference":pinned})
+            }
+            "components.update_reference" => {
+                let id = required(a, "nodeId")?;
+                let before = wirecraft_core::components::reference(candidate.node(id)?)
+                    .ok_or_else(|| Error::new("invalid_input", "Entity is not a Reference"))?;
+                if let Some(base) = self.path.as_deref().and_then(Path::parent) {
+                    wirecraft_core::components::resolve(&mut candidate, base);
+                }
+                let after = wirecraft_core::components::pin(&mut candidate, id)?;
+                let removed: Vec<_> = before
+                    .ports
+                    .iter()
+                    .filter(|p| !after.ports.contains(p))
+                    .collect();
+                let added: Vec<_> = after
+                    .ports
+                    .iter()
+                    .filter(|p| !before.ports.contains(p))
+                    .collect();
+                json!({"nodeId":id,"reference":after,"removedPorts":removed,"addedPorts":added})
+            }
             "update_link" => {
                 let id = required(a, "nodeId")?;
                 if candidate.node(id)?.link.is_none() {
@@ -734,6 +856,7 @@ impl Service {
                 ));
             }
         };
+        wirecraft_core::components::normalize(&mut candidate)?;
         candidate.ensure_valid()?;
         if serde_json::to_value(&candidate)? != serde_json::to_value(&self.document)? {
             self.undo.push((

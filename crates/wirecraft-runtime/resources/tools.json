@@ -853,6 +853,30 @@
           "operation"
         ]
       }
+    },
+    {
+      "name": "wirecraft.components",
+      "description": "Pluggable components (docs/design/components.md). 'publish' creates an Exterior and its single link: arguments {nodeId, direction: 'output'|'input', name, typeDefinitionId or typeName plus payloadDefinition, x, y}; the Exterior is named <link>Out or <link>In. 'reference' places a Reference to another saved design inside this design's directory: {path, parentId, name, x, y}; it is pinned by SHA-256 and lists the published ports. 'update_reference' re-pins {nodeId} and reports added and removed ports. Link to a Reference port with sourcePortName/targetPortName set to the port name; output ports accept one link, input ports any number. Generation expands References (C17 only).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "publish",
+              "reference",
+              "update_reference"
+            ]
+          },
+          "arguments": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

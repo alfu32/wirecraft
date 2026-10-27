@@ -87,11 +87,17 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                         arguments.get("arguments").cloned().unwrap_or(json!({})),
                     ))
                     .await
-                } else if name == "wirecraft.language_server" || name == "wirecraft.build" {
-                    let prefix = if name == "wirecraft.build" {
-                        "jobs"
-                    } else {
-                        "lsp"
+                } else if [
+                    "wirecraft.language_server",
+                    "wirecraft.build",
+                    "wirecraft.components",
+                ]
+                .contains(&name)
+                {
+                    let prefix = match name {
+                        "wirecraft.build" => "jobs",
+                        "wirecraft.components" => "components",
+                        _ => "lsp",
                     };
                     let operation = arguments["operation"].as_str().unwrap_or("");
                     app.execute(Request::new(
