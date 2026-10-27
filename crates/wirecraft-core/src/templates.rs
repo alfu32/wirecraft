@@ -216,7 +216,11 @@ impl TemplateSet {
         phase: &str,
         layout: &str,
     ) -> Option<&str> {
-        let stereo = kebab(stereotype);
+        let stereo = kebab(if composite && stereotype == "Node" {
+            "CompositeWorker"
+        } else {
+            stereotype
+        });
         let fallback = if composite { "composite" } else { kind };
         [
             format!("{stereo}.{phase}.{layout}"),

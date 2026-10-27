@@ -8,7 +8,7 @@ The six original template sets (C, Go, Kotlin, Node.js, PHP, QuickJS; 90 hashed 
 
 Real Go/Node/Kotlin/PHP/QuickJS producer → typed FIFO → consumer → shutdown fixtures execute successfully. Node/PHP single and filesystem layouts and Kotlin single/source-set layouts are covered. CLI custom-template export/reuse and real HTTP MCP catalog/generation/export pass. Rendering rejects malformed templates, bounds instructions/output, and generation rejects unsafe/duplicate paths and unresolved scope connections. C bundle execution/unsupported overrides, generic composite boundary channels and mixed-language delegation return explicit errors. See [compiler-templates.md](compiler-templates.md) for the exact retained contract and examples. Language generation does not imply broader inline LSP/coloring parity.
 
-The 0.6.0 final native/packaging/check results are being collected; the detailed 0.5.0 results below remain historical until that verification record is added.
+0.6.0 checks: **81 Rust tests passed, zero failed or ignored**, with the optional real toolchains explicitly enabled; formatting, workspace build and strict Clippy passed. The default test invocation leaves two optional toolchain tests ignored unless requested. All 90 assets match the exact baseline git objects. CLI/API/MCP compiler workflows pass. Native Generate produced and executed the Node.js example once; the full new native suite did not pass because Wayland/isolated GTK picker observation was inconsistent, so native compiler-export picker completion remains unverified. The previous 0.5.0 native suites below are historical, not a claim about this new picker flow. Details: [verification](evidence/v0.6.0/verification.json).
 
 ## Corrective milestone
 

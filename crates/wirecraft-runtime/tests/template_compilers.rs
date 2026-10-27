@@ -35,6 +35,7 @@ fn graph(set: &str, layout: &str) -> Document {
         _ => unreachable!(),
     };
     let mut d = Document::new("network");
+    d.nodes.get_mut("root").unwrap().kind = NodeKind::Node;
     d.patch("root",&json!({"technology":{"languageId":language,"technologyId":technology},"fileLayoutStrategyId":layout})).unwrap();
     let producer = d.create("root", "producer", NodeKind::Processor).unwrap();
     let consumer = d.create("root", "consumer", NodeKind::Processor).unwrap();

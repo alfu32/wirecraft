@@ -1190,6 +1190,7 @@ impl Wirecraft {
             .and_then(|p| p.parent())
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        self.status = "Choose an output path in the save dialog".into();
         let prompt = cx.prompt_for_new_path(
             &directory,
             Some(if kind == "archetype" {
@@ -1199,7 +1200,22 @@ impl Wirecraft {
             }),
         );
         cx.spawn_in(window, async move |this, cx| {
-            if let Ok(Ok(Some(path))) = prompt.await {
+            let chosen = match prompt.await {
+                Ok(Ok(path)) => path,
+                result => {
+                    let message = match result {
+                        Ok(Err(error)) => error.to_string(),
+                        Err(error) => error.to_string(),
+                        _ => String::new(),
+                    };
+                    let _ = this.update_in(cx, |this, _, cx| {
+                        this.status = format!("Cannot open output dialog: {message}");
+                        cx.notify();
+                    });
+                    return;
+                }
+            };
+            if let Some(path) = chosen {
                 let _ = this.update_in(cx, |this, _, _| {
                     if kind == "archetype" {
                         if let Some(id) = this.selected.first() {

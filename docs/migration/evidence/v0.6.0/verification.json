@@ -1,0 +1,52 @@
+{
+  "version": "0.6.0",
+  "sourceRevision": "7d392d3a0e30b86445e00e7c03032a5188b26593",
+  "originalAssets": 90,
+  "assetCheck": "Every recorded SHA-256 matches the source revision git object",
+  "checks": {
+    "format": "passed",
+    "strictClippy": "passed; existing upstream widget dependency warnings remain",
+    "rustTests": {
+      "passed": 81,
+      "failed": 0,
+      "ignored": 0,
+      "command": "cargo test --workspace --locked -- --include-ignored",
+      "environment": {
+        "WIRECRAFT_TEST_KOTLINC": "/tmp/wirecraft-toolchains/kotlin-2.2.0/kotlinc/bin/kotlinc",
+        "WIRECRAFT_TEST_PHP": "/tmp/wirecraft-toolchains/php",
+        "WIRECRAFT_TEST_QJS": "/tmp/wirecraft-toolchains/quickjs-2026-06-04/qjs"
+      }
+    }
+  },
+  "realTools": {
+    "go": "go version go1.25.4 linux/amd64",
+    "node": "v22.17.0",
+    "kotlin": "2.2.0 standalone archive from JetBrains; JVM 21",
+    "php": "8.4.11 extracted Ubuntu CLI with isolated dependency wrapper",
+    "quickjs": "2026-06-04 built from upstream source"
+  },
+  "workflows": [
+    "Go single-file producer/channel/consumer/shutdown",
+    "Node.js single-file and filesystem producer/channel/consumer/shutdown",
+    "Kotlin single-file and source-set producer/channel/consumer/shutdown",
+    "PHP single-file and filesystem producer/channel/consumer/shutdown",
+    "QuickJS single-file producer/channel/consumer/shutdown",
+    "Node-kind composite roots",
+    "HTTP MCP catalog, compile, bundle export and reuse",
+    "CLI custom override bundle and project-file roundtrip",
+    "unsafe and duplicate paths, external subtree connections, malformed/oversized rendering, static companions, source maps"
+  ],
+  "native": {
+    "generate": "Produced and executed the Node.js example during one owned GTK-portal session",
+    "completeSuite": "not passed",
+    "limitation": "The GNOME Wayland picker is outside X11 automation. Repeated private GTK-portal automation could not consistently observe both dialogs; native compiler-export picker completion is unverified. No failed harness is shipped.",
+    "liveSessions": "The original JVM and user Wirecraft sessions were not stopped or changed."
+  },
+  "remaining": [
+    "C source capabilities and C template override/bundle execution",
+    "Generic compiler composite boundary channels and aggregate mixed technologies",
+    "Full capability/collection/layout parity",
+    "Broader generated-body editor adapters and inline intelligence",
+    "Windows/macOS packaging and clean-image installation"
+  ]
+}
