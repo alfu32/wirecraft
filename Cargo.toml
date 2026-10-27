@@ -4,7 +4,7 @@ resolver = "2"
 exclude = ["vendor/gpui-component"]
 
 [workspace.package]
-version = "0.11.2"
+version = "0.11.3"
 edition = "2024"
 license = "MIT"
 rust-version = "1.89"
