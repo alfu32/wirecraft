@@ -19,6 +19,16 @@ pub struct Shape {
     pub technology: String,
     pub fields: Vec<String>,
     pub diagnostics: usize,
+    /// Set for an Exterior, drawn as a circle instead of a box.
+    pub exterior: Option<ExteriorView>,
+}
+#[derive(Clone)]
+pub struct ExteriorView {
+    /// The Exterior receives its link's packets: an output port of the design.
+    pub output: bool,
+    /// Its link leaves the circle's right side, facing the linked entity.
+    pub link_right: bool,
+    pub type_name: String,
 }
 #[derive(Clone)]
 pub struct Edge {
@@ -142,6 +152,7 @@ impl Drawing {
             }
             let composite = n.is_composite();
             let expanded = n.layout.is_expanded;
+            let exterior = crate::components::is_exterior(n);
             let rect = Rect {
                 x: n.layout.x,
                 y: n.layout.y,
@@ -173,10 +184,45 @@ impl Drawing {
                             .unwrap_or("?")
                     )
                 })
-                .collect();
+                .collect::<Vec<_>>();
+            // A Reference lists the ports its component publishes.
+            let fields = match crate::components::reference(n) {
+                Some(r) if crate::components::is_reference(n) => r
+                    .ports
+                    .iter()
+                    .map(|p| {
+                        format!(
+                            "{} {}: {}",
+                            if p.direction == crate::Direction::Output {
+                                "out"
+                            } else {
+                                "in"
+                            },
+                            p.name,
+                            p.type_name
+                        )
+                    })
+                    .collect(),
+                _ => fields,
+            };
+            let rect = if exterior {
+                let diameter = crate::components::EXTERIOR_DIAMETER;
+                Rect {
+                    width: diameter,
+                    height: diameter,
+                    ..rect
+                }
+            } else {
+                rect
+            };
             shapes.insert(
                 id.clone(),
                 Shape {
+                    exterior: exterior.then(|| ExteriorView {
+                        output: false,
+                        link_right: true,
+                        type_name: String::new(),
+                    }),
                     name: n.name.clone(),
                     detail: n.name_detail.clone(),
                     kind: n.kind,
@@ -335,6 +381,35 @@ impl Drawing {
             }
         }
         auto_size(d, &mut shapes, &edges, &callouts);
+        let centers: BTreeMap<String, f64> = shapes
+            .iter()
+            .map(|(id, s)| (id.clone(), s.rect.x + s.rect.width / 2.))
+            .collect();
+        for (id, shape) in shapes.iter_mut() {
+            let Some(view) = &mut shape.exterior else {
+                continue;
+            };
+            let Some((link, output)) = d.nodes[id]
+                .outgoing_links
+                .iter()
+                .map(|l| (l, false))
+                .chain(d.nodes[id].incoming_links.iter().map(|l| (l, true)))
+                .find_map(|(l, output)| d.nodes.get(l).map(|l| (l, output)))
+            else {
+                continue;
+            };
+            let l = link.link.as_ref().unwrap();
+            let other = if output {
+                &l.source_node_id
+            } else {
+                &l.target_node_id
+            };
+            view.output = output;
+            view.type_name = crate::components::link_type(d, link);
+            if let Some(center) = visible_ancestor.get(other).and_then(|o| centers.get(o)) {
+                view.link_right = *center >= shape.rect.x + shape.rect.width / 2.;
+            }
+        }
         let mut references: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
         for n in d.nodes.values() {
             if let Some(link) = &n.link
@@ -578,7 +653,9 @@ fn auto_size(
     edges: &BTreeMap<String, Edge>,
     callouts: &BTreeMap<String, (usize, usize)>,
 ) {
-    let fitted = |s: &Shape| s.kind != NodeKind::Note && !(s.composite && s.expanded);
+    let fitted = |s: &Shape| {
+        s.kind != NodeKind::Note && !(s.composite && s.expanded) && s.exterior.is_none()
+    };
     for shape in shapes.values_mut().filter(|s| fitted(s)) {
         let title = format!(
             "{}{} {}",

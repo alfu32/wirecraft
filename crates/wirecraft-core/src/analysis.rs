@@ -72,6 +72,12 @@ pub fn stereotype(d: &Document, n: &Node) -> &'static str {
     if n.is_link() {
         return "Link";
     }
+    if crate::components::is_exterior(n) {
+        return crate::components::EXTERIOR;
+    }
+    if crate::components::is_reference(n) {
+        return crate::components::REFERENCE;
+    }
     if n.kind == NodeKind::Type {
         return "Type";
     }

@@ -112,6 +112,15 @@ pub fn generate(d: &Document, root: &str, options: CompileOptions) -> Result<Gen
         }
         return crate::c17::C17::generate(d, root);
     }
+    if d.nodes
+        .values()
+        .any(|n| crate::components::is_exterior(n) || crate::components::is_reference(n))
+    {
+        return Err(Error::new(
+            "unsupported",
+            "Component Exteriors and References are supported by the C17 compiler only",
+        ));
+    }
     if options.bundle.is_none() && id == "literal" {
         return crate::generation::literal_files(d, root);
     }

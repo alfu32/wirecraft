@@ -11,6 +11,7 @@ thiserror.workspace = true
 uuid.workspace = true
 base64 = "0.22"
 regex = "1"
+sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 minijinja = { version = "=3.0.4", features = ["serde", "fuel"] }
 

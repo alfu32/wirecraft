@@ -27,3 +27,5 @@ pub mod templates;
 pub mod compiler;
 
 pub mod libraries;
+
+pub mod components;

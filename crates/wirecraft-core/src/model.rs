@@ -327,6 +327,9 @@ pub struct Document {
     pub users: Vec<Value>,
     #[serde(flatten)]
     pub extra: Extras,
+    /// Designs referenced by Reference nodes, resolved by the loader; never serialized.
+    #[serde(skip)]
+    pub components: BTreeMap<String, crate::components::Resolved>,
 }
 fn revision_default() -> Value {
     json!({"name":"","date":""})
@@ -350,6 +353,7 @@ impl Document {
             master_revision: revision_default(),
             users: vec![],
             extra: Extras::new(),
+            components: BTreeMap::new(),
         }
     }
     pub fn node(&self, id: &str) -> Result<&Node> {

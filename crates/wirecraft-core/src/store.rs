@@ -54,8 +54,11 @@ pub fn encode(document: &Document) -> Result<String> {
     v["nodes"] = serde_json::to_value(ordered)?;
     Ok(serde_json::to_string_pretty(&v)? + "\n")
 }
+/// Decode a project file and resolve the components it references, relative to it.
 pub fn load(path: &Path) -> Result<Document> {
-    decode(&fs::read_to_string(path)?)
+    let mut d = decode(&fs::read_to_string(path)?)?;
+    crate::components::resolve(&mut d, path.parent().unwrap_or(Path::new(".")));
+    Ok(d)
 }
 pub fn save(document: &Document, path: &Path) -> Result<()> {
     atomic_write(path, encode(document)?.as_bytes())
