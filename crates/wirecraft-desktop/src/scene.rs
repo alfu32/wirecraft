@@ -870,7 +870,8 @@ impl Scene {
                 y += 15.;
             }
         }
-        if active {
+        // Only expanded composites keep a handle; it edits their padding.
+        if active && shape.composite && shape.expanded {
             window.paint_quad(fill(
                 Bounds::new(
                     rect.bottom_right() - point(px(6.), px(6.)),
@@ -1005,7 +1006,7 @@ mod tests {
             BTreeSet::from([a.clone()])
         );
         assert_eq!(
-            s.window_selection([90., 90.], [210., 190.]),
+            s.window_selection([90., 90.], [230., 190.]),
             BTreeSet::from([a])
         );
         assert_eq!(
@@ -1026,17 +1027,17 @@ mod tests {
         let r = s
             .selection_bounds(&selection, &selection, [50., 25.])
             .unwrap();
-        assert_eq!([r.x, r.y, r.width, r.height], [150., 125., 400., 80.]);
+        assert_eq!([r.x, r.y, r.width, r.height], [150., 125., 420., 73.]);
         let r = s
             .selection_bounds(&BTreeSet::from([wire.clone()]), &selection, [50., 25.])
             .unwrap();
         for (actual, expected) in [r.x, r.y, r.width, r.height]
             .into_iter()
-            .zip([250.2, 160.2, 199.8, 9.6])
+            .zip([270.2, 156.7, 179.8, 9.6])
         {
             assert!((actual - expected).abs() < 1e-6);
         }
-        assert_eq!(s.pick([210., 140.], 1., true), Some(wire));
+        assert_eq!(s.pick([230., 136.5], 1., true), Some(wire));
     }
     #[test]
     fn links_inside_composite_remain_pickable() {
@@ -1061,11 +1062,16 @@ mod tests {
         d.move_node(&a, Some(&group)).unwrap();
         let s = Scene::new(&d, "root");
         let selection = BTreeSet::from([a]);
-        assert_eq!(s.project_selection(&selection), BTreeSet::from([group]));
+        assert_eq!(
+            s.project_selection(&selection),
+            BTreeSet::from([group.clone()])
+        );
         let r = s
             .selection_bounds(&selection, &BTreeSet::new(), [0., 0.])
             .unwrap();
-        assert_eq!([r.x, r.y, r.width, r.height], [60., 220., 180., 70.]);
+        let contour = s.drawing.shapes[&group].rect;
+        assert_eq!([r.x, r.y], [60., 220.]);
+        assert_eq!([r.width, r.height], [contour.width, contour.height]);
     }
     #[test]
     fn moving_primitives_are_culled_at_their_preview_positions() {
@@ -1083,13 +1089,12 @@ mod tests {
     }
     #[test]
     fn completed_reroute_retains_its_obstacle_detour() {
-        let (_, mut d, a, _, wire) = fixture();
+        let (_, mut d, a, b, wire) = fixture();
+        // The auto-sized obstacle is 120 wide; leave a detour corridor before B.
+        d.patch(&b, &json!({"layout":{"x":600}})).unwrap();
         let obstacle = d.create("root", "Obstacle", NodeKind::Processor).unwrap();
-        d.patch(
-            &obstacle,
-            &json!({"layout":{"x":280,"y":90,"width":50,"height":100}}),
-        )
-        .unwrap();
+        d.patch(&obstacle, &json!({"layout":{"x":320,"y":90}}))
+            .unwrap();
         let s = Scene::new(&d, "root");
         let edge = &s.drawing.edges[&wire];
         let obstacle = s.drawing.shapes[&obstacle].rect;

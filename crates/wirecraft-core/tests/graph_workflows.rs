@@ -174,12 +174,40 @@ fn composite_projection_keeps_absolute_children_and_collapses_boundary_links() {
     let open = Drawing::new(&d, "root");
     assert_eq!(open.shapes[&child].rect.x, 200.);
     assert_eq!(open.shapes[&child].depth, 1);
-    assert_eq!(open.edges[&link].points[0][0], 420.);
+    let child_rect = open.shapes[&child].rect;
+    // The output cap sits 20 units outside the auto-sized child.
+    assert_eq!(
+        open.edges[&link].points[0][0],
+        child_rect.x + child_rect.width + 20.
+    );
+    // The expanded composite encloses its child with the default padding and header.
+    let group = open.shapes[&composite].rect;
+    assert_eq!(group.x, child_rect.x - drawing::COMPOSITE_PADDING);
+    assert_eq!(
+        group.x + group.width,
+        child_rect.x + child_rect.width + drawing::COMPOSITE_PADDING
+    );
+    assert!(group.y + 60. < child_rect.y);
+    assert_eq!(
+        group.y + group.height,
+        child_rect.y + child_rect.height + drawing::COMPOSITE_PADDING
+    );
     d.patch(&composite, &json!({"layout":{"isExpanded":false}}))
         .unwrap();
     let closed = Drawing::new(&d, "root");
     assert!(!closed.shapes.contains_key(&child));
-    assert_eq!(closed.edges[&link].points[0][0], 320.);
+    let closed_rect = closed.shapes[&composite].rect;
+    assert_eq!(
+        closed.edges[&link].points[0][0],
+        closed_rect.x + closed_rect.width + 20.
+    );
+    d.patch(
+        &composite,
+        &json!({"layout":{"isExpanded":true,"padding":10.}}),
+    )
+    .unwrap();
+    let tight = Drawing::new(&d, "root");
+    assert_eq!(tight.shapes[&composite].rect.x, child_rect.x - 10.);
     let focused = Drawing::new(&d, &composite);
     assert!(focused.shapes.contains_key(&child));
     assert!(!focused.shapes.contains_key(&peer));
@@ -379,4 +407,62 @@ fn sheet_world_contours_cover_the_drawing_and_follow_split_tiles() {
     // Neighbouring pages overlap by exactly the configured millimetres (4 world units/mm).
     let step = split.world_tiles[1].x - split.world_tiles[0].x;
     assert!((split.world_tiles[0].width - step - 5. * 4.).abs() < 1e-6);
+}
+
+#[test]
+fn simple_boxes_fit_their_text_and_lateral_port_rows() {
+    use wirecraft_core::{Link, drawing::Drawing};
+    let mut d = Document::new("Sizing");
+    let hub = d.create("root", "hub", NodeKind::Processor).unwrap();
+    let long = d
+        .create(
+            "root",
+            "a_processor_with_a_rather_long_descriptive_name",
+            NodeKind::Processor,
+        )
+        .unwrap();
+    d.patch(
+        &hub,
+        &json!({"layout":{"x":0.,"y":0.,"width":500.,"height":30.}}),
+    )
+    .unwrap();
+    d.patch(
+        &long,
+        &json!({"layout":{"x":-900.,"y":0.,"width":50.,"height":500.}}),
+    )
+    .unwrap();
+    let mut sinks = vec![];
+    for i in 0..6 {
+        let sink = d
+            .create("root", &format!("sink{i}"), NodeKind::Processor)
+            .unwrap();
+        d.patch(&sink, &json!({"layout":{"x":900.,"y":i as f64 * 200.}}))
+            .unwrap();
+        d.create_link(
+            &format!("out{i}"),
+            Link {
+                source_node_id: hub.clone(),
+                target_node_id: sink.clone(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        sinks.push(sink);
+    }
+    let drawing = Drawing::new(&d, "root");
+    let hub_rect = drawing.shapes[&hub].rect;
+    let long_rect = drawing.shapes[&long].rect;
+    // Width follows the text, not the stored 500/50 units.
+    assert!(hub_rect.width < 200., "{}", hub_rect.width);
+    assert!(long_rect.width > 14. * 0.6 * 40., "{}", long_rect.width);
+    // Six right-side ports stay within the box with at least one pitch between rows.
+    assert!(hub_rect.height >= 2. * 12. + 7. * drawing::PORT_PITCH);
+    for id in d.nodes[&hub].outgoing_links.clone() {
+        let y = drawing.edges[&id].points[0][1];
+        assert!(y > hub_rect.y && y < hub_rect.y + hub_rect.height);
+    }
+    // A box without ports keeps the minimum text height, regardless of the stored 500.
+    assert_eq!(long_rect.height, 73.);
+    // The stored model layout is untouched by the projection.
+    assert_eq!(d.nodes[&hub].layout.width, 500.);
 }

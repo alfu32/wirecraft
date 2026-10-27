@@ -527,7 +527,7 @@ impl Service {
             "entities.align" => {
                 let ids: Vec<String> = serde_json::from_value(a["nodeIds"].clone())?;
                 let operation = required(a, "operation")?;
-                let mut nodes = ids
+                let nodes = ids
                     .iter()
                     .map(|id| candidate.node(id).cloned())
                     .collect::<Result<Vec<_>>>()?
@@ -544,22 +544,38 @@ impl Service {
                     ));
                 }
                 let aligned = nodes.iter().map(|n| n.id.clone()).collect::<Vec<_>>();
-                let left = nodes
+                // Align the projected boxes: simple boxes are auto-sized and an expanded
+                // composite's contour follows its children, so stored sizes are not extents.
+                let parent = nodes[0]
+                    .parent_id
+                    .clone()
+                    .unwrap_or_else(|| candidate.root_node_id.clone());
+                let drawing = wirecraft_core::drawing::Drawing::new(&candidate, &parent);
+                let rects = nodes
                     .iter()
-                    .map(|n| n.layout.x)
-                    .fold(f64::INFINITY, f64::min);
-                let top = nodes
+                    .map(|n| {
+                        drawing.shapes.get(&n.id).map_or(
+                            wirecraft_core::viewport::Rect {
+                                x: n.layout.x,
+                                y: n.layout.y,
+                                width: n.layout.width,
+                                height: n.layout.height,
+                            },
+                            |s| s.rect,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let left = rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
+                let top = rects.iter().map(|r| r.y).fold(f64::INFINITY, f64::min);
+                let right = rects
                     .iter()
-                    .map(|n| n.layout.y)
-                    .fold(f64::INFINITY, f64::min);
-                let right = nodes
-                    .iter()
-                    .map(|n| n.layout.x + n.layout.width)
+                    .map(|r| r.x + r.width)
                     .fold(f64::NEG_INFINITY, f64::max);
-                let bottom = nodes
+                let bottom = rects
                     .iter()
-                    .map(|n| n.layout.y + n.layout.height)
+                    .map(|r| r.y + r.height)
                     .fold(f64::NEG_INFINITY, f64::max);
+                let mut moves = vec![];
                 if operation == "distribute-horizontal" || operation == "distribute-vertical" {
                     if nodes.len() < 3 {
                         return Err(Error::new(
@@ -568,23 +584,18 @@ impl Service {
                         ));
                     }
                     let horizontal = operation == "distribute-horizontal";
-                    nodes.sort_by(|a, b| {
+                    let mut order = (0..nodes.len()).collect::<Vec<_>>();
+                    order.sort_by(|a, b| {
                         if horizontal {
-                            a.layout.x.total_cmp(&b.layout.x)
+                            rects[*a].x.total_cmp(&rects[*b].x)
                         } else {
-                            a.layout.y.total_cmp(&b.layout.y)
+                            rects[*a].y.total_cmp(&rects[*b].y)
                         }
                     });
-                    let total = nodes
-                        .iter()
-                        .map(|n| {
-                            if horizontal {
-                                n.layout.width
-                            } else {
-                                n.layout.height
-                            }
-                        })
-                        .sum::<f64>();
+                    let extent = |r: &wirecraft_core::viewport::Rect| {
+                        if horizontal { r.width } else { r.height }
+                    };
+                    let total = rects.iter().map(extent).sum::<f64>();
                     let gap = ((if horizontal {
                         right - left
                     } else {
@@ -592,33 +603,49 @@ impl Service {
                     }) - total)
                         / (nodes.len() - 1) as f64;
                     let mut cursor = if horizontal { left } else { top };
-                    for n in nodes {
-                        let mut layout = n.layout.clone();
-                        if horizontal {
-                            layout.x = cursor;
-                            cursor += layout.width + gap;
+                    for i in order {
+                        let r = rects[i];
+                        moves.push(if horizontal {
+                            (i, [cursor - r.x, 0.])
                         } else {
-                            layout.y = cursor;
-                            cursor += layout.height + gap;
-                        }
-                        candidate.patch(&n.id, &json!({"layout":layout}))?;
+                            (i, [0., cursor - r.y])
+                        });
+                        cursor += extent(&r) + gap;
                     }
                 } else {
-                    for n in nodes {
-                        let mut layout = n.layout;
-                        match operation {
-                            "left" => layout.x = left,
-                            "right" => layout.x = right - layout.width,
-                            "top" => layout.y = top,
-                            "bottom" => layout.y = bottom - layout.height,
-                            _ => {
-                                return Err(Error::new(
-                                    "invalid_input",
-                                    "Unknown alignment operation",
-                                ));
-                            }
+                    for (i, r) in rects.iter().enumerate() {
+                        moves.push((
+                            i,
+                            match operation {
+                                "left" => [left - r.x, 0.],
+                                "right" => [right - r.x - r.width, 0.],
+                                "top" => [0., top - r.y],
+                                "bottom" => [0., bottom - r.y - r.height],
+                                _ => {
+                                    return Err(Error::new(
+                                        "invalid_input",
+                                        "Unknown alignment operation",
+                                    ));
+                                }
+                            },
+                        ));
+                    }
+                }
+                // Children use absolute coordinates, so a box moves with its whole subtree.
+                for (i, [dx, dy]) in moves {
+                    if dx.abs() < 1e-9 && dy.abs() < 1e-9 {
+                        continue;
+                    }
+                    let mut stack = vec![nodes[i].id.clone()];
+                    while let Some(id) = stack.pop() {
+                        let n = candidate.node(&id)?.clone();
+                        if !n.is_link() {
+                            candidate.patch(
+                                &id,
+                                &json!({"layout":{"x":n.layout.x + dx,"y":n.layout.y + dy}}),
+                            )?;
                         }
-                        candidate.patch(&n.id, &json!({"layout":layout}))?;
+                        stack.extend(n.children);
                     }
                 }
                 json!({"aligned":aligned,"operation":operation})

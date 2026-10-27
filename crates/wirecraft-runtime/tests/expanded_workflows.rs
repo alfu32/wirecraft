@@ -70,13 +70,15 @@ fn alignment_distribution_cut_paste_and_undo_are_transactions() {
 }
 #[test]
 fn align_and_distribute_ignore_selected_links_in_bounds_parent_checks_and_results() {
+    // Extents are the projected, auto-sized boxes, not stored sizes: the "Generator"
+    // box is 120 wide and the two "ProcessingUnit" boxes 128; all are 73 high.
     for (operation, expected) in [
         ("left", [0., 0., 0.]),
-        ("right", [520., 540., 500.]),
+        ("right", [508., 500., 500.]),
         ("top", [0., 0., 0.]),
-        ("bottom", [440., 430., 400.]),
-        ("distribute-horizontal", [0., 260., 500.]),
-        ("distribute-vertical", [0., 195., 400.]),
+        ("bottom", [400., 400., 400.]),
+        ("distribute-horizontal", [0., 246., 500.]),
+        ("distribute-vertical", [0., 200., 400.]),
     ] {
         let mut d = Document::new("Mixed selection");
         let group = d.create("root", "Group", NodeKind::Group).unwrap();

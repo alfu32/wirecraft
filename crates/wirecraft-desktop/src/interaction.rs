@@ -83,7 +83,12 @@ impl Wirecraft {
                     self.load_editor(window, cx);
                     if let Some(shape) = self.scene.drawing.shapes.get(&id) {
                         let r = shape.rect;
-                        if (world[0] - r.x - r.width).abs() < 10. / self.viewport.zoom
+                        // Simple boxes size themselves; only an expanded composite's
+                        // handle remains, and it edits the free space around its children.
+                        if shape.composite
+                            && shape.expanded
+                            && !self.snapshot.document.nodes[&id].children.is_empty()
+                            && (world[0] - r.x - r.width).abs() < 10. / self.viewport.zoom
                             && (world[1] - r.y - r.height).abs() < 10. / self.viewport.zoom
                         {
                             self.resize_start = Some((id, world, r));
@@ -159,22 +164,15 @@ impl Wirecraft {
         }
     }
     fn up(&mut self, _: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some((id, _, r)) = self.resize_start.take() {
+        if let Some((id, _, _)) = self.resize_start.take() {
             let n = &self.snapshot.document.nodes[&id];
-            let width = (r.width + self.drag_delta[0]).max(100.);
-            let height = (r.height + self.drag_delta[1]).max(70.);
-            let mut layout = json!({"width":width,"height":height});
-            if n.is_composite() && n.layout.is_expanded {
-                layout["openWidth"] = json!(width);
-                layout["openHeight"] = json!(height);
-            } else {
-                layout["closedWidth"] = json!(width);
-                layout["closedHeight"] = json!(height);
+            let padding = padding_after_drag(n, self.drag_delta);
+            if (padding - wirecraft_core::drawing::composite_padding(n)).abs() > 0.5 {
+                self.client.send(
+                    "threadwork.update_entity",
+                    json!({"nodeId":id,"patch":{"layout":{"padding":padding}}}),
+                );
             }
-            self.client.send(
-                "threadwork.update_entity",
-                json!({"nodeId":id,"patch":{"layout":layout}}),
-            );
         } else if self.drag_start.take().is_some()
             && (self.drag_delta[0].abs() > 0.5 || self.drag_delta[1].abs() > 0.5)
         {
@@ -463,4 +461,12 @@ impl Wirecraft {
         })
         .detach();
     }
+}
+
+/// Dragging the bottom-right handle outward grows the composite's padding on every side
+/// by the larger axis delta; dragging inward shrinks it, down to zero.
+pub(crate) fn padding_after_drag(n: &wirecraft_core::Node, delta: [f64; 2]) -> f64 {
+    (wirecraft_core::drawing::composite_padding(n) + delta[0].max(delta[1]))
+        .clamp(0., 2000.)
+        .round()
 }

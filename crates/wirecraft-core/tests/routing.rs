@@ -163,7 +163,12 @@ fn nearer_side_ports_follow_angular_order_and_detour_around_obstacles() {
     assert_routes(&drawing);
     for id in [&lower, &upper, &mid] {
         assert_eq!(drawing.edges[id].points[0][0], 480.);
-        assert_eq!(drawing.edges[id].points.last().unwrap()[0], 100.);
+        // Inputs end on the auto-sized target's right edge (minimum width 120).
+        let target = drawing.shapes[&drawing.edges[id].target].rect;
+        assert_eq!(
+            drawing.edges[id].points.last().unwrap()[0],
+            target.x + target.width
+        );
     }
     assert!(drawing.edges[&upper].points[0][1] < drawing.edges[&mid].points[0][1]);
     assert!(drawing.edges[&mid].points[0][1] < drawing.edges[&lower].points[0][1]);

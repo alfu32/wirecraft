@@ -1705,10 +1705,11 @@ impl Render for Wirecraft {
                 .filter_map(|d| d["source"]["nodeId"].as_str().map(str::to_string))
                 .collect::<BTreeSet<_>>();
             let moving = self.drag_ids.clone();
-            let resize = self
-                .resize_start
-                .as_ref()
-                .map(|(_, _, r)| (*r, self.drag_delta));
+            let resize = self.resize_start.as_ref().map(|(id, _, r)| {
+                let n = &self.snapshot.document.nodes[id];
+                let padding = interaction::padding_after_drag(n, self.drag_delta);
+                (*r, padding - wirecraft_core::drawing::composite_padding(n))
+            });
             let selection = self.selection_start.zip(self.selection_end);
             let sheets = self.sheet_contours.clone();
             let parent_name = self.snapshot.document.qualified_name(&self.parent);
@@ -1807,23 +1808,18 @@ impl Render for Wirecraft {
                                             BorderStyle::Dashed,
                                         ));
                                     }
-                                    if let Some((r, delta)) = resize {
-                                        let p = view.screen([r.x, r.y]);
+                                    if let Some((r, grow)) = resize {
+                                        // Padding preview: the contour grows on every side.
+                                        let p = view.screen([r.x - grow, r.y - grow]);
                                         window.paint_quad(quad(
                                             Bounds::new(
                                                 b.origin + point(px(p[0] as f32), px(p[1] as f32)),
                                                 size(
-                                                    px(
-                                                        ((r.width + delta[0]).max(100.) * view.zoom)
-                                                            as f32,
-                                                    ),
-                                                    px(
-                                                        ((r.height + delta[1]).max(70.) * view.zoom)
-                                                            as f32,
-                                                    ),
+                                                    px(((r.width + 2. * grow) * view.zoom) as f32),
+                                                    px(((r.height + 2. * grow) * view.zoom) as f32),
                                                 ),
                                             ),
-                                            px(4.),
+                                            px(0.),
                                             rgba(0x70d5c620),
                                             px(2.),
                                             crate::chrome::color(0x70d5c6),

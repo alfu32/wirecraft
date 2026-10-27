@@ -306,6 +306,35 @@ impl Drawing {
                 },
             );
         }
+        // Right-side callouts stack beside their owner and count as lateral rows.
+        let mut callouts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+        for (_, a, _) in &capabilities {
+            callouts.entry(a.clone()).or_default().0 += 1;
+        }
+        for n in d.nodes.values() {
+            if let Some(link) = &n.link
+                && !link.type_definition_id.is_empty()
+            {
+                callouts
+                    .entry(link.type_definition_id.clone())
+                    .or_default()
+                    .1 += 1;
+            }
+            for field in n
+                .type_definition
+                .as_ref()
+                .and_then(|v| v["fields"].as_array())
+                .into_iter()
+                .flatten()
+            {
+                if let Some(type_id) = field["typeId"].as_str()
+                    && d.nodes.contains_key(type_id)
+                {
+                    callouts.entry(type_id.into()).or_default().1 += 1;
+                }
+            }
+        }
+        auto_size(d, &mut shapes, &edges, &callouts);
         let mut references: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
         for n in d.nodes.values() {
             if let Some(link) = &n.link
@@ -486,6 +515,132 @@ impl Drawing {
     }
 }
 
+/// Vertical distance reserved for each lateral port row or right-side callout.
+pub const PORT_PITCH: f64 = 24.;
+/// Free space between a composite's border and its children when unset in the model.
+/// Wider than the router's 46-unit boundary stub so boundary links clear the children.
+pub const COMPOSITE_PADDING: f64 = 64.;
+/// Space above a composite's children for its three header lines.
+const COMPOSITE_HEADER: f64 = 64.;
+/// Stored `layout.padding`, the composite free space edited by its resize handle.
+pub fn composite_padding(n: &crate::Node) -> f64 {
+    n.layout
+        .extra
+        .get("padding")
+        .and_then(|v| v.as_f64())
+        .filter(|v| v.is_finite())
+        .map_or(COMPOSITE_PADDING, |v| v.clamp(0., 2000.))
+}
+/// Text width estimate for the canvas sans-serif face; slightly generous so
+/// proportional glyphs never cross the border.
+fn text_width(text: &str, size: f64) -> f64 {
+    text.chars().count() as f64 * size * 0.6
+}
+/// Simple boxes take their width from their text lines and their height from
+/// the most occupied lateral side. Expanded composites enclose their visible
+/// children plus padding. Notes keep their stored size. The stored layout is
+/// not modified; this is the shared projection for canvas, routing and export.
+fn auto_size(
+    d: &Document,
+    shapes: &mut BTreeMap<String, Shape>,
+    edges: &BTreeMap<String, Edge>,
+    callouts: &BTreeMap<String, (usize, usize)>,
+) {
+    let fitted = |s: &Shape| s.kind != NodeKind::Note && !(s.composite && s.expanded);
+    for shape in shapes.values_mut().filter(|s| fitted(s)) {
+        let title = format!(
+            "{}{} {}",
+            if shape.composite { "⊞ " } else { "" },
+            shape.name,
+            shape.detail
+        );
+        let text = [
+            text_width(&title, 14.),
+            text_width(&shape.role, 11.),
+            text_width(&shape.technology, 10.),
+        ]
+        .into_iter()
+        .chain(shape.fields.iter().map(|f| text_width(f, 10.)))
+        .fold(0., f64::max);
+        // Left text inset plus room for the diagnostic badge on the right.
+        shape.rect.width = (9. + text + 26.).max(120.).ceil();
+    }
+    fit_composites(d, shapes);
+    // Same side rule as the router: x-centers only, which sizing below does not change.
+    let center = |s: &Shape| s.rect.x + s.rect.width / 2.;
+    let mut sides: BTreeMap<(String, bool), usize> = BTreeMap::new();
+    let mut loops: Vec<&str> = vec![];
+    for edge in edges.values().filter(|e| !e.annotation_only) {
+        let (Some(a), Some(b)) = (shapes.get(&edge.source), shapes.get(&edge.target)) else {
+            continue;
+        };
+        if edge.source == edge.target {
+            loops.push(&edge.source);
+            continue;
+        }
+        *sides
+            .entry((edge.source.clone(), center(b) >= center(a)))
+            .or_default() += 1;
+        *sides
+            .entry((edge.target.clone(), center(a) >= center(b)))
+            .or_default() += 1;
+    }
+    for owner in loops {
+        let left = sides.get(&(owner.into(), false)).copied().unwrap_or(0);
+        let right = sides.get(&(owner.into(), true)).copied().unwrap_or(0);
+        *sides.entry((owner.into(), right <= left)).or_default() += 2;
+    }
+    for (id, shape) in shapes.iter_mut().filter(|(_, s)| fitted(s)) {
+        let rows = sides
+            .get(&(id.clone(), false))
+            .copied()
+            .unwrap_or(0)
+            .max(sides.get(&(id.clone(), true)).copied().unwrap_or(0));
+        let text = 8. + 3. * 19. + shape.fields.len() as f64 * 15. + 8.;
+        // Ports are spread over the height minus a 12-unit inset at both ends.
+        let ports = if rows == 0 {
+            0.
+        } else {
+            2. * 12. + (rows + 1) as f64 * PORT_PITCH
+        };
+        let (providers, usages) = callouts.get(id).copied().unwrap_or((0, 0));
+        let beside = (8. + providers as f64 * 30.).max(8. + usages as f64 * 24.);
+        shape.rect.height = text.max(ports).max(beside).max(70.).ceil();
+    }
+    fit_composites(d, shapes);
+}
+/// Encloses each expanded composite's visible children, deepest first.
+fn fit_composites(d: &Document, shapes: &mut BTreeMap<String, Shape>) {
+    let mut composites = shapes
+        .iter()
+        .filter(|(_, s)| s.composite && s.expanded)
+        .map(|(id, s)| (s.depth, id.clone()))
+        .collect::<Vec<_>>();
+    composites.sort_by_key(|c| std::cmp::Reverse(c.0));
+    for (_, id) in composites {
+        let Some(n) = d.nodes.get(&id) else {
+            continue;
+        };
+        let Some(bounds) = n
+            .children
+            .iter()
+            .filter_map(|c| shapes.get(c).map(|s| s.rect))
+            .reduce(Rect::union)
+        else {
+            continue;
+        };
+        let padding = composite_padding(n);
+        let title = text_width(&format!("⊟ {} {}", n.name, n.name_detail), 14.) + 9. + 26.;
+        if let Some(shape) = shapes.get_mut(&id) {
+            shape.rect = Rect {
+                x: bounds.x - padding,
+                y: bounds.y - padding - COMPOSITE_HEADER,
+                width: (bounds.width + 2. * padding).max(title),
+                height: bounds.height + 2. * padding + COMPOSITE_HEADER,
+            };
+        }
+    }
+}
 fn capability_color(relation: Option<Relation>) -> &'static str {
     match relation {
         Some(Relation::Source) => "linkSource",

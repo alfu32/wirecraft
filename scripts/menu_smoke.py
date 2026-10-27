@@ -9,9 +9,8 @@ ARTIFACT=ROOT/'target/menu-smoke';ARTIFACT.mkdir(parents=True,exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
  state=pathlib.Path(temporary);project=state/'fixture.orch'
  import shutil
- shutil.copy(ROOT/'docs/migration/threadworks/example-c.orch',project)
+ shutil.copy(os.environ.get('WIRECRAFT_SMOKE_FIXTURE',ROOT/'docs/migration/threadworks/example-c.orch'),project)
  reference=json.loads(project.read_text());reference_nodes=reference['nodes']
- read_time=next(n['id'] for n in reference_nodes if n['name']=='read_time');packets=next(n['id'] for n in reference_nodes if n['name']=='Packets')
  (state/'ui.json').write_text(json.dumps({'document_id':reference['id'],'parent':'root','tab':'Designer','selected':None,'selected_ids':[],'sidebar_width':400,'inspector_width':450,'export_settings':{'sheet':{'format':'A4','scale':1,'split':True,'overlapMm':5}},'viewport':{'x':40,'y':40,'zoom':1}}))
  env=os.environ.copy();env.pop('WAYLAND_DISPLAY',None)
  log=open(ARTIFACT/'interaction.log','w');app=None;window=None
@@ -84,6 +83,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-canvas-') as temporary:
   click(560,161);shot('05-node-mode')
   click(1080,500);time.sleep(.3)
   click(470,161);click(896,161);time.sleep(.8);shot('06-sheet-on')
+  click(470,161);click(812,161);time.sleep(.8);shot('07-fit')
   print('READY')
   # Save with nothing selected used to panic in the response handler.
   xd('key','ctrl+s');time.sleep(1.2)
