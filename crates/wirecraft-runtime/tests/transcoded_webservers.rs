@@ -219,3 +219,21 @@ fn kotlin_webserver() {
     java.arg("-jar").arg(&jar);
     exercise(java, "Kotlin");
 }
+
+#[test]
+fn nodejs_webserver() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = generate("nodejs", temp.path());
+    let main = files
+        .iter()
+        .find(|f| f.extension().is_some_and(|e| e == "js"))
+        .unwrap();
+    built(
+        Command::new(tool("WIRECRAFT_TEST_NODE", "node"))
+            .arg("--check")
+            .arg(main),
+    );
+    let mut node = Command::new(tool("WIRECRAFT_TEST_NODE", "node"));
+    node.arg(main);
+    exercise(node, "Node.js");
+}

@@ -46,16 +46,26 @@ At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP serve
 |---|---|---|
 | Go | Passes (Go 1.25) | Composite boundary channels in single-file layouts; library `import` declarations hoisted into the file's import block (lines stay as comments, source maps shift) |
 | Kotlin | Passes (Kotlin 2.4.21, Java 21; `--include-ignored`) | None beyond the boundary channels. Bodies rebuild the immutable data classes with `copy`; `base_lib` mirrors the C platform headers with `typealias` declarations, because imports must precede every declaration |
-| Node.js | Pending | |
+| Node.js | Passes (Node.js 22.17) | Asynchronous runner that yields to the event loop between ticks, with idle back-off and `threadworkRunner.wake()`; runtime emitted once per single file (nested composites redeclared `ThreadworkRunner`) |
 | PHP | Pending (no interpreter installed here) | |
 | QuickJS | Pending (no interpreter installed here) | |
 
 **Composite boundary channels.** A data link whose ends sit in different composites, such as `router` → `routes/routeHomeAbout`, is declared and transported by its owning composite. In a single-file layout its buffers are file-scope symbols, so the nested end receives them like any other link. File-based layouts still return an explicit `unsupported` error for such links, since one file cannot see another's buffers.
 
+**Node.js runner (Wirecraft overlay adaptation 2).** The baseline runner was a synchronous `while` loop, so no socket, timer or signal handler ever ran. SIGTERM could not stop a generated program, and a server could never accept a connection. The runner is now `async`:
+- after a tick that moved packets it continues on `setImmediate`;
+- consecutive idle ticks wait 1, 2, 4 … up to 25 ms, the C17 example's `poll` timeout;
+- `threadworkRunner.wake()` ends such a wait as soon as an event handler has work.
+
+Measured on the Node.js WebServer: idle CPU fell from 12 % (with a fixed 1 ms wait) to 1 %. A request arriving at an idle server was answered in 4.2 ms on average (maximum 36 ms over 20 requests), and SIGTERM exits 0. Bodies that do work without moving packets now run at most 40 ticks per second while idle.
+
+**Single-file runtime (overlay adaptation 3).** Nested composites render the same single-file assembly as the root, so the Node.js and QuickJS runtime classes were declared once per composite. That is a syntax error in any single-file design with a nested composite. The runtime is now emitted for the compilation root only. PHP was unaffected because its runtime is wrapped in `class_exists` guards.
+
 **Language adaptations in the bodies.**
 - C `static` counters become entries of the run context's import map.
 - Library functions return values instead of filling C out-parameters, because PHP library instances forward `...$arguments`, which cannot pass references.
 - Go has no `poll()`: `http_wait` accepts under a deadline and hands the connection to the next `http_accept`.
+- Node.js sockets are event driven: the library reads each connection completely between ticks, or rejects it, and `http_accept` takes the next complete request. Because JS values are references, `socket_accept` copies a request before sending it down two paths, as C does by value.
 
 ## Shared entry points
 
