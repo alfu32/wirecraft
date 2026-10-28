@@ -2,6 +2,17 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Ports in composites, Port mode and IO marking (0.13.0)
+
+User-requested follow-ups to components:
+- **Port mode** (toolbar **Port**, palette **Port Mode**) places an unlinked Exterior that a later link names and publishes. An unlinked port is a warning, not an error.
+- **Ports inside composites.** An Exterior may sit in any composite, and the Link-mode gesture works in the focused composite. While the composite is collapsed, its ports are drawn beside it with their links, instead of disappearing.
+- **IO marking.** **IO role** in the inspector, or **Mark Selection as IO-in / IO-out / IO-in/out** and **Clear IO Marking** in the Graph commands, stores `io: "in" | "out" | "inout"` as an extension field. It is shown as an amber badge and a dashed amber outline, on the canvas and in SVG/PDF plans. Generation ignores it. A `null` patch value now removes an extension field instead of storing `null`.
+- **Dashed contours.** GPUI's dashed border scales its dashes with the 1px stroke and read as a solid line. Expanded composites, IO entities and the selection bounds now stroke explicit dash and gap lengths that continue around corners.
+- Plans now draw Exteriors as circles.
+
+Verification: `tests/components.rs` adds a nested-port component program (`got 42`), the collapsed placement, and IO marking with its SVG badge. Native screenshots of the IO badges, the expanded and collapsed composite, and Port mode were inspected. The WebServer end-to-end test currently fails at HEAD. This comes from the user's in-progress `examples/webserver-component.orch` edit (`ec49850`), which changes the pinned hash and adds a `listenerConfig` port, not from this change.
+
 ## Pluggable components (0.12.0)
 
 A Wirecraft extension specified with the user in [docs/design/components.md](../design/components.md). A design publishes ports by linking entities to **Exterior** placements, drawn as 73-unit circles. Each placement has one link, takes its name from it (`<link>Out`/`<link>In`) and shows a chevron along the flow. Another design places a **Reference** pinned by SHA-256; its links name the published ports, and inputs accept fan-in. `components::expand` copies the component into the consumer and joins every port with its consumer links into one channel (no extra tick) inside `C17::generate`. Template compilers reject both explicitly.

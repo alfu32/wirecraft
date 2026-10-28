@@ -6,7 +6,7 @@ A design becomes a reusable component by linking some of its entities to the **E
 
 ## Exterior
 
-An Exterior is a node of kind `Node` with `stereotype: "Exterior"`, placed directly under the design root.
+An Exterior is a node of kind `Node` with `stereotype: "Exterior"`. It may sit at the design root or inside any composite (0.13.0); wherever it is, it publishes a port of the whole design.
 
 - **One logical entity, one placement per port.** Every Exterior node in a design stands for the same outside world, like an off-page connector in a schematic. No identifier links the placements: in this version a design has exactly one exterior.
 - **Exactly one link per placement.** Each placement is the endpoint of exactly one link, and that link is the published port:
@@ -17,12 +17,15 @@ An Exterior is a node of kind `Node` with `stereotype: "Exterior"`, placed direc
 - **Derived name.** An Exterior has no name of its own. Its name is derived from its link: `<link-name>In` for an input port (the Exterior is the link's source) and `<link-name>Out` for an output port (the Exterior is the link's target).
   - The name is stored so that other tools and the Threadworks app see a meaningful name. Wirecraft rewrites it whenever the link is renamed or reversed.
   - Renaming is done on the link: an edit to the Exterior's own name is replaced by the derived name in the same transaction.
-  - A placement without a link has no name yet and is a validation error, so the canvas creates one only together with its link: in Link mode, click an entity and then empty root canvas to publish an output, or empty root canvas and then an entity to publish an input. MCP `wirecraft.components` `publish` does the same.
+  - A placement without a link keeps the provisional name `port` and publishes nothing; it is a validation warning until linked. Two ways to create one:
+    - **Port mode** (toolbar **Port**, or the command palette **Port Mode**): click to place an unlinked circle, then link it in Link mode like any entity. Linking from it makes an input, linking to it an output.
+    - **Link mode**: click an entity and then empty canvas to publish an output, or empty canvas and then an entity to publish an input. The circle and its link are created together, in the focused composite. MCP `wirecraft.components` `publish` (with an optional `parentId`) does the same.
 - **Rules** (each is a validation error):
   - An Exterior has no source, initialization, tests or technology, and is never emitted or initialized.
   - It cannot be the endpoint of a library or dependency link, of a self-link, or of a link whose other end is also an Exterior.
   - Derived names must be unique, so a design cannot publish two input ports (or two output ports) with the same name. Every Exterior link needs an explicit type.
-  - An Exterior may appear only directly under the root. Composite boundaries keep their existing boundary ports.
+  - An Exterior with two or more links is an error.
+- **Inside composites.** A port nested in a composite stays visible while the composite is collapsed: the circle is drawn beside the collapsed box (inputs left, outputs right, in their stored vertical order) and its link is drawn from the box. There it cannot be dragged; expand the composite to move it. Expansion and C17 generation follow the link through the nesting.
 - **Drawing.** An Exterior is a circle, not a box, so it reads as the open connection to the outside:
   - **Size and stroke.** Diameter 73 world units, the height of a single-port processing node (its three text rows; 2.9 squares of the 25-unit grid), so a circle sits level with the entity it connects to. The stroke is heavier than entity boxes. At that size it cannot be mistaken for the small hollow via circles that mark unconnected crossings. Its link attaches at the circle's vertical center, where a single-port node places its port.
   - **Cap.** The circle carries the port cap of the link end it hosts, on the rim facing its link, mirrored by side like any other port (see `core::drawing::port_glyphs`). An input Exterior shows the hollow output cap, because the link starts there. An output Exterior shows the filled, notched input cap, because the link ends there.
@@ -115,10 +118,12 @@ Verified in 0.12.0:
 - The WebServer split: the end-to-end HTTP test runs against the consumer; 5000 simultaneous clients each received 200.
 - The circle, chevron and label, the Link-mode publish gesture and the Reference box (`scripts/components_smoke.py`).
 
+Verified in 0.13.0: Port mode, ports inside composites (a nested component program prints `got 42`; collapsed placement is asserted on the shared drawing) and native screenshots of the expanded and collapsed composite.
+
 Pending:
 - Template compilers (Go, Kotlin, Node.js, PHP, QuickJS).
 - Per-instance state, so a component can be referenced more than once per program.
 - Clangd analysis inside a component's bodies: a component generates only through a consumer, so the background check skips it.
 - **Open component** from a Reference, and a port picker when the automatic choice is ambiguous.
 - The standalone harness, a splitter archetype, and the component as a built-in archetype.
-- Exteriors inside composites, and checking that the Threadworks JVM app opens files that use these fields.
+- Checking that the Threadworks JVM app opens files that use these fields.
