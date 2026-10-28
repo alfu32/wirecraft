@@ -415,6 +415,23 @@ fn sheet_world_contours_cover_the_drawing_and_follow_split_tiles() {
             "shape outside contour"
         );
     }
+    // The title block sits in the bottom-right corner and the parts list top right,
+    // 5 mm inside the page edge (20 world units at 1:1).
+    let block = |label: &str| {
+        single
+            .world_blocks
+            .iter()
+            .find(|b| b.label == label)
+            .unwrap()
+            .rect
+    };
+    let (title, parts) = (block("Title block"), block("Parts list"));
+    let right = page.x + page.width - 20.;
+    assert!((title.x + title.width - right).abs() < 1e-6);
+    assert!((title.y + title.height - (page.y + page.height - 20.)).abs() < 1e-6);
+    assert!((parts.x + parts.width - right).abs() < 1e-6);
+    assert!((parts.y - (page.y + 20.)).abs() < 1e-6);
+    assert!(parts.y + parts.height < title.y);
     let split = sheets::plan(
         &d,
         "root",

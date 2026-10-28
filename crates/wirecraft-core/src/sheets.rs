@@ -39,6 +39,20 @@ pub struct SheetPlan {
     /// Page contours in canvas world units, in the same order as `tiles`.
     #[serde(skip)]
     pub world_tiles: Vec<crate::viewport::Rect>,
+    /// Title block and parts list contours in canvas world units.
+    #[serde(skip)]
+    pub world_blocks: Vec<SheetBlock>,
+}
+/// A fixed block of the technical sheet, such as the title block.
+#[derive(Clone, Debug)]
+pub struct SheetBlock {
+    pub label: &'static str,
+    pub rect: crate::viewport::Rect,
+}
+/// Millimetre rectangles of the parts list and title block on the assembled sheet.
+struct BlockLayout {
+    parts: [f64; 4],
+    title: [f64; 4],
 }
 pub const FORMATS: &[&str] = &[
     "Auto",
@@ -211,7 +225,7 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
             })
         })
         .collect::<Vec<_>>();
-    let technical = technical_block(
+    let (technical, blocks) = technical_block(
         d,
         parent,
         [total_w, total_h],
@@ -283,17 +297,29 @@ pub fn plan(d: &Document, parent: &str, options: &SheetOptions) -> Result<SheetP
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{total_w}mm\" height=\"{total_h}mm\" viewBox=\"0 0 {total_w} {total_h}\"><rect width=\"{total_w}\" height=\"{total_h}\" fill=\"white\"/>{composition}{contours}{alignment}</svg>"
     );
     let pages=tiles.iter().map(|tile|format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}mm\" height=\"{height}mm\" viewBox=\"{} {} {width} {height}\"><rect x=\"{}\" y=\"{}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/>{composition}{alignment}</svg>",tile.x_mm,tile.y_mm,tile.x_mm,tile.y_mm)).collect();
+    let world = |[left, top, w, h]: [f64; 4]| crate::viewport::Rect {
+        x: view_box[0] + (left - x) * unit_scale,
+        y: view_box[1] + (top - y) * unit_scale,
+        width: w * unit_scale,
+        height: h * unit_scale,
+    };
     let world_tiles = tiles
         .iter()
-        .map(|t| crate::viewport::Rect {
-            x: view_box[0] + (t.x_mm - x) * unit_scale,
-            y: view_box[1] + (t.y_mm - y) * unit_scale,
-            width: t.width_mm * unit_scale,
-            height: t.height_mm * unit_scale,
-        })
+        .map(|t| world([t.x_mm, t.y_mm, t.width_mm, t.height_mm]))
         .collect();
+    let world_blocks = vec![
+        SheetBlock {
+            label: "Parts list",
+            rect: world(blocks.parts),
+        },
+        SheetBlock {
+            label: "Title block",
+            rect: world(blocks.title),
+        },
+    ];
     Ok(SheetPlan {
         world_tiles,
+        world_blocks,
         format: format.into(),
         width_mm: width,
         height_mm: height,
@@ -314,7 +340,7 @@ fn technical_block(
     format: &str,
     scale: u32,
     pagination: [usize; 2],
-) -> Result<String> {
+) -> Result<(String, BlockLayout)> {
     let [width, height] = dimensions;
     let [page, pages] = pagination;
     use std::fmt::Write;
@@ -483,7 +509,13 @@ fn technical_block(
         offset += 297.;
     }
     out.push_str("</g>");
-    Ok(out)
+    Ok((
+        out,
+        BlockLayout {
+            parts: [x, 5., table_w, table_h],
+            title: [bx, by, block_w, 36.],
+        },
+    ))
 }
 fn text_width(value: &str) -> f64 {
     value
