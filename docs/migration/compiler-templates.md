@@ -45,7 +45,7 @@ At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP serve
 | Language | Status | Generator changes it required |
 |---|---|---|
 | Go | Passes (Go 1.25) | Composite boundary channels in single-file layouts; library `import` declarations hoisted into the file's import block (lines stay as comments, source maps shift) |
-| Kotlin | Pending | |
+| Kotlin | Passes (Kotlin 2.4.21, Java 21; `--include-ignored`) | None beyond the boundary channels. Bodies rebuild the immutable data classes with `copy`; `base_lib` mirrors the C platform headers with `typealias` declarations, because imports must precede every declaration |
 | Node.js | Pending | |
 | PHP | Pending (no interpreter installed here) | |
 | QuickJS | Pending (no interpreter installed here) | |

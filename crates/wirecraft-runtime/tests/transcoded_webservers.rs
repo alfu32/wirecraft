@@ -197,3 +197,25 @@ fn go_webserver() {
     );
     exercise(Command::new(exe), "Go");
 }
+
+#[test]
+#[ignore = "needs kotlinc and java; set WIRECRAFT_TEST_KOTLINC or put kotlinc on PATH"]
+fn kotlin_webserver() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = generate("kotlin", temp.path());
+    let jar = temp.path().join("webserver.jar");
+    let sources = files
+        .iter()
+        .filter(|f| f.extension().is_some_and(|e| e == "kt"))
+        .collect::<Vec<_>>();
+    built(
+        Command::new(tool("WIRECRAFT_TEST_KOTLINC", "kotlinc"))
+            .args(&sources)
+            .args(["-include-runtime", "-d"])
+            .arg(&jar)
+            .current_dir(temp.path()),
+    );
+    let mut java = Command::new("java");
+    java.arg("-jar").arg(&jar);
+    exercise(java, "Kotlin");
+}
