@@ -37,6 +37,18 @@ Routing has an 80 ms quiet interval and one background projection at a time. Imm
 
 Sizing is a projection shared by canvas, hit-testing, routing and SVG/PDF export: stored `width`/`height`/`closed*`/`open*` values are left unchanged in `.orch` files. `padding` is stored as an extra layout key, which the JVM store ignores; a plain number (written by 0.8.0) still means uniform padding, and missing sides use the default. Text widths are estimated at 0.6 × font size per character. When zoomed out, the canvas's 7px minimum label size can still make text extend past a box edge. `scripts/menu_smoke.py` (optionally `WIRECRAFT_SMOKE_FIXTURE=…`) checks menus, mode highlight, sheet contours, Fit and save without a selection natively; `scripts/padding_smoke.py` drags a real top-left handle and checks the two edited sides, the unchanged sides and one-step undo.
 
+## Placement previews, routed links under construction and link rewiring (0.14.0)
+
+Wirecraft extensions requested by the user:
+- **Future contours.** In Node, Type and Port modes, the canvas shows what a click would create at the pointer.
+- **Links under construction.** In Link mode, once a source is chosen, the link follows the pointer. Over an entity, that entity is outlined. Over empty canvas, the port circle the click would publish is shown.
+- **One preview mechanism.** The desktop clones the snapshot, adds the would-be entity, link or port, and projects it on the background executor. The whole projection is drawn: the pending link is routed together with every other link, which may shift to make room. Pending items are highlighted and outlined but excluded from the selection bounds.
+- **Debouncing.** Previews run 50 ms after the pointer settles, with at most one in flight. Until one arrives, a default-size outline or a straight dashed line with an arrowhead stands in. Measured on the WebServer component: 4–150 ms per preview in a debug build. Previews never touch the design.
+- **Rewiring a link.** A selected link shows a grab handle at each end. Pressing one picks that end up; it follows the pointer with the same routed preview. Clicking an entity reattaches it there; clicking empty canvas ends it at a new Exterior port in the focused composite. Escape cancels.
+  - The backend command `links.reconnect` (`nodeId`, `end: source|target`, `entityId`, or `parentId`/`x`/`y` for a new port) makes the change in one undo step.
+  - The moved end takes the default port name, and the previous entity loses the port no other link uses. `sync_links` moves the link to the new common parent and recomputes its boundaries.
+- **Verification.** `scripts/rubber_band_smoke.py` checks all of the above natively, including handle pick-up, a cancelled rewire (no change) and a real drop. `tests/components.rs` covers reconnection, re-parenting, port pruning, new ports and undo. X11 captures can lag behind the newest frame, so the script waits after each hover.
+
 ## Verification
 
 `crates/wirecraft-core/tests/canvas_interactions.rs` checks selection operations, containment/segment crossing and anchored zoom at the clamps. The six desktop scene unit tests cover directional windows, picking, bounds, collapsed projection, moving-object culling and preserving computed detours.

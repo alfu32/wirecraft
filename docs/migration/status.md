@@ -2,6 +2,15 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Placement previews, routed link construction and link rewiring (0.14.0)
+
+At the user's request:
+- Node, Type and Port modes draw the future contour under the pointer.
+- A link under construction is routed together with the other links. It shows its would-be target, or the port that releasing on empty canvas would create.
+- A selected link's ends can be picked up and dropped on another entity, or on empty canvas to make a new port (`links.reconnect`, one undo step).
+
+Details and verification are in [canvas-interactions.md](canvas-interactions.md#placement-previews-routed-links-under-construction-and-link-rewiring-0140). The WebServer end-to-end test still fails only because of the pending user edit to `examples/webserver-component.orch` described below.
+
 ## Ports in composites, Port mode and IO marking (0.13.0)
 
 User-requested follow-ups to components:
