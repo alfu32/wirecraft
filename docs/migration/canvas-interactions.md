@@ -32,7 +32,7 @@ Routing has an 80 ms quiet interval and one background projection at a time. Imm
 | Note | Keeps its stored size |
 | Align/distribute | Use these projected boxes; a composite moves with its whole subtree |
 | Menubar | Opens on press, left-aligned under its label, no backdrop; pressing the label again or outside closes it; hover switches menus while one is open |
-| Mode buttons / Sheet | The active mode is highlighted; Sheet toggles dashed page contours from the current export format, scale, split and overlap |
+| Mode buttons / Sheet | The active mode is highlighted; Sheet toggles dashed page contours from the current export format, scale, split and overlap, with the labelled title block and parts list contours where the plan export places them (0.15.0) |
 | Entity tree | Composites show boxed `+` (collapsed) and `−` (expanded) |
 
 Sizing is a projection shared by canvas, hit-testing, routing and SVG/PDF export: stored `width`/`height`/`closed*`/`open*` values are left unchanged in `.orch` files. `padding` is stored as an extra layout key, which the JVM store ignores; a plain number (written by 0.8.0) still means uniform padding, and missing sides use the default. Text widths are estimated at 0.6 × font size per character. When zoomed out, the canvas's 7px minimum label size can still make text extend past a box edge. `scripts/menu_smoke.py` (optionally `WIRECRAFT_SMOKE_FIXTURE=…`) checks menus, mode highlight, sheet contours, Fit and save without a selection natively; `scripts/padding_smoke.py` drags a real top-left handle and checks the two edited sides, the unchanged sides and one-step undo.

@@ -2,6 +2,12 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Sheet preview blocks (0.15.0)
+
+At the user's request, the canvas Sheet preview also outlines the title block and the parts list, labelled, where the technical plan places them on the assembled sheet. `sheets::plan` returns both blocks in world units (`world_blocks`) from the same layout that draws them, so the canvas and the export cannot drift apart. Page contours now use explicit dash lengths like the other dashed contours. Verified by `graph_workflows.rs` (title block in the bottom-right corner and parts list top right, 5 mm inside the page) and `scripts/sheet_blocks_smoke.py` (native screenshot inspected).
+
+Correction: v0.14.0 was pushed with one strict-Clippy error in `tests/components.rs` (`cloned_ref_to_slice_refs`); the check output had been truncated. It is fixed here.
+
 ## Placement previews, routed link construction and link rewiring (0.14.0)
 
 At the user's request:
