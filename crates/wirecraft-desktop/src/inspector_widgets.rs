@@ -135,6 +135,12 @@ impl Wirecraft {
                 ],
                 "None",
             ),
+            "/io" => vec![
+                (String::new(), "None".into()),
+                ("in".into(), "IO-in".into()),
+                ("out".into(), "IO-out".into()),
+                ("inout".into(), "IO-in/out".into()),
+            ],
             "/link/interactionKind" => list(
                 &["auto", "data", "lib", "src", "run", "type-usage"],
                 "Inherited",

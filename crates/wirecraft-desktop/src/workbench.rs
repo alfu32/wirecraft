@@ -44,6 +44,7 @@ pub fn make_fields(window: &mut Window, cx: &mut Context<Wirecraft>) -> Vec<Form
         ("/technology/languageId", "Language"),
         ("/technology/technologyId", "Technology"),
         ("/fileLayoutStrategyId", "File layout strategy"),
+        ("/io", "IO role"),
         ("/status", "Status"),
         ("/responsible", "Responsible"),
         ("/assignee", "Assignee"),
@@ -278,6 +279,41 @@ const COMMANDS: &[Command] = &[
         icon: "link",
     },
     Command {
+        id: "port",
+        group: "Graph",
+        label: "Port Mode (place a component port)",
+        shortcut: "",
+        icon: "port",
+    },
+    Command {
+        id: "io-in",
+        group: "Graph",
+        label: "Mark Selection as IO-in",
+        shortcut: "",
+        icon: "node",
+    },
+    Command {
+        id: "io-out",
+        group: "Graph",
+        label: "Mark Selection as IO-out",
+        shortcut: "",
+        icon: "node",
+    },
+    Command {
+        id: "io-inout",
+        group: "Graph",
+        label: "Mark Selection as IO-in/out",
+        shortcut: "",
+        icon: "node",
+    },
+    Command {
+        id: "io-clear",
+        group: "Graph",
+        label: "Clear IO Marking",
+        shortcut: "",
+        icon: "node",
+    },
+    Command {
         id: "reference",
         group: "Graph",
         label: "Insert Component Reference…",
@@ -445,12 +481,14 @@ impl Wirecraft {
             for part in &parts[..parts.len() - 1] {
                 cursor = &mut cursor[*part];
             }
-            cursor[parts[parts.len() - 1]] =
-                if ["/status", "/responsible", "/assignee"].contains(&f.path) && text.is_empty() {
-                    Value::Null
-                } else {
-                    json!(text)
-                };
+            cursor[parts[parts.len() - 1]] = if ["/status", "/responsible", "/assignee", "/io"]
+                .contains(&f.path)
+                && text.is_empty()
+            {
+                Value::Null
+            } else {
+                json!(text)
+            };
         }
         let before = value.clone();
         let _ = self.tables.merge(&mut value, cx);
@@ -521,6 +559,36 @@ impl Wirecraft {
             "node" => self.node_mode(&NodeMode, w, cx),
             "link" => self.link_mode(&LinkMode, w, cx),
             "type" => self.mode = Mode::Type,
+            "port" => {
+                self.mode = Mode::Port;
+                self.status =
+                    "Click to place a port, then link it to an entity in Link mode".into();
+            }
+            "io-in" | "io-out" | "io-inout" | "io-clear" => {
+                let role = id.strip_prefix("io-").filter(|r| *r != "clear");
+                let targets: Vec<String> = self
+                    .selected
+                    .iter()
+                    .filter(|id| {
+                        self.snapshot.document.nodes.get(*id).is_some_and(|n| {
+                            !n.is_link()
+                                && n.kind != wirecraft_core::NodeKind::Type
+                                && !wirecraft_core::components::is_exterior(n)
+                        })
+                    })
+                    .cloned()
+                    .collect();
+                if targets.is_empty() {
+                    self.status = "Select the processing entities to mark".into();
+                }
+                // One revision-checked batch, so the marking is one undo step.
+                if !targets.is_empty() {
+                    self.client.send(
+                        "entities.patch",
+                        json!({"changes":targets.iter().map(|id|json!({"nodeId":id,"patch":{"io":role}})).collect::<Vec<_>>()}),
+                    );
+                }
+            }
             "delete" => self.delete(&DeleteSelection, w, cx),
             "reference" => self.reference_dialog(w, cx),
             "update-reference" => {
@@ -1371,6 +1439,15 @@ impl Wirecraft {
             }
             if n.is_some_and(|n| n.is_link())
                 && (f.path.starts_with("/technology/") || f.path == "/fileLayoutStrategyId")
+            {
+                continue;
+            }
+            if f.path == "/io"
+                && n.is_none_or(|n| {
+                    n.is_link()
+                        || n.kind == wirecraft_core::NodeKind::Type
+                        || wirecraft_core::components::is_exterior(n)
+                })
             {
                 continue;
             }

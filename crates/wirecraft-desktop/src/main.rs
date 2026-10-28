@@ -59,6 +59,8 @@ enum Mode {
     Node,
     Type,
     Link,
+    /// Places an unlinked Exterior; linking it publishes a port.
+    Port,
 }
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -450,6 +452,19 @@ impl Wirecraft {
                 }
                 if command.as_deref() == Some("editor.tokens") {
                     self.tokens_failed(message, cx);
+                    return;
+                }
+                // A component's bodies only compile through a design that references it;
+                // the background header query failing there is expected, not news.
+                if command.as_deref() == Some("editor.context")
+                    && self
+                        .snapshot
+                        .document
+                        .nodes
+                        .values()
+                        .any(wirecraft_core::components::is_exterior)
+                {
+                    self.function_header.clear();
                     return;
                 }
                 self.completion = None;
@@ -1785,6 +1800,17 @@ impl Render for Wirecraft {
                         .child(
                             active(button("link", "Link"), self.mode == Mode::Link).on_click(
                                 cx.listener(|this, _, w, cx| this.link_mode(&LinkMode, w, cx)),
+                            ),
+                        )
+                        .child(
+                            active(button("port", "Port"), self.mode == Mode::Port).on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.mode = Mode::Port;
+                                    this.status =
+                                    "Click to place a port, then link it to an entity in Link mode"
+                                        .into();
+                                    cx.notify();
+                                }),
                             ),
                         )
                         .child(

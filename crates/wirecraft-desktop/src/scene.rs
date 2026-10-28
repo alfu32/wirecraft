@@ -4,6 +4,56 @@ use wirecraft_core::{
     Document, NodeKind,
     viewport::{Rect, RouteIndex, SceneIndex, Viewport},
 };
+/// Contour and badge color of entities the user marked as doing IO.
+const IO_COLOR: u32 = 0xe8a33d;
+/// Strokes a rectangle with dashes that continue around its corners.
+fn dashed_outline(
+    rect: Bounds<Pixels>,
+    width: f32,
+    dash: f32,
+    gap: f32,
+    color: Rgba,
+    window: &mut Window,
+) {
+    let corners = [
+        rect.origin,
+        rect.top_right(),
+        rect.bottom_right(),
+        rect.bottom_left(),
+        rect.origin,
+    ];
+    let mut path = PathBuilder::stroke(px(width));
+    // Distance into the current dash/gap period, carried across corners.
+    let mut phase = 0.;
+    let period = dash + gap;
+    for side in corners.windows(2) {
+        let (a, b) = (side[0], side[1]);
+        let delta = b - a;
+        let length = (f32::from(delta.x).powi(2) + f32::from(delta.y).powi(2)).sqrt();
+        if length < 0.1 {
+            continue;
+        }
+        let at = |t: f32| a + delta * (t / length);
+        let mut t = 0.;
+        while t < length {
+            let span = if phase < dash {
+                dash - phase
+            } else {
+                period - phase
+            };
+            let end = (t + span).min(length);
+            if phase < dash {
+                path.move_to(at(t));
+                path.line_to(at(end));
+            }
+            phase = (phase + end - t) % period;
+            t = end;
+        }
+    }
+    if let Ok(path) = path.build() {
+        window.paint_path(path, color);
+    }
+}
 pub struct Scene {
     parent: String,
     appearance: wirecraft_runtime::config::Appearance,
@@ -749,7 +799,7 @@ impl Scene {
         }
         if let Some(r) = self.selection_bounds(selected, moving, drag) {
             let origin = screen([r.x, r.y]) - point(px(5.), px(5.));
-            window.paint_quad(quad(
+            dashed_outline(
                 Bounds::new(
                     origin,
                     size(
@@ -757,12 +807,12 @@ impl Scene {
                         px((r.height * view.zoom) as f32 + 10.),
                     ),
                 ),
-                px(0.),
-                rgba(0x00000000),
-                px(1.),
+                1.,
+                6.,
+                5.,
                 rgb(self.color(0x70d5c6)),
-                BorderStyle::Dashed,
-            ));
+                window,
+            );
         }
     }
     #[allow(clippy::too_many_arguments)]
@@ -802,18 +852,34 @@ impl Scene {
             "Test" | "TestSuite" => (0x273d2c, 0x6ac284),
             _ => (0x202c38, 0x8196a9),
         };
+        let outline = rgb(self.color(if active {
+            0x70d5c6
+        } else if shape.io.is_some() {
+            IO_COLOR
+        } else {
+            stroke
+        }));
+        let width: f32 = if active { 2. } else { 1. };
+        // GPUI's dashed border scales its dashes with the border width, which at 1px
+        // reads as a solid line; dashed contours are stroked with explicit lengths.
+        let dashes = if shape.io.is_some() {
+            Some((width.max(2.), 14., 6.))
+        } else if shape.composite && shape.expanded {
+            Some((width, 9., 7.))
+        } else {
+            None
+        };
         window.paint_quad(quad(
             rect,
             px(0.),
             rgb(self.color(fill_color)),
-            px(if active { 2. } else { 1. }),
-            rgb(self.color(if active { 0x70d5c6 } else { stroke })),
-            if shape.composite && shape.expanded {
-                BorderStyle::Dashed
-            } else {
-                BorderStyle::Solid
-            },
+            px(if dashes.is_some() { 0. } else { width }),
+            outline,
+            BorderStyle::Solid,
         ));
+        if let Some((width, dash, gap)) = dashes {
+            dashed_outline(rect, width, dash, gap, outline, window);
+        }
         if view.zoom >= 0.2 {
             let mut y = 8.;
             for (text, size, color) in [
@@ -888,6 +954,9 @@ impl Scene {
                     rgb(self.color(0x70d5c6)),
                 ));
             }
+        }
+        if let Some(badge) = shape.io {
+            self.io_badge(badge, rect, view, window, cx);
         }
         if shape.diagnostics > 0 || code_error {
             let diameter = (14. * view.zoom as f32).max(8.);
@@ -977,6 +1046,43 @@ impl Scene {
                 BorderStyle::Solid,
             ));
         }
+    }
+    /// A pill straddling the top edge, left of the title, naming the IO role.
+    fn io_badge(
+        &self,
+        badge: &str,
+        rect: Bounds<Pixels>,
+        view: Viewport,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        if view.zoom < 0.2 {
+            return;
+        }
+        let font_size = (10. * view.zoom as f32).max(7.);
+        let height = font_size + 6.;
+        let run = TextRun {
+            len: badge.len(),
+            font: font(self.appearance.designer_font.clone()).bold(),
+            color: rgb(0x1f1606).into(),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+        };
+        let line =
+            window
+                .text_system()
+                .shape_line(badge.to_string().into(), px(font_size), &[run], None);
+        let origin = rect.origin + point(px(10. * view.zoom as f32), px(-height / 2.));
+        window.paint_quad(quad(
+            Bounds::new(origin, size(line.width + px(10.), px(height))),
+            px(height / 2.),
+            rgb(self.color(IO_COLOR)),
+            px(0.),
+            rgb(self.color(IO_COLOR)),
+            BorderStyle::Solid,
+        ));
+        let _ = line.paint(origin + point(px(5.), px(0.)), px(height), window, cx);
     }
     fn port_label(
         &self,

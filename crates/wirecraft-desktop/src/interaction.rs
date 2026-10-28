@@ -73,17 +73,20 @@ impl Wirecraft {
             Mode::Node | Mode::Type => {
                 self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"name":if self.mode==Mode::Type{"New type"}else{"New processor"},"kind":if self.mode==Mode::Type{"Type"}else{"Processor"},"attributes":{"layout":{"x":world[0],"y":world[1]}}}));
             }
+            Mode::Port => {
+                let diameter = wirecraft_core::components::EXTERIOR_DIAMETER;
+                self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"name":"port","kind":"Node","attributes":{"stereotype":wirecraft_core::components::EXTERIOR,"layout":{"x":world[0]-diameter/2.,"y":world[1]-diameter/2.,"width":diameter,"height":diameter}}}));
+            }
             Mode::Link => {
-                // Empty root canvas as an end of the link publishes a port: the link goes
-                // to (or comes from) a new Exterior placed there.
-                let at_root = self.parent == self.snapshot.document.root_node_id;
+                // Empty canvas as an end of the link publishes a port: the link goes
+                // to (or comes from) a new Exterior placed there, in the focused composite.
                 let x = world[0] - wirecraft_core::components::EXTERIOR_DIAMETER / 2.;
                 let y = world[1] - wirecraft_core::components::EXTERIOR_DIAMETER / 2.;
                 match (hit, self.link_source.take(), self.exterior_source.take()) {
                     (Some(id), None, Some([x, y])) => {
                         self.client.send(
                             "components.publish",
-                            json!({"nodeId":id,"direction":"input","name":"port","x":x,"y":y}),
+                            json!({"nodeId":id,"direction":"input","name":"port","parentId":self.parent,"x":x,"y":y}),
                         );
                     }
                     (Some(id), Some(source), _) => {
@@ -95,19 +98,15 @@ impl Wirecraft {
                             "Choose the target entity, or empty canvas for an Exterior output"
                                 .into();
                     }
-                    (None, Some(source), _) if at_root => {
+                    (None, Some(source), _) => {
                         self.client.send(
                             "components.publish",
-                            json!({"nodeId":source,"direction":"output","name":"port","x":x,"y":y}),
+                            json!({"nodeId":source,"direction":"output","name":"port","parentId":self.parent,"x":x,"y":y}),
                         );
                     }
-                    (None, None, _) if at_root => {
+                    (None, None, _) => {
                         self.exterior_source = Some([x, y]);
                         self.status = "Choose the entity that receives from the Exterior".into();
-                    }
-                    (None, source, _) => {
-                        self.link_source = source;
-                        self.status = "Exterior ports are published at the design root".into();
                     }
                 }
             }
@@ -147,7 +146,14 @@ impl Wirecraft {
                             self.tab = "Editor".into();
                         }
                     } else {
-                        if self.scene.nodes.contains_key(&id) {
+                        // Ports pinned beside a collapsed composite keep their stored layout.
+                        let pinned = self
+                            .scene
+                            .drawing
+                            .shapes
+                            .get(&id)
+                            .is_some_and(|s| s.pinned_to.is_some());
+                        if self.scene.nodes.contains_key(&id) && !pinned {
                             self.drag_start = Some(world);
                             self.drag_ids = self
                                 .selected
