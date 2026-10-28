@@ -2,6 +2,10 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## systemJS (0.19.0)
+
+At the user's request, the QuickJS template set is renamed systemJS, because it emits engine-neutral scripts, and it is tested on Bun. Stored `quickjs` technologies still select it. Its runner now yields to host timers and handles `process` signals. The WebServer is transcoded into systemJS too and passes on Bun. Details are in [compiler-templates.md](compiler-templates.md#webserver-transcodings-wirecraft-viability-test-0160).
+
 ## WebServer transcodings and template generator fixes (0.16.0–0.18.0)
 
 At the user's request, `examples/WebServer.orch` (C17) was transcoded into the template technologies to test the generators on a real network server. Go, Kotlin, Node.js, Node.js on Bun, and PHP all pass the same HTTP exchange as the C17 example (`tests/transcoded_webservers.rs`). QuickJS has no socket API; at the user's direction the JavaScript server runs on Bun instead. PHP 8.4.26 and QuickJS 2025-04-26 were built locally, from checksum-verified source, for the optional tests.

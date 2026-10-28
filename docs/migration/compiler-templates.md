@@ -11,7 +11,7 @@ The 90 original text resources are retained under `crates/wirecraft-core/resourc
 | Kotlin | `kotlin` / `kotlin-jvm` | source-set | Single-file and file-based assembly; Gradle/runtime/entry point project files |
 | Node.js | `javascript` / `nodejs` | direct-file-system-homomorphism | Single/file-based CommonJS modules, runtime and package manifest |
 | PHP | `php` / `php` | direct-file-system-homomorphism | Embedded templates and graph assembly; representative interpreter execution verified |
-| QuickJS | `javascript` / `quickjs` | single-file | Embedded templates and graph assembly; representative interpreter execution verified |
+| systemJS (formerly QuickJS) | `javascript` / `systemjs` (`quickjs` accepted) | single-file | Engine-neutral scripts from the baseline QuickJS templates; tested on Bun, also verified on QuickJS and Node.js |
 | Custom | any / `compiler-template-set` | classified-filesystem | Model `@…` role overrides and portable JSON template bundles |
 
 The initial 0.5.0 release had only C17 and literal exports. These additions form the 0.6.0 milestone. Asset availability is not a claim of complete language parity. Cross-composite routing/code interfaces, all collection expressions, capability variants, mixed technologies and language-specific editor intelligence require additional tests. The generic LSP service already accepts explicit external servers, but only C/C++ has the fully connected generated-body editor adapter.
@@ -49,7 +49,7 @@ At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP serve
 | Node.js | Passes (Node.js 22.17) | Asynchronous runner that yields to the event loop between ticks, with idle back-off and `threadworkRunner.wake()`; runtime emitted once per single file (nested composites redeclared `ThreadworkRunner`) |
 | PHP | Passes (PHP 8.4.26 built locally: `--disable-all --enable-cli --enable-pcntl`; `--include-ignored`, `WIRECRAFT_TEST_PHP`) | Composites declare `global` for every buffer their children use (a child fed by an outer composite's link received an undefined local, a `TypeError`); drain trace opt-in on stderr |
 | Bun | Passes (Bun 1.3.5; `--include-ignored`, `WIRECRAFT_TEST_BUN`) | None: Bun runs the Node.js set's CommonJS output unchanged, including the asynchronous runner, SIGTERM and the 1 % idle CPU |
-| QuickJS | Not transcoded | QuickJS's `std`/`os` modules have no socket API, so a self-contained HTTP server is not possible. At the user's direction the JavaScript server runs on Bun instead; the QuickJS set keeps its non-network tests |
+| systemJS | Passes on Bun 1.3.5 (`--include-ignored`, `WIRECRAFT_TEST_BUN`) | Renamed from QuickJS at the user's request (see below); the runner yields between ticks where the host has timers, and handles SIGINT/SIGTERM through `process.on`. The bodies take sockets from `node:net`, which plain QuickJS lacks |
 
 **Composite boundary channels.** A data link whose ends sit in different composites, such as `router` → `routes/routeHomeAbout`, is declared and transported by its owning composite. In a single-file layout its buffers are file-scope symbols, so the nested end receives them like any other link. File-based layouts still return an explicit `unsupported` error for such links, since one file cannot see another's buffers.
 
@@ -64,7 +64,15 @@ Measured on the Node.js WebServer: idle CPU fell from 12 % (with a fixed 1 ms wa
 
 **Runtime trace (overlay adaptation 5).** The Go and PHP runtimes printed a trace line on every shutdown-drain tick to stdout, which for the WebServer is its access log. As in the C17 runtime, the trace is now opt-in (`WIRECRAFT_TRACE`) and goes to stderr.
 
-**Regression test.** `template_compilers.rs` adds a producer at the root feeding a consumer inside a nested composite, executed in every language: Go and Node.js by default; Kotlin, PHP and QuickJS (2025-04-26, built from Debian's verified orig tarball) with `--include-ignored`. It also checks that file-based layouts refuse such a link with an explicit error. With the old PHP composite template it fails with the `TypeError` above.
+**systemJS (overlay adaptation 6, 0.19.0).** At the user's request the QuickJS set is called systemJS. Its output is plain ECMAScript: the only host-specific code feature-detects QuickJS's `os.signal`, so one script runs on QuickJS, Bun and Node.js. Compatibility details:
+- Stored projects with technology `quickjs` select it unchanged, and so does `TemplateSet::builtin("quickjs")`.
+- The 90 baseline assets keep their `quickjs/` directory and stay byte-identical; `examples/quickjs.orch` is now `examples/systemjs.orch`.
+- Where the host has timers (Bun, Node.js, Deno), the runner yields between ticks like the Node.js runner, including the idle back-off and `wake()`. Plain QuickJS has no timers, so it still runs ticks back to back.
+- Shutdown signals also use `process.on` where it exists. Before this, Bun ignored SIGTERM because the set only knew QuickJS's `os.signal`.
+- The template tests run systemJS on Bun (`WIRECRAFT_TEST_BUN`, default `bun`) instead of `qjs`.
+- The systemJS WebServer idles at 1 % CPU on Bun and exits 0 on SIGTERM.
+
+**Regression test.** `template_compilers.rs` adds a producer at the root feeding a consumer inside a nested composite, executed in every language: Go and Node.js by default; Kotlin, PHP and systemJS (on Bun; QuickJS 2025-04-26 built from Debian's verified orig tarball was used before the rename) with `--include-ignored`. It also checks that file-based layouts refuse such a link with an explicit error. With the old PHP composite template it fails with the `TypeError` above.
 
 **Single-file runtime (overlay adaptation 3).** Nested composites render the same single-file assembly as the root, so the Node.js and QuickJS runtime classes were declared once per composite. That is a syntax error in any single-file design with a nested composite. The runtime is now emitted for the compilation root only. PHP was unaffected because its runtime is wrapped in `class_exists` guards.
 
@@ -83,7 +91,7 @@ Measured on the Node.js WebServer: idle CPU fell from 12 % (with a fixed 1 ms wa
 - `wirecraft export-compiler PROJECT.orch NEW_DIRECTORY nodejs` exports `compiler.wirecompiler.json`, including model overrides. Consume it with `wirecraft compile PROJECT.orch NEW_OUTPUT --compiler compiler.wirecompiler.json`.
 - API `compile.project`, `compiler.templates`, `compiler.export` expose the same services. `wirecraft.workbench` MCP operations are `compile_project`, `compiler_templates`, `export_compiler`, with the service parameters inside `arguments`. Existing `wirecraft.compile_c17` and literal-export contracts stay available.
 
-Generation never invokes downloaded tools. Build/run through the existing supervised external jobs or your shell: `go build`, `node path/to/root.js`, `kotlinc SOURCES -include-runtime -d app.jar` then `java -jar app.jar`, `php root.php`, or `qjs root.js`. Kotlin's retained Gradle template pins Kotlin 2.2.0 and JVM 21. The Kotlin tests use `kotlinc` from PATH or `WIRECRAFT_TEST_KOTLINC`; they pass with Kotlin 2.2.0 and 2.4.21 on Java 21. Kotlin 1.9.0 fails on Java 21 (`ArrayDeque.addLast` resolves to JDK 21's sequenced-collection API) even for baseline output.
+Generation never invokes downloaded tools. Build/run through the existing supervised external jobs or your shell: `go build`, `node path/to/root.js`, `kotlinc SOURCES -include-runtime -d app.jar` then `java -jar app.jar`, `php root.php`, or `bun run root.js` for systemJS (engine-neutral scripts also run on `qjs` or `node`). Kotlin's retained Gradle template pins Kotlin 2.2.0 and JVM 21. The Kotlin tests use `kotlinc` from PATH or `WIRECRAFT_TEST_KOTLINC`; they pass with Kotlin 2.2.0 and 2.4.21 on Java 21. Kotlin 1.9.0 fails on Java 21 (`ArrayDeque.addLast` resolves to JDK 21's sequenced-collection API) even for baseline output.
 
 ## Portable bundle and compatibility
 
