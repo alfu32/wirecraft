@@ -896,6 +896,51 @@ impl Document {
         self.sync_links()?;
         Ok(id)
     }
+    /// Moves one end of a link to another entity. The link moves to the new common
+    /// parent, that end takes the default port name, and the previous entity loses
+    /// the port no other link uses.
+    pub fn reconnect(&mut self, id: &str, source: bool, entity: &str) -> Result<()> {
+        if self.node(entity)?.is_link() {
+            return Err(Error::new(
+                "invalid_input",
+                "A link end must be an entity, not another link",
+            ));
+        }
+        let mut link = self
+            .node(id)?
+            .link
+            .clone()
+            .ok_or_else(|| Error::new("invalid_input", "Only links can be reconnected"))?;
+        let (previous, port, direction) = if source {
+            (
+                std::mem::replace(&mut link.source_node_id, entity.into()),
+                std::mem::replace(&mut link.source_port_name, "out".into()),
+                Direction::Output,
+            )
+        } else {
+            (
+                std::mem::replace(&mut link.target_node_id, entity.into()),
+                std::mem::replace(&mut link.target_port_name, "in".into()),
+                Direction::Input,
+            )
+        };
+        self.nodes.get_mut(id).unwrap().link = Some(link);
+        self.sync_links()?;
+        let still_used = self.nodes.values().any(|n| {
+            n.link.as_ref().is_some_and(|l| {
+                if direction == Direction::Output {
+                    l.source_node_id == previous && l.source_port_name == port
+                } else {
+                    l.target_node_id == previous && l.target_port_name == port
+                }
+            })
+        });
+        if !still_used && let Some(n) = self.nodes.get_mut(&previous) {
+            n.ports
+                .retain(|p| !(p.name == port && p.direction == direction));
+        }
+        Ok(())
+    }
     pub fn delete(&mut self, id: &str) -> Result<()> {
         self.node(id)?;
         if id == self.root_node_id {
