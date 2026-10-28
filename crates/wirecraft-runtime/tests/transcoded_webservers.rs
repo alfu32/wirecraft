@@ -252,3 +252,19 @@ fn bun_runs_the_nodejs_webserver() {
     bun.arg("run").arg(main);
     exercise(bun, "Node.js");
 }
+
+#[test]
+#[ignore = "needs php; set WIRECRAFT_TEST_PHP or put php on PATH"]
+fn php_webserver() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = generate("php", temp.path());
+    let main = files
+        .iter()
+        .find(|f| f.extension().is_some_and(|e| e == "php"))
+        .unwrap();
+    let php = tool("WIRECRAFT_TEST_PHP", "php");
+    built(Command::new(&php).arg("-l").arg(main));
+    let mut server = Command::new(&php);
+    server.arg(main);
+    exercise(server, "PHP");
+}

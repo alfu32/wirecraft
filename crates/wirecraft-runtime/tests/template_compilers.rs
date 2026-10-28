@@ -232,6 +232,56 @@ async fn real_php_and_quickjs_library_instances() {
     ])
     .await;
 }
+/// The producer stays at the root while the consumer moves into a nested composite, so
+/// the data link crosses the composite boundary and the root owns and transports it.
+fn nested_graph(set: &str, layout: &str) -> Document {
+    let mut d = graph(set, layout);
+    let stage = d.create("root", "stage", NodeKind::Processor).unwrap();
+    let consumer = d
+        .nodes
+        .values()
+        .find(|n| n.name == "consumer")
+        .unwrap()
+        .id
+        .clone();
+    d.move_node(&consumer, Some(&stage)).unwrap();
+    d
+}
+#[tokio::test]
+async fn real_go_and_node_composite_boundary_channels() {
+    run_cases(
+        &[("go", "single-file"), ("nodejs", "single-file")],
+        nested_graph,
+    )
+    .await;
+    // A file cannot see another file's buffers: file-based layouts refuse explicitly.
+    let error = compiler::generate(
+        &nested_graph("nodejs", "direct-file-system-homomorphism"),
+        "root",
+        CompileOptions::default(),
+    )
+    .err()
+    .unwrap();
+    assert!(
+        error.message.contains("single-file layout"),
+        "{}",
+        error.message
+    );
+}
+#[tokio::test]
+#[ignore = "requires Kotlin 2.2+ and Java 21; kotlinc on PATH or WIRECRAFT_TEST_KOTLINC"]
+async fn real_kotlin_composite_boundary_channels() {
+    run_cases(&[("kotlin", "single-file")], nested_graph).await;
+}
+#[tokio::test]
+#[ignore = "requires external PHP and QuickJS; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_QJS"]
+async fn real_php_and_quickjs_composite_boundary_channels() {
+    run_cases(
+        &[("php", "single-file"), ("quickjs", "single-file")],
+        nested_graph,
+    )
+    .await;
+}
 async fn library_workflows(cases: &[(&str, &str)]) {
     run_cases(cases, library_graph).await;
 }
