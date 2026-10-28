@@ -1,0 +1,7 @@
+{# Emit a Rust structure for one modeled type; references to other types are boxed options. #}
+{% macro field_type(field) %}{% if field.typeName == "string" or field.typeName == "char *" or field.typeName == "const char *" %}String{% elif field.typeName == "number" or field.typeName == "double" %}f64{% elif field.typeName == "float" %}f32{% elif field.typeName == "int" or field.typeName == "date" %}i64{% elif field.typeName == "boolean" %}bool{% elif field.typeName == "void *" %}Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>{% else %}{{ field.typeSymbol }}{% endif %}{% endmacro %}
+{{ nodeProvenanceComment }}
+#[derive(Clone, Debug, Default)]
+pub struct {{ symbol }} {
+{% for field in typeFields %}    pub {{ field.symbol }}: {% if field.isReference %}Option<Box<{{ field_type(field) }}>>{% else %}{{ field_type(field) }}{% endif %},
+{% endfor %}}

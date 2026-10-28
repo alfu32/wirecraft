@@ -1,0 +1,29 @@
+{# Each data link owns source and destination FIFO buffers, as file-scope statics. #}
+{{ linkProvenanceComment }}
+{% if link.isLibraryCapability %}// Library instances are declared once, with their library.
+{% elif link.isSourceCapability %}struct {{ link.capabilityTypeSymbol }} {
+    template_source: &'static str,
+}
+
+impl {{ link.capabilityTypeSymbol }} {
+    fn get_source(&self, parameters: &std::collections::HashMap<String, String>) -> String {
+        threadwork_materialize_source(self.template_source, parameters)
+    }
+}
+
+static {{ link.dependencySymbol }}: {{ link.capabilityTypeSymbol }} = {{ link.capabilityTypeSymbol }} {
+    template_source: r####"{{ link.sourceNodeDeclaration }}"####,
+};
+{% elif not link.isCapability %}// {{ link.aPortSymbol }} carries {% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}untyped{% endif %} values produced by {{ link.sourceNodeName }}.
+static {{ link.aPortSymbol }}: ThreadworkBuffer = ThreadworkBuffer::new();
+
+// {{ link.bPortSymbol }} carries {% if link.typeSymbol is not empty %}{{ link.typeSymbol }}{% else %}untyped{% endif %} values consumed by {{ link.targetNodeName }}.
+static {{ link.bPortSymbol }}: ThreadworkBuffer = ThreadworkBuffer::new();
+
+{{ transportProvenanceComment }}
+fn {{ link.transportSymbol }}(a: &ThreadworkBuffer, b: &ThreadworkBuffer) {
+    if threadwork_transport(a, b) {
+        threadwork_runner.record_transit();
+    }
+}
+{% endif %}

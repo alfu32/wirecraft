@@ -4,7 +4,7 @@ use wirecraft_core::{
     templates::{self, ASSETS, TemplateSet},
 };
 #[test]
-fn every_original_template_parses_and_all_six_sets_resolve_roles() {
+fn every_template_parses_and_all_seven_sets_resolve_roles() {
     let context = json!({"node":{"kind":{"name":"Processor"}},"link":{},"isCompilationRoot":true,"layoutStrategy":{"id":"single-file"}});
     for (path, source) in ASSETS.iter().filter(|(p, _)| p.ends_with(".peb")) {
         templates::render(source, &context).unwrap_or_else(|e| panic!("{path}: {e:?}"));
@@ -14,8 +14,10 @@ fn every_original_template_parses_and_all_six_sets_resolve_roles() {
             .as_array()
             .unwrap()
             .len(),
-        6
+        7
     );
+    // The Wirecraft-authored Rust set has no Threadworks baseline revision.
+    assert!(TemplateSet::catalog()["templateSets"][6]["sourceRevision"].is_null());
 }
 #[test]
 fn pebble_branches_legacy_placeholders_and_graph_overrides_are_preserved() {
@@ -58,7 +60,7 @@ fn rendered_output_is_bounded_and_overrides_are_case_insensitive() {
         "systemjs"
     );
     assert_eq!(TemplateSet::builtin("quickjs").unwrap().id, "systemjs");
-    for name in ["go", "nodejs", "kotlin", "php", "systemjs"] {
+    for name in ["go", "nodejs", "kotlin", "php", "systemjs", "rust"] {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../../examples/{name}.orch"));
         let d = wirecraft_core::store::load(&path).unwrap();

@@ -1,0 +1,6 @@
+{# Notes become comments; Rust block comments nest, so their delimiters are broken up. #}
+{{ nodeProvenanceComment }}
+{% if specification is not empty %}/*
+{{ specification | replace("/*", "/ *") | replace("*/", "* /") }}
+*/
+{% endif %}

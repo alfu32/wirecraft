@@ -46,6 +46,7 @@ pub fn template_set_id(technology: &str) -> &'static str {
         "php" => "php",
         // Stored Threadworks projects may still name the systemJS set by its former name.
         "systemjs" | "quickjs" => "systemjs",
+        "rust" => "rust",
         "compiler-template-set" | "compiler-compiler" => "generic",
         _ => "literal",
     }
@@ -159,6 +160,9 @@ pub fn generate(d: &Document, root: &str, options: CompileOptions) -> Result<Gen
     if plan.set.id == "go" {
         files.iter_mut().for_each(hoist_go_imports);
     }
+    if plan.set.id == "rust" {
+        files.iter_mut().for_each(comment_duplicate_rust_uses);
+    }
     let project_context = plan.project_context();
     for file in &plan.set.project_files {
         if !file.layouts.is_empty() && !file.layouts.contains(&artifact.layout) {
@@ -264,7 +268,7 @@ impl Plan<'_> {
                 format!("Unsupported compiler layout {value}"),
             ));
         }
-        if ["go", "systemjs"].contains(&self.set.id.as_str()) && value != "single-file" {
+        if ["go", "systemjs", "rust"].contains(&self.set.id.as_str()) && value != "single-file" {
             return Err(Error::new(
                 "unsupported",
                 format!("{} supports single-file layout", self.set.id),
@@ -350,7 +354,7 @@ impl Plan<'_> {
             self.compile(&link.source_node_id)?;
         }
         if relation(self.d, &n) == Some(Relation::Runnable)
-            && ["go", "c"].contains(&self.set.id.as_str())
+            && ["go", "c", "rust"].contains(&self.set.id.as_str())
         {
             return Err(Error::new(
                 "unsupported",
@@ -538,7 +542,23 @@ impl Plan<'_> {
         json!({"id":n.id,"name":n.name,"symbol":identifier(&n.name),"runSymbol":format!("run_{indexed}"),"initializerSymbol":format!("init_{indexed}"),"classFileSymbol":upper(&indexed),"kind":{"name":format!("{:?}",n.kind)},"isComposite":n.is_composite(),"isTerminal":!n.is_composite()&&!n.is_link(),"isLink":n.is_link(),"stereotype":role,"children":n.children,"metadata":n.metadata,"pluginData":n.plugin_data,"text":{"declaration":n.text.source,"instantiation":n.text.initialization,"specification":n.text.specification},"technology":n.technology,"layout":n.layout,"typeFields":self.fields(n),"ports":n.ports})
     }
     fn fields(&self, n: &Node) -> Vec<Value> {
-        n.type_definition.as_ref().and_then(|v|v["fields"].as_array()).into_iter().flatten().map(|f|{let name=f["name"].as_str().unwrap_or("");let mut ty=self.type_name(f["typeId"].as_str().unwrap_or(""));if self.set.id=="kotlin"&&ty=="boolean"{ty="Boolean".into();}json!({"name":name,"symbol":identifier(name),"typeName":ty,"typeSymbol":ty,"isReference":f["isReference"].as_bool().unwrap_or(false)})}).collect()
+        n.type_definition.as_ref().and_then(|v|v["fields"].as_array()).into_iter().flatten().map(|f|{let name=f["name"].as_str().unwrap_or("");let mut ty=self.type_name(f["typeId"].as_str().unwrap_or(""));if self.set.id=="kotlin"&&ty=="boolean"{ty="Boolean".into();}json!({"name":name,"symbol":self.member(&identifier(name)),"typeName":ty,"typeSymbol":ty,"isReference":f["isReference"].as_bool().unwrap_or(false)})}).collect()
+    }
+    /// Parameter and field names: Rust spells keywords as raw identifiers (`r#type`).
+    fn member(&self, symbol: &str) -> String {
+        const RUST_KEYWORDS: &[&str] = &[
+            "as", "async", "await", "break", "const", "continue", "dyn", "else", "enum", "extern",
+            "false", "fn", "for", "gen", "if", "impl", "in", "let", "loop", "match", "mod", "move",
+            "mut", "pub", "ref", "return", "static", "struct", "trait", "true", "type", "unsafe",
+            "use", "where", "while", "abstract", "become", "box", "do", "final", "macro",
+            "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
+        ];
+        match symbol {
+            // These cannot be raw identifiers.
+            "self" | "Self" | "super" | "crate" if self.set.id == "rust" => format!("{symbol}_"),
+            _ if self.set.id == "rust" && RUST_KEYWORDS.contains(&symbol) => format!("r#{symbol}"),
+            _ => symbol.into(),
+        }
     }
     fn type_name(&self, id: &str) -> String {
         self.d
@@ -565,6 +585,7 @@ impl Plan<'_> {
             + 1;
         let symbol = identifier(&n.name);
         let allocation = format!("{symbol}{ordinal}");
+        let argument = self.member(&symbol);
         let source_product = self
             .artifacts
             .get(&source.id)
@@ -579,7 +600,7 @@ impl Plan<'_> {
         let declared = self.d.nodes.get(&l.type_definition_id);
         let escaped = serde_json::to_string(source_product).unwrap();
         let escaped = &escaped[1..escaped.len() - 1];
-        let mut descriptor = json!({"id":n.id,"name":n.name,"symbol":symbol,"variableName":n.name,"argumentSymbol":symbol,"allocationSymbol":allocation,"dependencySymbol":allocation,"capabilityTypeSymbol":format!("{}Capability",upper(&allocation)),"aPortSymbol":format!("{allocation}_a_port"),"bPortSymbol":format!("{allocation}_b_port"),"transportSymbol":format!("transport_{allocation}"),"typeName":ty,"typeSymbol":ty,"typeDefinitionId":l.type_definition_id,"typeDefinition":l.payload_definition,"payloadDefinition":l.payload_definition,"typeFields":declared.map(|n|self.fields(n)).unwrap_or_default(),"isCapability":cap,"isLibraryCapability":relation(self.d,n)==Some(Relation::Dependency),"isSourceCapability":relation(self.d,n)==Some(Relation::Source),"isRunnableCapability":relation(self.d,n)==Some(Relation::Runnable),"sourceNodeName":source.name,"sourceNodeSymbol":identifier(&source.name),"sourceNodeTypeSymbol":identifier(&source.name),"sourceRunSymbol":format!("run_{}",self.symbols[&source.id]),"sourceNodeDeclaration":source_product,"sourceNodeDeclarationDoubleQuoted":escaped,"sourceNodeDeclarationDollarEscaped":escaped.replace('$',"\\$"),"sourceNodeInstantiation":source.text.initialization,"libraryInstantiation":source.text.initialization,"sourceNodeId":source.id,"targetNodeId":target.id,"targetNodeName":target.name,"sourcePortName":l.source_port_name,"targetPortName":l.target_port_name,"transportKind":l.transport_kind,"interactionKind":l.interaction_kind});
+        let mut descriptor = json!({"id":n.id,"name":n.name,"symbol":symbol,"variableName":n.name,"argumentSymbol":argument,"allocationSymbol":allocation,"dependencySymbol":allocation,"capabilityTypeSymbol":format!("{}Capability",upper(&allocation)),"aPortSymbol":format!("{allocation}_a_port"),"bPortSymbol":format!("{allocation}_b_port"),"transportSymbol":format!("transport_{allocation}"),"typeName":ty,"typeSymbol":ty,"typeDefinitionId":l.type_definition_id,"typeDefinition":l.payload_definition,"payloadDefinition":l.payload_definition,"typeFields":declared.map(|n|self.fields(n)).unwrap_or_default(),"isCapability":cap,"isLibraryCapability":relation(self.d,n)==Some(Relation::Dependency),"isSourceCapability":relation(self.d,n)==Some(Relation::Source),"isRunnableCapability":relation(self.d,n)==Some(Relation::Runnable),"sourceNodeName":source.name,"sourceNodeSymbol":identifier(&source.name),"sourceNodeTypeSymbol":identifier(&source.name),"sourceRunSymbol":format!("run_{}",self.symbols[&source.id]),"sourceNodeDeclaration":source_product,"sourceNodeDeclarationDoubleQuoted":escaped,"sourceNodeDeclarationDollarEscaped":escaped.replace('$',"\\$"),"sourceNodeInstantiation":source.text.initialization,"libraryInstantiation":source.text.initialization,"sourceNodeId":source.id,"targetNodeId":target.id,"targetNodeName":target.name,"sourcePortName":l.source_port_name,"targetPortName":l.target_port_name,"transportKind":l.transport_kind,"interactionKind":l.interaction_kind});
         if relation(self.d, n) == Some(Relation::Dependency) {
             // Every link from a library lends the same shared instance; the link name is
             // only the consumer's argument name (`argumentSymbol`).
@@ -930,6 +951,35 @@ fn hoist_go_imports(file: &mut VirtualFile) {
             map.generated_start_line += shift;
             map.generated_end_line += shift;
         }
+    }
+}
+/// Library sources share the file's module scope, where importing one name twice is an
+/// error: a repeated single-line file-scope `use` stays as a comment, so lines keep their
+/// numbers and source maps stay valid.
+fn comment_duplicate_rust_uses(file: &mut VirtualFile) {
+    let mut seen = BTreeSet::new();
+    let mut changed = false;
+    let lines = file
+        .content
+        .lines()
+        .map(|line| {
+            let statement = line.trim_end();
+            let import = (statement.starts_with("use ") || statement.starts_with("pub use "))
+                && statement.ends_with(';');
+            if import && !seen.insert(statement.to_string()) {
+                changed = true;
+                format!("// {statement} (duplicate)")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>();
+    if changed {
+        let mut content = lines.join("\n");
+        if file.content.ends_with('\n') {
+            content.push('\n');
+        }
+        file.content = content;
     }
 }
 fn marked(n: &Node, section: &str, text: &str) -> String {

@@ -108,6 +108,7 @@ impl Wirecraft {
                     "nodejs",
                     "php",
                     "systemjs",
+                    "rust",
                     "compiler-template-set",
                     "file-export",
                     "multi-tech",

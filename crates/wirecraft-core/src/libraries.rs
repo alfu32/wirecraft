@@ -166,6 +166,49 @@ pub fn instance(set: &str, library: &Node, module_export: bool) -> LibraryInstan
             };
             format!("{}\n${instance_symbol} = {value};\n", comment("//"))
         }
+        "rust" if !instantiation.is_empty() => {
+            // As in Kotlin, the library declares a type named after itself.
+            format!(
+                "{}\ntype {type_symbol} = {};\n\nstatic {instance_symbol}: std::sync::LazyLock<{type_symbol}> =\n    std::sync::LazyLock::new(|| {instantiation});\n",
+                comment("//"),
+                crate::c17::identifier(&library.name)
+            )
+        }
+        "rust" => {
+            // Methods forward to the file-scope functions, which an unqualified call inside
+            // the `impl` resolves to. They take the unit instance by value, so elided output
+            // lifetimes follow the parameters as in the function itself, and stay private
+            // like the library's own items (the program is one module).
+            let methods = rust_functions(source)
+                .iter()
+                .map(|f| {
+                    let call = format!("{}({})", f.name, f.arguments.join(", "));
+                    format!(
+                        "    {}fn {}{}(self{}{}){} {{\n        {}\n    }}",
+                        if f.unsafe_ { "unsafe " } else { "" },
+                        f.name,
+                        f.generics,
+                        if f.parameters.is_empty() { "" } else { ", " },
+                        f.parameters.join(", "),
+                        if f.tail.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" {}", f.tail)
+                        },
+                        if f.unsafe_ {
+                            format!("unsafe {{ {call} }}")
+                        } else {
+                            call
+                        }
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            format!(
+                "{}\n#[derive(Clone, Copy)]\nstruct {type_symbol};\n\nimpl {type_symbol} {{\n{methods}\n}}\n\nstatic {instance_symbol}: {type_symbol} = {type_symbol};\n",
+                comment("//")
+            )
+        }
         _ => String::new(),
     };
     LibraryInstance {
@@ -173,4 +216,151 @@ pub fn instance(set: &str, library: &Node, module_export: bool) -> LibraryInstan
         instance_symbol,
         code,
     }
+}
+
+/// A top-level Rust function a library instance forwards to.
+struct RustFunction {
+    name: String,
+    unsafe_: bool,
+    /// `<...>` after the name, or empty.
+    generics: String,
+    /// Parameters, with patterns other than plain names renamed to `argument<i>`.
+    parameters: Vec<String>,
+    arguments: Vec<String>,
+    /// Return type and `where` clause, up to the body.
+    tail: String,
+}
+
+/// Unique non-async, non-extern functions starting at column 0 (so `impl` members and
+/// nested functions are excluded); `main` is not part of a library.
+fn rust_functions(source: &str) -> Vec<RustFunction> {
+    let start = Regex::new(
+        r"(?m)^(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(unsafe\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)",
+    )
+    .unwrap();
+    let mut functions: Vec<RustFunction> = vec![];
+    let mut repeated = vec![];
+    for capture in start.captures_iter(source) {
+        let name = capture[2].to_string();
+        let Some(function) = rust_signature(&source[capture.get(0).unwrap().end()..]) else {
+            continue;
+        };
+        if name == "main" {
+            continue;
+        }
+        if functions.iter().any(|f| f.name == name) {
+            repeated.push(name);
+            continue;
+        }
+        let (generics, parameters, tail) = function;
+        let mut arguments = vec![];
+        let parameters = parameters
+            .iter()
+            .enumerate()
+            .map(|(i, parameter)| {
+                let (pattern, ty) = split_top_level(parameter, ':')
+                    .map(|(p, t)| (p.trim(), t.trim()))
+                    .unwrap_or(("", parameter.trim()));
+                let pattern = pattern.strip_prefix("mut ").unwrap_or(pattern).trim();
+                let plain = !pattern.is_empty()
+                    && pattern != "_"
+                    && pattern
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_');
+                let argument = if plain {
+                    pattern.to_string()
+                } else {
+                    format!("argument{i}")
+                };
+                arguments.push(argument.clone());
+                format!("{argument}: {ty}")
+            })
+            .collect();
+        functions.push(RustFunction {
+            name,
+            unsafe_: capture.get(1).is_some(),
+            generics,
+            parameters,
+            arguments,
+            tail,
+        });
+    }
+    functions.retain(|f| !repeated.contains(&f.name));
+    functions
+}
+
+/// Generics, parameters and tail of the signature following a function name; `None`
+/// when no body follows (a declaration inside `extern`, or unbalanced text).
+fn rust_signature(rest: &str) -> Option<(String, Vec<String>, String)> {
+    let rest = rest.trim_start();
+    let (generics, rest) = if rest.starts_with('<') {
+        let end = closing(rest, '<', '>')?;
+        (rest[..=end].to_string(), rest[end + 1..].trim_start())
+    } else {
+        (String::new(), rest)
+    };
+    if !rest.starts_with('(') {
+        return None;
+    }
+    let end = closing(rest, '(', ')')?;
+    let parameters = split_all_top_level(&rest[1..end], ',')
+        .into_iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect();
+    let after = &rest[end + 1..];
+    let body = after.find('{')?;
+    if after[..body].contains(';') {
+        return None;
+    }
+    Some((generics, parameters, after[..body].trim().to_string()))
+}
+
+/// Index of the delimiter closing the one `text` starts with; `->` is not a closing `>`.
+fn closing(text: &str, open: char, close: char) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut previous = ' ';
+    for (i, c) in text.char_indices() {
+        if c == open {
+            depth += 1;
+        } else if c == close && !(close == '>' && previous == '-') {
+            depth = depth.checked_sub(1)?;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
+        previous = c;
+    }
+    None
+}
+
+/// Splits at every `separator` outside (), [], {} and <> (`->` excepted).
+fn split_all_top_level(text: &str, separator: char) -> Vec<&str> {
+    let mut parts = vec![];
+    let (mut depth, mut start, mut previous) = (0i32, 0, ' ');
+    for (i, c) in text.char_indices() {
+        match c {
+            '(' | '[' | '{' | '<' => depth += 1,
+            ')' | ']' | '}' => depth -= 1,
+            '>' if previous != '-' => depth -= 1,
+            _ if c == separator && depth == 0 => {
+                // `::` is a path, not a pattern/type separator.
+                let path = separator == ':' && (previous == ':' || text[i + 1..].starts_with(':'));
+                if !path {
+                    parts.push(&text[start..i]);
+                    start = i + 1;
+                }
+            }
+            _ => {}
+        }
+        previous = c;
+    }
+    parts.push(&text[start..]);
+    parts
+}
+
+/// The text before and after the first top-level `separator`.
+fn split_top_level(text: &str, separator: char) -> Option<(&str, &str)> {
+    let first = split_all_top_level(text, separator).first()?.len();
+    (first < text.len()).then(|| (&text[..first], &text[first + 1..]))
 }

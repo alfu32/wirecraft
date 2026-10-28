@@ -14,10 +14,12 @@ fn visit(root: &Path, files: &mut Vec<PathBuf>) {
 }
 fn main() {
     let mut text = String::from("pub const ASSETS: &[(&str,&str)] = &[\n");
-    // Baseline templates keep their relative names; the Wirecraft overlay is prefixed.
+    // Baseline templates keep their relative names; the Wirecraft overlay and the
+    // Wirecraft-authored sets (no Threadworks baseline) are prefixed.
     for (root, prefix) in [
         ("resources/compiler-templates", ""),
         ("resources/compiler-templates-wirecraft", "wirecraft/"),
+        ("resources/compiler-templates-native", "native/"),
     ] {
         embed(Path::new(root), prefix, &mut text);
     }

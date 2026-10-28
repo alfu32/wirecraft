@@ -1,0 +1,13 @@
+{# A dependency-free manifest; `[workspace]` keeps the package out of any enclosing workspace. -#}
+[package]
+name = "{{ safePackageName }}"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "{{ safePackageName }}"
+path = "{{ singleFileBaseName }}.rs"
+
+[workspace]
+

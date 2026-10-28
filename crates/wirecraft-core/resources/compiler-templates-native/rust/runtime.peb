@@ -1,0 +1,201 @@
+{# Runtime support shared by every generated Rust node; standard library only, fully qualified paths. #}
+/// A FIFO of packets. Link buffers are file-scope statics, so the queue sits behind a lock;
+/// `push`, `pop` and transports hold it only for one operation.
+pub struct ThreadworkBuffer {
+    items: std::sync::Mutex<std::collections::VecDeque<Box<dyn std::any::Any + Send>>>,
+}
+
+impl ThreadworkBuffer {
+    pub const fn new() -> Self {
+        Self {
+            items: std::sync::Mutex::new(std::collections::VecDeque::new()),
+        }
+    }
+
+    fn items(&self) -> std::sync::MutexGuard<'_, std::collections::VecDeque<Box<dyn std::any::Any + Send>>> {
+        self.items.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Number of queued packets.
+    pub fn len(&self) -> usize {
+        self.items().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items().is_empty()
+    }
+}
+
+/// Appends a packet; the value moves into the buffer (clone it to send it down two paths).
+pub fn push<T: std::any::Any + Send>(buffer: &ThreadworkBuffer, value: T) {
+    buffer.items().push_back(Box::new(value));
+}
+
+/// Removes the oldest packet when it is a `T`; a packet of another type stays queued.
+pub fn pop<T: std::any::Any>(buffer: &ThreadworkBuffer) -> Option<T> {
+    let mut items = buffer.items();
+    if !items.front()?.as_ref().is::<T>() {
+        return None;
+    }
+    items.pop_front()?.downcast::<T>().ok().map(|value| *value)
+}
+
+/// Moves at most one packet from a link's source buffer to its destination buffer.
+fn threadwork_transport(a: &ThreadworkBuffer, b: &ThreadworkBuffer) -> bool {
+    let Some(packet) = a.items().pop_front() else {
+        return false;
+    };
+    b.items().push_back(packet);
+    true
+}
+
+pub type ThreadworkError = Box<dyn std::error::Error>;
+pub type ThreadworkResult = Result<(), ThreadworkError>;
+
+/// Run context passed to every node; `imports` holds state that C bodies keep in statics.
+pub struct ThreadworkContext {
+    pub imports: std::collections::HashMap<String, Box<dyn std::any::Any>>,
+}
+
+impl ThreadworkContext {
+    pub fn new() -> Self {
+        Self {
+            imports: std::collections::HashMap::new(),
+        }
+    }
+
+    /// The state stored under `key`, created with `T::default()` on first use.
+    pub fn state<T: std::any::Any + Default>(&mut self, key: &str) -> &mut T {
+        self.imports
+            .entry(key.to_string())
+            .or_insert_with(|| Box::new(T::default()))
+            .downcast_mut::<T>()
+            .unwrap_or_else(|| panic!("run context state '{key}' holds another type"))
+    }
+}
+
+pub struct ThreadworkRunner {
+    running: std::sync::atomic::AtomicBool,
+    shutdown_signal: std::sync::atomic::AtomicI32,
+    transit: std::sync::atomic::AtomicU64,
+    shutdown_previous_transit: std::sync::atomic::AtomicU64,
+    shutdown_idle_ticks: std::sync::atomic::AtomicU32,
+    shutdown_remaining_ticks: std::sync::atomic::AtomicU32,
+}
+
+impl ThreadworkRunner {
+    pub const fn new() -> Self {
+        Self {
+            running: std::sync::atomic::AtomicBool::new(true),
+            shutdown_signal: std::sync::atomic::AtomicI32::new(0),
+            transit: std::sync::atomic::AtomicU64::new(0),
+            shutdown_previous_transit: std::sync::atomic::AtomicU64::new(0),
+            shutdown_idle_ticks: std::sync::atomic::AtomicU32::new(0),
+            shutdown_remaining_ticks: std::sync::atomic::AtomicU32::new(0),
+        }
+    }
+
+    /// Asks the generated network to leave its normal execution loop.
+    pub fn shutdown_request(&self) {
+        self.running.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// The last SIGINT or SIGTERM observed by the runtime, or zero.
+    pub fn get_shutdown_signal(&self) -> i32 {
+        self.shutdown_signal.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Whether modeled code lets normal execution continue.
+    pub fn is_running(&self) -> bool {
+        self.running.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Records one packet completed by a modeled transport.
+    pub fn record_transit(&self) {
+        self.transit.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Starts the bounded idle window used to drain residual packets.
+    pub fn begin_shutdown_drain(&self, idle_ticks: u32) {
+        let transit = self.transit.load(std::sync::atomic::Ordering::SeqCst);
+        self.shutdown_previous_transit.store(transit, std::sync::atomic::Ordering::SeqCst);
+        self.shutdown_idle_ticks.store(idle_ticks, std::sync::atomic::Ordering::SeqCst);
+        self.shutdown_remaining_ticks.store(idle_ticks, std::sync::atomic::Ordering::SeqCst);
+        threadwork_trace(format_args!(
+            "[ThreadworkRunner.begin_shutdown_drain] transit={transit} idle_ticks={idle_ticks}"
+        ));
+    }
+
+    /// Whether transport activity or the idle drain window remains.
+    pub fn has_recent_transit(&self) -> bool {
+        use std::sync::atomic::Ordering::SeqCst;
+        let transit = self.transit.load(SeqCst);
+        let previous = self.shutdown_previous_transit.load(SeqCst);
+        let remaining = self.shutdown_remaining_ticks.load(SeqCst);
+        threadwork_trace(format_args!(
+            "[ThreadworkRunner.has_recent_transit] transit={transit} previous={previous} remaining={remaining}"
+        ));
+        if transit != previous {
+            self.shutdown_previous_transit.store(transit, SeqCst);
+            self.shutdown_remaining_ticks.store(self.shutdown_idle_ticks.load(SeqCst), SeqCst);
+            return true;
+        }
+        if remaining == 0 {
+            return false;
+        }
+        self.shutdown_remaining_ticks.store(remaining - 1, SeqCst);
+        true
+    }
+
+    /// Records catchable process shutdown signals (SIGINT, SIGTERM) for modeled nodes.
+    pub fn install_shutdown_signal_handlers(&self) {
+        #[cfg(any(unix, windows))]
+        threadwork_signals::install();
+    }
+}
+
+pub static threadwork_runner: ThreadworkRunner = ThreadworkRunner::new();
+
+/// The C library's `signal`; the handler only stores atomics, which is async-signal-safe.
+#[cfg(any(unix, windows))]
+mod threadwork_signals {
+    unsafe extern "C" {
+        fn signal(number: i32, handler: extern "C" fn(i32)) -> usize;
+    }
+
+    extern "C" fn on_signal(number: i32) {
+        super::threadwork_runner
+            .shutdown_signal
+            .store(number, std::sync::atomic::Ordering::SeqCst);
+        super::threadwork_runner.shutdown_request();
+    }
+
+    pub fn install() {
+        // SIGINT and SIGTERM have these numbers on POSIX systems and in the Windows C runtime.
+        for number in [2, 15] {
+            unsafe {
+                signal(number, on_signal);
+            }
+        }
+    }
+}
+
+/// Writes a runtime trace line to stderr when WIRECRAFT_TRACE is set.
+fn threadwork_trace(line: std::fmt::Arguments) {
+    if std::env::var_os("WIRECRAFT_TRACE").is_some_and(|value| !value.is_empty()) {
+        eprintln!("{line}");
+    }
+}
+
+fn threadwork_materialize_source(
+    template_source: &str,
+    parameters: &std::collections::HashMap<String, String>,
+) -> String {
+    let mut product = template_source.to_string();
+    for (name, value) in parameters {
+        // Dollar-brace placeholders, spelled out piecewise: the template engine owns that syntax.
+        let placeholder = String::from("$") + "{" + name + "}";
+        product = product.replace(&placeholder, value);
+    }
+    product
+}

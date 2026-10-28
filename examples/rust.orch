@@ -1,0 +1,29 @@
+{
+  "id": "wirecraft-example-rust",
+  "name": "hello-rust",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "hello_rust",
+      "kind": "Node",
+      "children": [
+        "worker"
+      ],
+      "technology": {
+        "languageId": "rust",
+        "technologyId": "rust"
+      },
+      "fileLayoutStrategyId": "single-file"
+    },
+    {
+      "id": "worker",
+      "name": "print_once",
+      "kind": "Processor",
+      "parentId": "root",
+      "text": {
+        "source": "if threadwork_runner.is_running() {\n    println!(\"Hello from Wirecraft Rust\");\n    threadwork_runner.shutdown_request();\n}"
+      }
+    }
+  ]
+}
