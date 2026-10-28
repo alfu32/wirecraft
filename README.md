@@ -71,6 +71,8 @@ clang -std=c17 -Wall -Wextra -pedantic /tmp/wirecraft-webserver/WebServerApp.c -
 WEBSERVER_PORT=8080 /tmp/wirecraft-webserver/webserver   # then: curl -i http://127.0.0.1:8080/home/about
 ```
 
+The same server is transcoded into Go, Kotlin, Node.js (also run on Bun) and PHP as `examples/webserver-<language>.orch` by `scripts/transcode_webserver.py`; `tests/transcoded_webservers.rs` builds each and runs the same HTTP exchange (see [compiler-templates.md](docs/migration/compiler-templates.md#webserver-transcodings-wirecraft-viability-test-0160)). QuickJS has no socket API, so it has no WebServer variant.
+
 Routes: `/home/about`, `/home/version`, `/api/user`; other paths answer 404, other methods 405, malformed requests 400. Set `WEBSERVER_MAX_REQUESTS=N` to exit after N requests and `WEBSERVER_BIND_ANY=1` to listen beyond loopback. After editing the component, run `cargo run -p wirecraft-runtime -- update-references examples/webserver.orch` (or **Graph → Update Component Reference**) to re-pin it.
 
 ## C17 topology generation

@@ -47,7 +47,7 @@ At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP serve
 | Go | Passes (Go 1.25) | Composite boundary channels in single-file layouts; library `import` declarations hoisted into the file's import block (lines stay as comments, source maps shift) |
 | Kotlin | Passes (Kotlin 2.4.21, Java 21; `--include-ignored`) | None beyond the boundary channels. Bodies rebuild the immutable data classes with `copy`; `base_lib` mirrors the C platform headers with `typealias` declarations, because imports must precede every declaration |
 | Node.js | Passes (Node.js 22.17) | Asynchronous runner that yields to the event loop between ticks, with idle back-off and `threadworkRunner.wake()`; runtime emitted once per single file (nested composites redeclared `ThreadworkRunner`) |
-| PHP | Pending (no interpreter installed here) | |
+| PHP | Passes (PHP 8.4.26 built locally: `--disable-all --enable-cli --enable-pcntl`; `--include-ignored`, `WIRECRAFT_TEST_PHP`) | Composites declare `global` for every buffer their children use (a child fed by an outer composite's link received an undefined local, a `TypeError`); drain trace opt-in on stderr |
 | Bun | Passes (Bun 1.3.5; `--include-ignored`, `WIRECRAFT_TEST_BUN`) | None: Bun runs the Node.js set's CommonJS output unchanged, including the asynchronous runner, SIGTERM and the 1 % idle CPU |
 | QuickJS | Not transcoded | QuickJS's `std`/`os` modules have no socket API, so a self-contained HTTP server is not possible. At the user's direction the JavaScript server runs on Bun instead; the QuickJS set keeps its non-network tests |
 
@@ -60,12 +60,19 @@ At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP serve
 
 Measured on the Node.js WebServer: idle CPU fell from 12 % (with a fixed 1 ms wait) to 1 %. A request arriving at an idle server was answered in 4.2 ms on average (maximum 36 ms over 20 requests), and SIGTERM exits 0. Bodies that do work without moving packets now run at most 40 ticks per second while idle.
 
+**PHP composite boundaries (overlay adaptation 4).** A PHP function sees a file-scope buffer only after declaring it `global`. Composites declared only the links they own, so a route inside `routes`, fed by a root-owned link, received an undefined local: `TypeError: … must be of type array, null given`. Composites now declare `global` for every buffer their children use.
+
+**Runtime trace (overlay adaptation 5).** The Go and PHP runtimes printed a trace line on every shutdown-drain tick to stdout, which for the WebServer is its access log. As in the C17 runtime, the trace is now opt-in (`WIRECRAFT_TRACE`) and goes to stderr.
+
+**Regression test.** `template_compilers.rs` adds a producer at the root feeding a consumer inside a nested composite, executed in every language: Go and Node.js by default; Kotlin, PHP and QuickJS (2025-04-26, built from Debian's verified orig tarball) with `--include-ignored`. It also checks that file-based layouts refuse such a link with an explicit error. With the old PHP composite template it fails with the `TypeError` above.
+
 **Single-file runtime (overlay adaptation 3).** Nested composites render the same single-file assembly as the root, so the Node.js and QuickJS runtime classes were declared once per composite. That is a syntax error in any single-file design with a nested composite. The runtime is now emitted for the compilation root only. PHP was unaffected because its runtime is wrapped in `class_exists` guards.
 
 **Language adaptations in the bodies.**
 - C `static` counters become entries of the run context's import map.
 - Library functions return values instead of filling C out-parameters, because PHP library instances forward `...$arguments`, which cannot pass references.
 - Go has no `poll()`: `http_wait` accepts under a deadline and hands the connection to the next `http_accept`.
+- PHP type instances are objects, so `socket_accept` deep-copies a request (`unserialize(serialize(…))`) before sending it down two paths. The library uses core streams only: `stream_socket_server`, `stream_select` as `poll`, and a 2 s read timeout.
 - Node.js sockets are event driven: the library reads each connection completely between ticks, or rejects it, and `http_accept` takes the next complete request. Because JS values are references, `socket_accept` copies a request before sending it down two paths, as C does by value.
 
 ## Shared entry points
@@ -95,4 +102,4 @@ C bundles can be inspected/exported, but execution returns `unsupported` until C
 
 Manual desktop verification: open `examples/nodejs.orch` in an isolated `--state-dir`, choose Generate Project, select a new output path and run `node OUTPUT/hello_nodejs.js`. Then choose Export Compiler from Model Overrides, select another new directory and use its JSON bundle through the CLI example above. Check inspector Technology choices without changing a live project. One native Generate/execution succeeded here; repeated full dialog automation did not pass because GNOME's Wayland picker is outside X11 automation and a private GTK portal was intermittent. Native bundle-picker completion remains unverified; the corresponding real CLI/API/MCP path passed.
 
-The optimized Linux archive was unpacked into a temporary directory and all five `examples/` programs compiled/executed there, followed by Node bundle export/reuse. Installation includes those examples under `share/doc/wirecraft/examples`. The unchanged Go/PHP reference runtimes still print their shutdown-drain trace messages; these are retained behavior, unlike the earlier C17 opt-in trace correction.
+The optimized Linux archive was unpacked into a temporary directory and all five `examples/` programs compiled/executed there, followed by Node bundle export/reuse. Installation includes those examples under `share/doc/wirecraft/examples`. At that time the Go/PHP reference runtimes still printed their shutdown-drain trace to stdout. Since 0.18.0 that trace is opt-in, as in C17: set `WIRECRAFT_TRACE` and it goes to stderr (overlay adaptation 5).

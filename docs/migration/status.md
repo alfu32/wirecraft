@@ -2,6 +2,20 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## WebServer transcodings and template generator fixes (0.16.0–0.18.0)
+
+At the user's request, `examples/WebServer.orch` (C17) was transcoded into the template technologies to test the generators on a real network server. Go, Kotlin, Node.js, Node.js on Bun, and PHP all pass the same HTTP exchange as the C17 example (`tests/transcoded_webservers.rs`). QuickJS has no socket API; at the user's direction the JavaScript server runs on Bun instead. PHP 8.4.26 and QuickJS 2025-04-26 were built locally, from checksum-verified source, for the optional tests.
+
+Generator defects found and fixed:
+- template composite boundary channels (single-file layouts);
+- Go library imports;
+- the synchronous Node.js runner, under which sockets, timers and SIGTERM never ran;
+- the Node.js and QuickJS runtime being redeclared by nested composites;
+- missing PHP `global`s for outer-composite buffers;
+- the Go/PHP drain trace on stdout.
+
+Details are in [compiler-templates.md](compiler-templates.md#webserver-transcodings-wirecraft-viability-test-0160).
+
 ## Sheet preview blocks (0.15.0)
 
 At the user's request, the canvas Sheet preview also outlines the title block and the parts list, labelled, where the technical plan places them on the assembled sheet. `sheets::plan` returns both blocks in world units (`world_blocks`) from the same layout that draws them, so the canvas and the export cannot drift apart. Page contours now use explicit dash lengths like the other dashed contours. Verified by `graph_workflows.rs` (title block in the bottom-right corner and parts list top right, 5 mm inside the page) and `scripts/sheet_blocks_smoke.py` (native screenshot inspected).
