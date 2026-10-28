@@ -14,7 +14,7 @@ fn graph(set: &str, layout: &str) -> Document {
             "if threadworkRunner.IsRunning() { push(packet, 42) }",
             "var item int; if pop(packet, &item) { fmt.Println(\"RESULT\", item); threadworkRunner.ShutdownRequest() }",
         ),
-        "nodejs" | "quickjs" => (
+        "nodejs" | "systemjs" => (
             "javascript",
             set,
             "if(threadworkRunner.isRunning()) packet.push(42);",
@@ -89,12 +89,12 @@ async fn real_kotlin_generated_dataflows() {
     workflows(&[("kotlin", "single-file"), ("kotlin", "source-set")]).await;
 }
 #[tokio::test]
-#[ignore = "requires external PHP and QuickJS; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_QJS"]
-async fn real_php_and_quickjs_generated_dataflows() {
+#[ignore = "requires external PHP and Bun; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_BUN"]
+async fn real_php_and_systemjs_generated_dataflows() {
     workflows(&[
         ("php", "single-file"),
         ("php", "direct-file-system-homomorphism"),
-        ("quickjs", "single-file"),
+        ("systemjs", "single-file"),
     ])
     .await;
 }
@@ -106,7 +106,7 @@ fn library_graph(set: &str, layout: &str) -> Document {
             "if threadworkRunner.IsRunning() { push(packet, numbers.maximum(39, 40)) }",
             "var item int; if pop(packet, &item) { fmt.Println(\"RESULT\", math.maximum(item, 42)); threadworkRunner.ShutdownRequest() }",
         ),
-        "nodejs" | "quickjs" => (
+        "nodejs" | "systemjs" => (
             "function maximum(left, right) {\n  return left > right ? left : right;\n}",
             "if(threadworkRunner.isRunning()) packet.push(numbers.maximum(39, 40));",
             "if(packet.length) { console.log('RESULT', math.maximum(packet.shift(), 42)); threadworkRunner.shutdownRequest(); }",
@@ -167,7 +167,7 @@ fn library_links_lend_one_shared_instance_named_by_each_link() {
         ("kotlin", "source-set"),
         ("php", "single-file"),
         ("php", "direct-file-system-homomorphism"),
-        ("quickjs", "single-file"),
+        ("systemjs", "single-file"),
     ] {
         let project = compiler::generate(
             &library_graph(set, layout),
@@ -223,12 +223,12 @@ async fn real_kotlin_library_instances() {
     library_workflows(&[("kotlin", "single-file"), ("kotlin", "source-set")]).await;
 }
 #[tokio::test]
-#[ignore = "requires external PHP and QuickJS; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_QJS"]
-async fn real_php_and_quickjs_library_instances() {
+#[ignore = "requires external PHP and Bun; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_BUN"]
+async fn real_php_and_systemjs_library_instances() {
     library_workflows(&[
         ("php", "single-file"),
         ("php", "direct-file-system-homomorphism"),
-        ("quickjs", "single-file"),
+        ("systemjs", "single-file"),
     ])
     .await;
 }
@@ -274,10 +274,10 @@ async fn real_kotlin_composite_boundary_channels() {
     run_cases(&[("kotlin", "single-file")], nested_graph).await;
 }
 #[tokio::test]
-#[ignore = "requires external PHP and QuickJS; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_QJS"]
-async fn real_php_and_quickjs_composite_boundary_channels() {
+#[ignore = "requires external PHP and Bun; set WIRECRAFT_TEST_PHP and WIRECRAFT_TEST_BUN"]
+async fn real_php_and_systemjs_composite_boundary_channels() {
     run_cases(
-        &[("php", "single-file"), ("quickjs", "single-file")],
+        &[("php", "single-file"), ("systemjs", "single-file")],
         nested_graph,
     )
     .await;
@@ -303,7 +303,7 @@ async fn run_cases(cases: &[(&str, &str)], build: fn(&str, &str) -> Document) {
             .filter(|f| {
                 f.path.ends_with(if set == "php" {
                     ".php"
-                } else if set == "quickjs" {
+                } else if set == "systemjs" {
                     ".js"
                 } else if set == "go" {
                     ".go"
@@ -341,11 +341,12 @@ async fn run_cases(cases: &[(&str, &str)], build: fn(&str, &str) -> Document) {
                 )
                 .await
             }
-            "quickjs" => {
+            // systemJS scripts are engine-neutral; the tests run them on Bun.
+            "systemjs" => {
                 run(
                     &jobs,
-                    &std::env::var("WIRECRAFT_TEST_QJS").unwrap_or_else(|_| "qjs".into()),
-                    vec![files[0].clone()],
+                    &std::env::var("WIRECRAFT_TEST_BUN").unwrap_or_else(|_| "bun".into()),
+                    vec!["run".into(), files[0].clone()],
                     &out,
                 )
                 .await
@@ -384,8 +385,8 @@ async fn run_cases(cases: &[(&str, &str)], build: fn(&str, &str) -> Document) {
     }
 }
 #[test]
-fn php_quickjs_generate_and_bundle_roundtrip_with_graph_overrides() {
-    for set in ["php", "quickjs"] {
+fn php_systemjs_generate_and_bundle_roundtrip_with_graph_overrides() {
+    for set in ["php", "systemjs"] {
         let project = compiler::generate(
             &graph(set, "single-file"),
             "root",

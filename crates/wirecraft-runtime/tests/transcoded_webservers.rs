@@ -268,3 +268,19 @@ fn php_webserver() {
     server.arg(main);
     exercise(server, "PHP");
 }
+
+/// systemJS scripts are engine-neutral; this design takes its sockets from `node:net`
+/// and is tested on Bun.
+#[test]
+#[ignore = "needs bun; set WIRECRAFT_TEST_BUN or put bun on PATH"]
+fn systemjs_webserver_on_bun() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = generate("systemjs", temp.path());
+    let main = files
+        .iter()
+        .find(|f| f.extension().is_some_and(|e| e == "js"))
+        .unwrap();
+    let mut bun = Command::new(tool("WIRECRAFT_TEST_BUN", "bun"));
+    bun.arg("run").arg(main);
+    exercise(bun, "systemJS");
+}
