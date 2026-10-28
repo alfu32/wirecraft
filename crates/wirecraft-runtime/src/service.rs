@@ -731,8 +731,12 @@ impl Service {
                     name = format!("{base}{suffix}");
                     suffix += 1;
                 }
-                let root = candidate.root_node_id.clone();
-                let exterior = candidate.create(&root, &name, NodeKind::Node)?;
+                let parent = a["parentId"]
+                    .as_str()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(&candidate.root_node_id)
+                    .to_string();
+                let exterior = candidate.create(&parent, &name, NodeKind::Node)?;
                 let diameter = wirecraft_core::components::EXTERIOR_DIAMETER;
                 candidate.patch(
                     &exterior,

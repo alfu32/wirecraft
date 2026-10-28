@@ -340,3 +340,179 @@ fn reference_paths_stay_inside_the_design_directory() {
                 && e.message.contains("inside the design's directory"))
     );
 }
+
+#[test]
+fn ports_inside_composites_publish_expand_and_stay_visible_when_collapsed() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nested.orch");
+    let mut s = Service::new(Document::new("Nested"), Some(path.clone()));
+    let root = s.document.root_node_id.clone();
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":root,"patch":{"technology":{"languageId":"c","technologyId":"c-native"}}}),
+    );
+    let stage = entity(&mut s, "stage", "");
+    let double = run(
+        &mut s,
+        "threadwork.create_entity",
+        json!({"name":"double","parentId":stage,"attributes":{"text":{"source":"int value;\nwhile (threadwork_buffer_count(numbers) > 0U) {\n    if (pop(numbers, &value) != THREADWORK_OK) return THREADWORK_ERROR;\n    value *= 2;\n    if (push(doubled, &value) != THREADWORK_OK) return THREADWORK_ERROR;\n}"}}}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    // A port placed on its own is only a warning until it is linked.
+    let placed = run(
+        &mut s,
+        "threadwork.create_entity",
+        json!({"name":"port","kind":"Node","parentId":stage,"attributes":{"stereotype":"Exterior"}}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(errors(&s.document).is_empty(), "{:?}", errors(&s.document));
+    assert!(
+        components::diagnostics(&s.document)
+            .iter()
+            .any(|e| e.severity == "Warning" && e.message.contains("not linked yet"))
+    );
+    // Linking it from an entity makes it an output named after the link.
+    run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"doubled","sourceNodeId":double,"targetNodeId":placed,"link":{"typeDefinitionId":"int"}}),
+    );
+    assert_eq!(s.document.nodes[&placed].name, "doubledOut");
+    let input = run(
+        &mut s,
+        "components.publish",
+        json!({"nodeId":double,"direction":"input","name":"numbers","typeDefinitionId":"int","parentId":stage}),
+    );
+    let input = input["exteriorId"].as_str().unwrap().to_string();
+    assert_eq!(
+        s.document.nodes[&input].parent_id.as_deref(),
+        Some(stage.as_str())
+    );
+    assert!(errors(&s.document).is_empty(), "{:?}", errors(&s.document));
+    assert_eq!(
+        components::published_ports(&s.document)
+            .into_iter()
+            .map(|(p, _)| p.name)
+            .collect::<Vec<_>>(),
+        ["doubled", "numbers"]
+    );
+
+    // Collapsed, the composite keeps both ports beside it: input left, output right.
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":stage,"patch":{"layout":{"isExpanded":false}}}),
+    );
+    let drawing = wirecraft_core::drawing::Drawing::new(&s.document, &root);
+    let box_ = drawing.shapes[&stage].rect;
+    for (id, right) in [(&placed, true), (&input, false)] {
+        let port = &drawing.shapes[id];
+        assert_eq!(port.pinned_to.as_deref(), Some(stage.as_str()));
+        if right {
+            assert!(port.rect.x > box_.x + box_.width);
+        } else {
+            assert!(port.rect.x + port.rect.width < box_.x);
+        }
+        assert!(
+            drawing
+                .edges
+                .values()
+                .any(|e| (e.source == stage && &e.target == id)
+                    || (&e.source == id && e.target == stage)),
+            "the port link is drawn from the collapsed composite"
+        );
+    }
+    assert!(!drawing.shapes.contains_key(&double));
+    run(&mut s, "file.save", json!({}));
+
+    // A consumer feeds 21 and prints what comes back.
+    let app = dir.path().join("app.orch");
+    let mut s = Service::new(Document::new("App"), Some(app.clone()));
+    let root = s.document.root_node_id.clone();
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":root,"patch":{"technology":{"languageId":"c","technologyId":"c-native"}}}),
+    );
+    run(&mut s, "file.save", json!({}));
+    let r = run(
+        &mut s,
+        "components.reference",
+        json!({"path":"nested.orch"}),
+    )["nodeId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let feed = entity(
+        &mut s,
+        "feed",
+        "static int sent = 0;\nint value = 21;\nif (!sent) {\n    sent = 1;\n    if (push(numbers, &value) != THREADWORK_OK) return THREADWORK_ERROR;\n}",
+    );
+    let show = entity(
+        &mut s,
+        "show",
+        "int value;\nwhile (threadwork_buffer_count(doubled) > 0U) {\n    if (pop(doubled, &value) != THREADWORK_OK) return THREADWORK_ERROR;\n    printf(\"got %d\\n\", value);\n    (void)threadwork_runner__shutdown_request(&threadwork_runner);\n}",
+    );
+    run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"numbers","sourceNodeId":feed,"targetNodeId":r,"typeDefinitionId":"int"}),
+    );
+    run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"doubled","sourceNodeId":r,"targetNodeId":show,"typeDefinitionId":"int"}),
+    );
+    assert!(errors(&s.document).is_empty(), "{:?}", errors(&s.document));
+    run(&mut s, "file.save", json!({}));
+    let d = store::load(&app).unwrap();
+    let unit = C17::generate(&d, &d.root_node_id).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    std::fs::write(temp.path().join("app.c"), &unit.files[0].content).unwrap();
+    let exe = temp.path().join("app");
+    let built = std::process::Command::new("clang")
+        .args(["-std=c17", "-Wall", "-Wextra", "-pedantic", "-Werror"])
+        .arg(temp.path().join("app.c"))
+        .arg("-o")
+        .arg(&exe)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let output = std::process::Command::new(&exe).output().unwrap();
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "got 42\n");
+}
+
+#[test]
+fn io_marking_is_an_extension_field_shown_as_a_badge() {
+    let mut s = Service::new(Document::new("io"), None);
+    let a = entity(&mut s, "reader", "");
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":a,"patch":{"io":"in"}}),
+    );
+    let root = s.document.root_node_id.clone();
+    let drawing = wirecraft_core::drawing::Drawing::new(&s.document, &root);
+    assert_eq!(drawing.shapes[&a].io, Some("IO-in"));
+    let svg = wirecraft_core::export::svg(&s.document, &root).unwrap();
+    assert!(svg.contains("io-badge") && svg.contains(">IO-in<"));
+    // Clearing removes the field instead of storing null.
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":a,"patch":{"io":null}}),
+    );
+    assert!(!s.document.nodes[&a].extra.contains_key("io"));
+    let drawing = wirecraft_core::drawing::Drawing::new(&s.document, &root);
+    assert_eq!(drawing.shapes[&a].io, None);
+}
