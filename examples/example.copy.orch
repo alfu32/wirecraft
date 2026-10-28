@@ -1454,14 +1454,14 @@
             "incomingLinks": [],
             "outgoingLinks": [],
             "layout": {
-                "x": 1673.0,
-                "y": 263.0,
-                "width": 816.0,
-                "height": 657.0,
+                "x": 1819.0,
+                "y": 273.0,
+                "width": 739.0,
+                "height": 647.0,
                 "closedWidth": 200.0,
                 "closedHeight": 228.0,
-                "openWidth": 816.0,
-                "openHeight": 657.0,
+                "openWidth": 739.0,
+                "openHeight": 647.0,
                 "isExpanded": true
             },
             "fileLayoutStrategyId": "single-file",
@@ -1651,8 +1651,8 @@
                 "link_d40b1933-7e41-4f24-924d-f7fd683cedfd"
             ],
             "layout": {
-                "x": 1853.0,
-                "y": 357.0,
+                "x": 2108.0,
+                "y": 367.0,
                 "width": 270.0,
                 "height": 108.0,
                 "closedWidth": 270.0,
