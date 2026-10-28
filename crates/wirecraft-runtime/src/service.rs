@@ -757,6 +757,40 @@ impl Service {
                 let link = candidate.create_link(&name, link)?;
                 json!({"exteriorId":exterior,"linkId":link})
             }
+            "links.reconnect" => {
+                // Moves one end of a link; without entityId the end becomes a new
+                // Exterior at x/y in parentId, publishing a port like Link mode does.
+                let id = required(a, "nodeId")?;
+                let source = match required(a, "end")? {
+                    "source" => true,
+                    "target" => false,
+                    _ => {
+                        return Err(Error::new(
+                            "invalid_input",
+                            "end must be 'source' or 'target'",
+                        ));
+                    }
+                };
+                let entity = match a["entityId"].as_str().filter(|s| !s.is_empty()) {
+                    Some(entity) => entity.to_string(),
+                    None => {
+                        let parent = a["parentId"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or(&candidate.root_node_id)
+                            .to_string();
+                        let exterior = candidate.create(&parent, "port", NodeKind::Node)?;
+                        let diameter = wirecraft_core::components::EXTERIOR_DIAMETER;
+                        candidate.patch(
+                            &exterior,
+                            &json!({"stereotype":wirecraft_core::components::EXTERIOR,"layout":{"x":a["x"].as_f64().unwrap_or(0.),"y":a["y"].as_f64().unwrap_or(0.),"width":diameter,"height":diameter}}),
+                        )?;
+                        exterior
+                    }
+                };
+                candidate.reconnect(id, source, &entity)?;
+                json!({"linkId":id,"entityId":entity})
+            }
             "components.reference" => {
                 let base = self
                     .path

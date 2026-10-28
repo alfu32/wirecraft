@@ -516,3 +516,95 @@ fn io_marking_is_an_extension_field_shown_as_a_badge() {
     let drawing = wirecraft_core::drawing::Drawing::new(&s.document, &root);
     assert_eq!(drawing.shapes[&a].io, None);
 }
+
+#[test]
+fn link_ends_reconnect_to_entities_or_to_a_new_port() {
+    let mut s = Service::new(Document::new("rewire"), None);
+    let a = entity(&mut s, "a", "");
+    let b = entity(&mut s, "b", "");
+    let stage = entity(&mut s, "stage", "");
+    let c = run(
+        &mut s,
+        "threadwork.create_entity",
+        json!({"name":"c","parentId":stage}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let link = run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"data","sourceNodeId":a,"targetNodeId":b,"link":{"targetPortName":"values"}}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let root = s.document.root_node_id.clone();
+    // The target end moves into the composite: default port name, old port pruned.
+    run(
+        &mut s,
+        "links.reconnect",
+        json!({"nodeId":link,"end":"target","entityId":c}),
+    );
+    let l = s.document.nodes[&link].link.clone().unwrap();
+    assert_eq!(
+        (l.target_node_id.as_str(), l.target_port_name.as_str()),
+        (c.as_str(), "in")
+    );
+    assert_eq!(
+        s.document.nodes[&link].parent_id.as_deref(),
+        Some(root.as_str())
+    );
+    assert!(
+        !s.document.nodes[&b]
+            .ports
+            .iter()
+            .any(|p| p.name == "values")
+    );
+    assert!(s.document.nodes[&b].incoming_links.is_empty());
+    assert_eq!(s.document.nodes[&c].incoming_links, [link.clone()]);
+    // Dropped on empty canvas inside the composite, the source end becomes an input port.
+    let moved = run(
+        &mut s,
+        "links.reconnect",
+        json!({"nodeId":link,"end":"source","parentId":stage,"x":10.,"y":20.}),
+    );
+    let port = moved["entityId"].as_str().unwrap().to_string();
+    assert!(components::is_exterior(&s.document.nodes[&port]));
+    assert_eq!(s.document.nodes[&port].name, "dataIn");
+    assert_eq!(
+        s.document.nodes[&port].parent_id.as_deref(),
+        Some(stage.as_str())
+    );
+    assert_eq!(
+        s.document.nodes[&link].parent_id.as_deref(),
+        Some(stage.as_str())
+    );
+    // One undo step restores the previous end.
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(
+        s.document.nodes[&link]
+            .link
+            .as_ref()
+            .unwrap()
+            .source_node_id,
+        a
+    );
+    assert!(!s.document.nodes.contains_key(&port));
+    // A link cannot end on another link.
+    let other = run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"other","sourceNodeId":b,"targetNodeId":a}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        s.execute(Request::new(
+            "links.reconnect",
+            json!({"nodeId":link,"end":"source","entityId":other}),
+        ))
+        .is_err()
+    );
+}
