@@ -21,7 +21,8 @@ TECHNOLOGIES = {
     "kotlin": ("kotlin", "kotlin-jvm", "Kotlin"),
     "nodejs": ("javascript", "nodejs", "Node.js"),
     "php": ("php", "php", "PHP"),
-    "quickjs": ("javascript", "quickjs", "QuickJS"),
+    # Engine-neutral scripts (formerly the QuickJS set); this design runs on Bun.
+    "systemjs": ("javascript", "systemjs", "systemJS"),
 }
 FIELD_TYPES = {"char *": "string", "const char *": "string", "int": "number", "string": "string"}
 
@@ -52,7 +53,8 @@ def transcode(language: str) -> pathlib.Path:
             if n["text"].get(section, "").strip() and (n["name"], section) not in used:
                 sys.exit(f"{language}: {n['name']} {section} has no transcoded body")
     root = nodes[d["rootNodeId"]]
-    root["name"] = f"WebServer{display.replace('.', '')}"
+    name = display.replace(".", "")
+    root["name"] = f"WebServer{name[0].upper()}{name[1:]}"
     root["technology"]["languageId"] = language_id
     root["technology"]["technologyId"] = technology_id
     root["fileLayoutStrategyId"] = "single-file"
