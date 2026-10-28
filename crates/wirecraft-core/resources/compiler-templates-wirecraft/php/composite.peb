@@ -5,7 +5,9 @@ function {{ initializerSymbol }}(array &$context{% for link in incomingDataLinks
 {% for child in childArtifacts %}{% for link in child.dependencyInjectionLinks %}    global ${{ link.dependencySymbol }};
 {% endfor %}{% endfor %}
 {% for linkArtifact in linkArtifacts %}{% if linkArtifact.link is not empty and not linkArtifact.link.isCapability %}    global ${{ linkArtifact.link.aPortSymbol }}, ${{ linkArtifact.link.bPortSymbol }};
-{% endif %}{% endfor %}
+{% endif %}{% endfor %}{% for child in childArtifacts %}{% for link in child.incomingDataLinks %}    global ${{ link.bPortSymbol }};
+{% endfor %}{% for link in child.outgoingDataLinks %}    global ${{ link.aPortSymbol }};
+{% endfor %}{% endfor %}
 {% if instantiation is not empty %}{{ instantiationIndent4 }}
 {% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}    {{ child.initializerSymbol }}($context{% for link in child.incomingDataLinks %}, ${{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, ${{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, ${{ link.dependencySymbol }}{% endfor %});
 {% endif %}{% endfor %}}
@@ -16,7 +18,9 @@ function {{ runSymbol }}(array &$context{% for link in incomingDataLinks %}, arr
 {% for child in childArtifacts %}{% for link in child.dependencyInjectionLinks %}    global ${{ link.dependencySymbol }};
 {% endfor %}{% endfor %}
 {% for linkArtifact in linkArtifacts %}{% if linkArtifact.link is not empty and not linkArtifact.link.isCapability %}    global ${{ linkArtifact.link.aPortSymbol }}, ${{ linkArtifact.link.bPortSymbol }};
-{% endif %}{% endfor %}
+{% endif %}{% endfor %}{% for child in childArtifacts %}{% for link in child.incomingDataLinks %}    global ${{ link.bPortSymbol }};
+{% endfor %}{% for link in child.outgoingDataLinks %}    global ${{ link.aPortSymbol }};
+{% endfor %}{% endfor %}
 {% if declaration is not empty %}{{ declarationIndent4 }}
 {% endif %}{% for child in childArtifacts %}{% if child.declaration is not empty and not child.isCapabilityOnlyProvider and child.node.kind.name != "Note" and child.node.kind.name != "Type" %}    {{ child.runSymbol }}($context{% for link in child.incomingDataLinks %}, ${{ link.bPortSymbol }}{% endfor %}{% for link in child.outgoingDataLinks %}, ${{ link.aPortSymbol }}{% endfor %}{% for link in child.dependencyInjectionLinks %}, ${{ link.dependencySymbol }}{% endfor %});
 {% endif %}{% endfor %}{% for linkArtifact in linkArtifacts %}{% if linkArtifact.instantiation is not empty and not linkArtifact.link.isCapability %}    {{ linkArtifact.instantiation }}

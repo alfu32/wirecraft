@@ -21,6 +21,14 @@ Adaptation 3 — nested composites in single files: a nested composite renders t
 single-file assembly as the root, so the Node.js and QuickJS runtime (and the QuickJS
 banner) are emitted for the compilation root only; the baseline declared the runtime
 classes once per composite, which is a redeclaration error.
+
+Adaptation 4 — PHP composite boundaries: a composite declares `global` for every buffer its
+children use, not only for the links it owns, so a child fed by a link of an outer
+composite receives the file-scope buffer instead of an undefined local.
+
+Adaptation 5 — opt-in runtime trace: the Go and PHP runtimes printed a drain trace on every
+shutdown tick to stdout, mixed with the program's own output. As in the C17 runtime, the
+trace is opt-in (environment variable WIRECRAFT_TRACE) and goes to stderr.
 """
 import pathlib
 import sys
@@ -110,6 +118,40 @@ NODE_WAKE = (
     "  /** End an idle wait between ticks early; event handlers call it when they have work. */\n"
     "  wake() {\n    const wake = this.idleWake;\n    this.idleWake = null;\n    if (wake) wake();\n  }\n",
 )
+PHP_LINK_GLOBALS = "{% for linkArtifact in linkArtifacts %}{% if linkArtifact.link is not empty and not linkArtifact.link.isCapability %}    global ${{ linkArtifact.link.aPortSymbol }}, ${{ linkArtifact.link.bPortSymbol }};\n{% endif %}{% endfor %}\n"
+PHP_CHILD_GLOBALS = (
+    PHP_LINK_GLOBALS,
+    PHP_LINK_GLOBALS.rstrip("\n")
+    + "{% for child in childArtifacts %}{% for link in child.incomingDataLinks %}    global ${{ link.bPortSymbol }};\n"
+    "{% endfor %}{% for link in child.outgoingDataLinks %}    global ${{ link.aPortSymbol }};\n{% endfor %}{% endfor %}\n",
+)
+GO_TRACE = [
+    ("fmt.Printf(", "threadworkTrace("),
+    (
+        "var threadworkRunner = NewThreadworkRunner()\n",
+        "var threadworkRunner = NewThreadworkRunner()\n\n"
+        "// threadworkTrace writes a runtime trace line to stderr when WIRECRAFT_TRACE is set.\n"
+        "func threadworkTrace(format string, values ...any) {\n"
+        "\tif os.Getenv(\"WIRECRAFT_TRACE\") != \"\" {\n"
+        "\t\tfmt.Fprintf(os.Stderr, format, values...)\n"
+        "\t}\n"
+        "}\n",
+    ),
+]
+PHP_TRACE = [
+    ("        printf(\n", "        threadwork_trace(\n"),
+    (
+        "$GLOBALS['threadwork_runner'] ??= new ThreadworkRunner();\n",
+        "$GLOBALS['threadwork_runner'] ??= new ThreadworkRunner();\n\n"
+        "if (!function_exists('threadwork_trace')) {\n"
+        "/** @brief Write a runtime trace line to stderr when WIRECRAFT_TRACE is set. */\n"
+        "function threadwork_trace(string $format, mixed ...$values): void\n"
+        "{\n"
+        "    if ((string) getenv('WIRECRAFT_TRACE') !== '') fwrite(STDERR, vsprintf($format, $values));\n"
+        "}\n"
+        "}\n",
+    ),
+]
 SINGLE_RUNTIME = (
     "{{ runtimeSupport }}\n",
     "{% if isCompilationRoot %}{{ runtimeSupport }}{% endif %}\n",
@@ -146,7 +188,9 @@ EDITS = {
     ("quickjs", "link-declaration.peb"): [JS_LINK],
     ("php", "processor.peb"): PHP_FILTERS,
     ("php", "generator.peb"): PHP_FILTERS,
-    ("php", "composite.peb"): PHP_FILTERS,
+    ("php", "composite.peb"): PHP_FILTERS + [PHP_CHILD_GLOBALS],
+    ("php", "runtime.peb"): PHP_TRACE,
+    ("go", "runtime.peb"): GO_TRACE,
 }
 # Files appended to (go/php already have a service-library role) or created new.
 APPEND = {
@@ -171,12 +215,12 @@ def main() -> int:
         for old, new in edits:
             # PHP filters overlap; only patterns present in a given file are required.
             if old not in text:
-                if edits is PHP_FILTERS:
+                if (old, new) in PHP_FILTERS:
                     continue
                 print(f"{set_id}/{name}: baseline text not found:\n{old}", file=sys.stderr)
                 return 1
             text = text.replace(old, new)
-        if edits is PHP_FILTERS and "isLibraryCapability %}" in text.replace("{% elseif link.isLibraryCapability %}", ""):
+        if any(edit in PHP_FILTERS for edit in edits) and "isLibraryCapability %}" in text.replace("{% elseif link.isLibraryCapability %}", ""):
             if "{% if not link.isLibraryCapability %}" in text:
                 print(f"{set_id}/{name}: unhandled library filter remains", file=sys.stderr)
                 return 1

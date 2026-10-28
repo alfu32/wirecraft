@@ -1,0 +1,149 @@
+{# Runtime support shared by every generated Go node. #}
+type ThreadworkBuffer []any
+
+type ThreadworkContext struct {
+	Imports map[string]any
+}
+
+func NewThreadworkContext() *ThreadworkContext {
+	return &ThreadworkContext{Imports: make(map[string]any)}
+}
+
+type ThreadworkRunner struct {
+	running                   atomic.Bool
+	shutdownSignal            atomic.Int64
+	transit                   atomic.Uint64
+	shutdownPreviousTransit   uint64
+	shutdownIdleTicks         uint32
+	shutdownRemainingTicks    uint32
+	shutdownSignals           chan os.Signal
+}
+
+func NewThreadworkRunner() *ThreadworkRunner {
+	runner := &ThreadworkRunner{}
+	runner.running.Store(true)
+	return runner
+}
+
+// ShutdownRequest asks the generated network to leave its normal execution loop.
+func (runner *ThreadworkRunner) ShutdownRequest() {
+	runner.running.Store(false)
+}
+
+// GetShutdownSignal returns the last SIGINT or SIGTERM observed by the runtime, or zero.
+func (runner *ThreadworkRunner) GetShutdownSignal() int {
+	return int(runner.shutdownSignal.Load())
+}
+
+// IsRunning reports whether modeled code has requested normal execution to continue.
+func (runner *ThreadworkRunner) IsRunning() bool {
+	return runner.running.Load()
+}
+
+// RecordTransit records one packet completed by a modeled transport.
+func (runner *ThreadworkRunner) RecordTransit() {
+	runner.transit.Add(1)
+}
+
+// BeginShutdownDrain starts the bounded idle window used to drain residual packets.
+func (runner *ThreadworkRunner) BeginShutdownDrain(idleTicks uint32) {
+	runner.shutdownPreviousTransit = runner.transit.Load()
+	runner.shutdownIdleTicks = idleTicks
+	runner.shutdownRemainingTicks = idleTicks
+	threadworkTrace("[ThreadworkRunner.BeginShutdownDrain] transit=%d idle_ticks=%d\n", runner.shutdownPreviousTransit, idleTicks)
+}
+
+// HasRecentTransit reports whether transport activity or the idle drain window remains.
+func (runner *ThreadworkRunner) HasRecentTransit() bool {
+	transit := runner.transit.Load()
+	threadworkTrace(
+		"[ThreadworkRunner.HasRecentTransit] transit=%d previous=%d remaining=%d\n",
+		transit,
+		runner.shutdownPreviousTransit,
+		runner.shutdownRemainingTicks,
+	)
+	if transit != runner.shutdownPreviousTransit {
+		runner.shutdownPreviousTransit = transit
+		runner.shutdownRemainingTicks = runner.shutdownIdleTicks
+		return true
+	}
+	if runner.shutdownRemainingTicks == 0 {
+		return false
+	}
+	runner.shutdownRemainingTicks--
+	return true
+}
+
+// InstallShutdownSignalHandlers records catchable process shutdown signals for modeled nodes.
+func (runner *ThreadworkRunner) InstallShutdownSignalHandlers() {
+	if runner.shutdownSignals != nil {
+		return
+	}
+	signals := make(chan os.Signal, 1)
+	runner.shutdownSignals = signals
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for received := range signals {
+			if number, ok := received.(syscall.Signal); ok {
+				runner.shutdownSignal.Store(int64(number))
+				runner.ShutdownRequest()
+			}
+		}
+	}()
+}
+
+// StopShutdownSignalHandlers releases the process signal subscription.
+func (runner *ThreadworkRunner) StopShutdownSignalHandlers() {
+	if runner.shutdownSignals == nil {
+		return
+	}
+	signal.Stop(runner.shutdownSignals)
+	close(runner.shutdownSignals)
+	runner.shutdownSignals = nil
+}
+
+var threadworkRunner = NewThreadworkRunner()
+
+// threadworkTrace writes a runtime trace line to stderr when WIRECRAFT_TRACE is set.
+func threadworkTrace(format string, values ...any) {
+	if os.Getenv("WIRECRAFT_TRACE") != "" {
+		fmt.Fprintf(os.Stderr, format, values...)
+	}
+}
+
+func push[T any](buffer *ThreadworkBuffer, value T) {
+	if buffer == nil {
+		return
+	}
+	*buffer = append(*buffer, value)
+}
+
+func pop[T any](buffer *ThreadworkBuffer, out *T) bool {
+	if buffer == nil || out == nil || len(*buffer) == 0 {
+		return false
+	}
+	value, ok := (*buffer)[0].(T)
+	if !ok {
+		return false
+	}
+	*buffer = (*buffer)[1:]
+	*out = value
+	return true
+}
+
+func threadworkTransport(a *ThreadworkBuffer, b *ThreadworkBuffer) bool {
+	if a == nil || b == nil || len(*a) == 0 {
+		return false
+	}
+	*b = append(*b, (*a)[0])
+	*a = (*a)[1:]
+	return true
+}
+
+func threadworkMaterializeSource(templateSource string, parameters map[string]string) string {
+	product := templateSource
+	for name, value := range parameters {
+		product = strings.ReplaceAll(product, "${"+name+"}", value)
+	}
+	return product
+}
