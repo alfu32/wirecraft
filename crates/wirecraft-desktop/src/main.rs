@@ -10,6 +10,7 @@ mod inspector;
 mod inspector_widgets;
 mod interaction;
 mod options;
+mod preview;
 mod reports;
 mod scene;
 mod workbench;
@@ -107,6 +108,14 @@ struct Wirecraft {
     link_source: Option<String>,
     /// Link mode started on empty root canvas: the link will leave a new Exterior here.
     exterior_source: Option<[f64; 2]>,
+    /// World pointer position while a placement or link under construction follows it.
+    hover_world: Option<[f64; 2]>,
+    /// A picked-up link end being moved: the link and whether it is its source end.
+    rewire: Option<(String, bool)>,
+    /// The design as the pending click would leave it, routed in the background.
+    preview: Option<preview::Preview>,
+    preview_timer: Option<Task<()>>,
+    preview_inflight: bool,
     tab: String,
     section: String,
     name: Entity<InputState>,
@@ -257,6 +266,11 @@ impl Wirecraft {
             sheet_contours: Vec::new(),
             link_source: None,
             exterior_source: None,
+            hover_world: None,
+            rewire: None,
+            preview: None,
+            preview_timer: None,
+            preview_inflight: false,
             tab: if session.tab.is_empty() {
                 "Designer".into()
             } else {
@@ -1202,6 +1216,7 @@ impl Wirecraft {
         self.mode = Mode::Select;
         self.link_source = None;
         self.exterior_source = None;
+        self.rewire = None;
         cx.notify();
     }
     fn node_mode(&mut self, _: &NodeMode, _: &mut Window, cx: &mut Context<Self>) {
@@ -1212,6 +1227,7 @@ impl Wirecraft {
         self.mode = Mode::Link;
         self.link_source = None;
         self.exterior_source = None;
+        self.rewire = None;
         cx.notify();
     }
     fn fit(&mut self, _: &Fit, _: &mut Window, cx: &mut Context<Self>) {
@@ -1734,14 +1750,20 @@ impl Render for Wirecraft {
             .child(tree);
         let mut content = div().flex_1().min_w_0().min_h_0().flex().flex_col();
         if self.tab == "Designer" {
+            let preview = self.current_preview();
             let (scene, routed_delta) = self
                 .drag_scene
                 .as_ref()
                 .map(|(s, d)| (s.clone(), *d))
+                .or_else(|| preview.map(|p| (p.scene.clone(), [0., 0.])))
                 .unwrap_or((self.scene.clone(), [0., 0.]));
             let bounds = self.bounds.clone();
             let view = self.viewport;
-            let selected = self.selected.clone();
+            let mut selected = self.selected.clone();
+            // Entities and links the pending click would create are highlighted.
+            if let Some(p) = preview {
+                selected.extend(p.created.iter().cloned());
+            }
             let drag = if self.resize_start.is_some() {
                 [0., 0.]
             } else {
@@ -1771,6 +1793,8 @@ impl Render for Wirecraft {
                 }
             });
             let selection = self.selection_start.zip(self.selection_end);
+            let rubber = self.rubber_band();
+            let link_ends = self.link_end_handles();
             let sheets = self.sheet_contours.clone();
             let parent_name = self.snapshot.document.qualified_name(&self.parent);
             content = content
@@ -1862,6 +1886,12 @@ impl Render for Wirecraft {
                                     scene.paint(
                                         b, view, &selected, &moving, drag, &errors, window, cx,
                                     );
+                                    for end in &link_ends {
+                                        scene::paint_link_end(*end, b.origin, view, window);
+                                    }
+                                    if let Some(band) = &rubber {
+                                        scene::paint_rubber_band(band, b.origin, view, window);
+                                    }
                                     for page in &sheets {
                                         let p = view.screen([page.x, page.y]);
                                         window.paint_quad(quad(

@@ -49,6 +49,35 @@ impl Wirecraft {
         }
         let world = self.viewport.world(local);
         let tolerance = 6. / self.viewport.zoom;
+        if self.mode == Mode::Select && event.button == MouseButton::Left {
+            // A picked-up link end drops on an entity, or on empty canvas as a new port.
+            if let Some((link, source)) = self.rewire.take() {
+                let end = if source { "source" } else { "target" };
+                let diameter = wirecraft_core::components::EXTERIOR_DIAMETER;
+                let arguments = match self
+                    .scene
+                    .pick(world, tolerance, false)
+                    .filter(|id| self.scene.nodes.contains_key(id))
+                {
+                    Some(entity) => json!({"nodeId":link,"end":end,"entityId":entity}),
+                    None => {
+                        json!({"nodeId":link,"end":end,"parentId":self.parent,"x":world[0]-diameter/2.,"y":world[1]-diameter/2.})
+                    }
+                };
+                self.client.send("links.reconnect", arguments);
+                self.status = "Link end moved".into();
+                cx.notify();
+                return;
+            }
+            if let Some(source) = self.picked_link_end(world) {
+                let link = self.selected.iter().next().cloned().unwrap();
+                self.rewire = Some((link, source));
+                self.hover_world = Some(world);
+                self.status = "Click an entity to attach the link end, or empty canvas for a port; Escape cancels".into();
+                cx.notify();
+                return;
+            }
+        }
         // Simple boxes size themselves; a selected expanded composite has four corner
         // handles, each editing the padding of its two adjacent sides. Handles straddle
         // the border, so they are tested before picking.
@@ -94,6 +123,7 @@ impl Wirecraft {
                     }
                     (Some(id), None, None) => {
                         self.link_source = Some(id);
+                        self.hover_world = Some(world);
                         self.status =
                             "Choose the target entity, or empty canvas for an Exterior output"
                                 .into();
@@ -106,6 +136,7 @@ impl Wirecraft {
                     }
                     (None, None, _) => {
                         self.exterior_source = Some([x, y]);
+                        self.hover_world = Some(world);
                         self.status = "Choose the entity that receives from the Exterior".into();
                     }
                 }
@@ -375,6 +406,11 @@ impl Wirecraft {
             return;
         }
         self.move_panel(event, window, cx);
+        if self.placing() {
+            self.hover_world = Some(self.viewport.world(self.local(event.position)));
+            self.queue_preview(cx);
+            cx.notify();
+        }
         if self.pan_start.is_some()
             || self.drag_start.is_some()
             || self.resize_start.is_some()

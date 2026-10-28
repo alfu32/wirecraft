@@ -4,6 +4,107 @@ use wirecraft_core::{
     Document, NodeKind,
     viewport::{Rect, RouteIndex, SceneIndex, Viewport},
 };
+/// Pointer-following overlay of a pending placement or link, in world coordinates.
+#[derive(Default)]
+pub struct RubberBand {
+    /// A straight link from its source to the pointer, until the routed preview exists.
+    pub line: Option<([f64; 2], [f64; 2])>,
+    /// Future outlines: boxes, or circles for Exterior ports.
+    pub ghosts: Vec<(Rect, bool)>,
+    /// The entity under the pointer that a click would link to.
+    pub target: Option<Rect>,
+}
+/// Dashed future outlines, the would-be target's highlight and the straight link
+/// with an arrowhead along the flow.
+pub fn paint_rubber_band(
+    band: &RubberBand,
+    origin: Point<Pixels>,
+    view: Viewport,
+    window: &mut Window,
+) {
+    let color = rgb(0x70d5c6);
+    let screen = |p: [f64; 2]| {
+        let s = view.screen(p);
+        origin + point(px(s[0] as f32), px(s[1] as f32))
+    };
+    let bounds = |r: Rect| {
+        Bounds::new(
+            screen([r.x, r.y]),
+            size(
+                px((r.width * view.zoom) as f32),
+                px((r.height * view.zoom) as f32),
+            ),
+        )
+    };
+    if let Some(r) = band.target {
+        window.paint_quad(quad(
+            bounds(r).dilate(px(3.)),
+            px(0.),
+            rgba(0x70d5c618),
+            px(2.),
+            color,
+            BorderStyle::Solid,
+        ));
+    }
+    for (r, circle) in &band.ghosts {
+        let b = bounds(*r);
+        if *circle {
+            window.paint_quad(quad(
+                b,
+                b.size.height / 2.,
+                rgba(0x16303f60),
+                px(2.),
+                rgba(0x70d5c6c0),
+                BorderStyle::Solid,
+            ));
+        } else {
+            window.paint_quad(fill(b, rgba(0x70d5c614)));
+            dashed_outline(b, 1.5, 8., 5., color, window);
+        }
+    }
+    let Some((start, end)) = band.line else {
+        return;
+    };
+    let (a, z) = (screen(start), screen(end));
+    let delta = z - a;
+    let length = (f32::from(delta.x).powi(2) + f32::from(delta.y).powi(2)).sqrt();
+    if length < 2. {
+        return;
+    }
+    let mut line = PathBuilder::stroke(px(1.5));
+    let mut t = 0.;
+    while t < length {
+        line.move_to(a + delta * (t / length));
+        line.line_to(a + delta * ((t + 7.).min(length) / length));
+        t += 12.;
+    }
+    if let Ok(path) = line.build() {
+        window.paint_path(path, color);
+    }
+    let (ux, uy) = (f32::from(delta.x) / length, f32::from(delta.y) / length);
+    let back = z - point(px(ux * 10.), px(uy * 10.));
+    let mut head = PathBuilder::fill();
+    head.move_to(z);
+    head.line_to(back + point(px(-uy * 5.), px(ux * 5.)));
+    head.line_to(back + point(px(uy * 5.), px(-ux * 5.)));
+    head.close();
+    if let Ok(path) = head.build() {
+        window.paint_path(path, color);
+    }
+}
+/// A grab handle on a selected link's end: press it to pick the end up.
+pub fn paint_link_end(end: [f64; 2], origin: Point<Pixels>, view: Viewport, window: &mut Window) {
+    let s = view.screen(end);
+    let centre = origin + point(px(s[0] as f32), px(s[1] as f32));
+    window.paint_quad(quad(
+        Bounds::new(centre - point(px(6.), px(6.)), size(px(12.), px(12.))),
+        px(6.),
+        rgb(0x70d5c6),
+        px(1.5),
+        rgb(0x10161e),
+        BorderStyle::Solid,
+    ));
+}
 /// Contour and badge color of entities the user marked as doing IO.
 const IO_COLOR: u32 = 0xe8a33d;
 /// Strokes a rectangle with dashes that continue around its corners.
@@ -63,6 +164,8 @@ pub struct Scene {
     incident: BTreeMap<String, Vec<String>>,
     pub nodes: BTreeMap<String, (String, NodeKind, Rect)>,
     pub links: BTreeMap<String, (String, Vec<[f64; 2]>)>,
+    /// Preview-only entities and links: highlighted, but outside the selection bounds.
+    pub pending: BTreeSet<String>,
 }
 impl Scene {
     pub fn new(d: &Document, parent: &str) -> Self {
@@ -75,6 +178,7 @@ impl Scene {
             incident: BTreeMap::new(),
             nodes: BTreeMap::new(),
             links: BTreeMap::new(),
+            pending: BTreeSet::new(),
         };
         let drawing = wirecraft_core::drawing::Drawing::new(d, parent);
         for (id, shape) in &drawing.shapes {
@@ -797,7 +901,8 @@ impl Scene {
                 }
             }
         }
-        if let Some(r) = self.selection_bounds(selected, moving, drag) {
+        let chosen: BTreeSet<String> = selected.difference(&self.pending).cloned().collect();
+        if let Some(r) = self.selection_bounds(&chosen, moving, drag) {
             let origin = screen([r.x, r.y]) - point(px(5.), px(5.));
             dashed_outline(
                 Bounds::new(
