@@ -32,6 +32,31 @@ Only top-level functions are exported. Overloaded or generic Kotlin functions, G
 
 The 90 baseline templates stay byte-identical. The adaptation lives in `crates/wirecraft-core/resources/compiler-templates-wirecraft/`, which takes precedence when a built-in set loads, so exported bundles carry it too. It is generated from the baseline by exact replacements in `scripts/template_overlay.py`, which fails if baseline text is missing: injected library arguments are typed in Go/Kotlin and no longer filtered out in Go/PHP; per-link library values are removed; Kotlin/Node/QuickJS gain a service-library role at file scope, and Kotlin composites stop invoking library children. Instance code comes from `wirecraft_core::libraries`.
 
+## WebServer transcodings (Wirecraft viability test, 0.16.0)
+
+At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP server) is transcoded into each template technology to test the generators on a real network. `scripts/transcode_webserver.py` keeps the C17 topology: the same entities, IDs, links, `routes` composite, layout and IO marks. Only the technology, the bodies (`examples/webserver-transcoded/<language>/<entity>.<section>.<ext>`) and the type field types change. Field types become the neutral `string`/`number`, with nested types kept as references. The script writes `examples/webserver-<language>.orch`.
+
+`tests/transcoded_webservers.rs` runs the same exchange as the C17 example test for each design:
+1. Generate the project and check that every authored section maps to its generated lines.
+2. Build it with the real toolchain.
+3. Send the three routes, 404, 405 with `Allow`, a 431 rejection with unread bytes, and HEAD.
+4. Check that the server exits 0 after its fifth resolved request, with the access log.
+
+| Language | Status | Generator changes it required |
+|---|---|---|
+| Go | Passes (Go 1.25) | Composite boundary channels in single-file layouts; library `import` declarations hoisted into the file's import block (lines stay as comments, source maps shift) |
+| Kotlin | Pending | |
+| Node.js | Pending | |
+| PHP | Pending (no interpreter installed here) | |
+| QuickJS | Pending (no interpreter installed here) | |
+
+**Composite boundary channels.** A data link whose ends sit in different composites, such as `router` → `routes/routeHomeAbout`, is declared and transported by its owning composite. In a single-file layout its buffers are file-scope symbols, so the nested end receives them like any other link. File-based layouts still return an explicit `unsupported` error for such links, since one file cannot see another's buffers.
+
+**Language adaptations in the bodies.**
+- C `static` counters become entries of the run context's import map.
+- Library functions return values instead of filling C out-parameters, because PHP library instances forward `...$arguments`, which cannot pass references.
+- Go has no `poll()`: `http_wait` accepts under a deadline and hands the connection to the next `http_accept`.
+
 ## Shared entry points
 
 - Desktop **Generate → Generate Project (effective technology)** uses the project's inherited `technologyId`. Select a new/empty destination; output is staged atomically. **Export Compiler from Model Overrides** exports a portable bundle.
