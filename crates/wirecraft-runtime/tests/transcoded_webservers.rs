@@ -1,8 +1,8 @@
 //! The C17 WebServer example transcoded into each template-compiler technology
 //! (scripts/transcode_webserver.py): every design is generated, built with the real
 //! toolchain and driven over HTTP with the same exchange as the C17 example test.
-//! Go and Node.js are required, as for the other compiler tests; Kotlin, PHP and
-//! QuickJS run with `--include-ignored` (see `tool`).
+//! Go, Node.js and rustc are required, as for the other compiler tests; Kotlin, PHP and
+//! Bun run with `--include-ignored` (see `tool`).
 use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -196,6 +196,24 @@ fn go_webserver() {
             .current_dir(temp.path()),
     );
     exercise(Command::new(exe), "Go");
+}
+
+#[test]
+fn rust_webserver() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = generate("rust", temp.path());
+    let main = files
+        .iter()
+        .find(|f| f.extension().is_some_and(|e| e == "rs"))
+        .unwrap();
+    let exe = temp.path().join("webserver");
+    built(
+        Command::new(tool("WIRECRAFT_TEST_RUSTC", "rustc"))
+            .args(["--edition", "2021", "-O", "-D", "warnings", "-o"])
+            .arg(&exe)
+            .arg(main),
+    );
+    exercise(Command::new(exe), "Rust");
 }
 
 #[test]

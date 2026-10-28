@@ -14,6 +14,12 @@ fn graph(set: &str, layout: &str) -> Document {
             "if threadworkRunner.IsRunning() { push(packet, 42) }",
             "var item int; if pop(packet, &item) { fmt.Println(\"RESULT\", item); threadworkRunner.ShutdownRequest() }",
         ),
+        "rust" => (
+            "rust",
+            "rust",
+            "if threadwork_runner.is_running() { push(packet, 42i64); }",
+            "if let Some(item) = pop::<i64>(packet) { println!(\"RESULT {item}\"); threadwork_runner.shutdown_request(); }",
+        ),
         "nodejs" | "systemjs" => (
             "javascript",
             set,
@@ -83,6 +89,157 @@ async fn real_go_and_node_generated_dataflows() {
     ])
     .await;
 }
+/// rustc ships with the toolchain that runs these tests (override: WIRECRAFT_TEST_RUSTC).
+#[tokio::test]
+async fn real_rust_dataflows_libraries_and_boundary_channels() {
+    workflows(&[("rust", "single-file")]).await;
+    library_workflows(&[("rust", "single-file")]).await;
+    run_cases(&[("rust", "single-file")], nested_graph).await;
+}
+/// Rust library instances forward generics, `where` clauses, elided lifetimes, patterns
+/// and `unsafe`; functions inside `impl` blocks and repeated file-scope imports are left out.
+fn rust_signature_graph(set: &str, layout: &str) -> Document {
+    let mut d = library_graph(set, layout);
+    let find = |d: &Document, name: &str| {
+        d.nodes
+            .values()
+            .find(|n| n.name == name)
+            .unwrap()
+            .id
+            .clone()
+    };
+    let (lib, consumer) = (find(&d, "lib_math"), find(&d, "consumer"));
+    let library = r#"use std::fmt::Display;
+use std::fmt::Display;
+
+fn maximum(left: i64, right: i64) -> i64 {
+    if left > right { left } else { right }
+}
+pub fn label<T: Display>(value: T) -> String {
+    format!("<{value}>")
+}
+fn first_word(text: &str) -> &str {
+    text.split(' ').next().unwrap_or("")
+}
+fn sum_pair((a, b): (i64, i64), mut scale: i64, _: bool) -> i64 {
+    scale += 0;
+    (a + b) * scale
+}
+fn apply<F>(f: F, x: i64) -> i64
+where
+    F: Fn(i64) -> i64,
+{
+    f(x)
+}
+unsafe fn raw(x: i64) -> i64 {
+    x
+}
+fn table() -> std::collections::HashMap<String, Vec<(i64, i64)>> {
+    Default::default()
+}
+struct Scale;
+impl Scale {
+    fn inner(&self) -> i64 {
+        1
+    }
+}"#;
+    d.patch(&lib, &json!({"text":{"source":library}})).unwrap();
+    let consume = "if let Some(item) = pop::<i64>(packet) {\n    let value = math.apply(|x| x + 1, math.sum_pair((math.maximum(item, 42), 0), 1, true) - 1);\n    let raw = unsafe { math.raw(value) };\n    println!(\"RESULT {raw} {} {} {}\", math.label(1), math.first_word(\"a b\"), math.table().len());\n    threadwork_runner.shutdown_request();\n}";
+    d.patch(&consumer, &json!({"text":{"source":consume}}))
+        .unwrap();
+    d
+}
+/// Link and field names that are Rust keywords become raw identifiers, and every modeled
+/// field type maps to a Rust type the derived traits accept.
+#[test]
+fn rust_keywords_and_field_types_compile() {
+    let mut d = graph("rust", "single-file");
+    let packet = d
+        .nodes
+        .values()
+        .find(|n| n.name == "packet")
+        .unwrap()
+        .id
+        .clone();
+    d.patch(&packet, &json!({"name":"type"})).unwrap();
+    for name in ["producer", "consumer"] {
+        let id = d
+            .nodes
+            .values()
+            .find(|n| n.name == name)
+            .unwrap()
+            .id
+            .clone();
+        let source = d.nodes[&id].text.source.replace("packet", "r#type");
+        d.patch(&id, &json!({"text":{"source":source}})).unwrap();
+    }
+    let inner = d.create("root", "Inner", NodeKind::Type).unwrap();
+    let record = d.create("root", "Record", NodeKind::Type).unwrap();
+    let fields = [
+        "string", "char *", "number", "double", "float", "int", "date", "boolean", "void *",
+    ]
+    .iter()
+    .enumerate()
+    .map(|(i, ty)| json!({"name":format!("f{i}"),"typeId":ty}))
+    .chain([
+        json!({"name":"type","typeId":inner}),
+        json!({"name":"self","typeId":record,"isReference":true}),
+    ])
+    .collect::<Vec<_>>();
+    d.patch(
+        &record,
+        &json!({"typeDefinition":{"fields":fields,"qualifier":"object","genericTypeIds":[]}}),
+    )
+    .unwrap();
+    let project = compiler::generate(&d, "root", CompileOptions::default()).unwrap();
+    let main = &project.files[0].content;
+    assert!(main.contains(", r#type: &ThreadworkBuffer)"), "{main}");
+    assert!(
+        main.contains("static type1_a_port: ThreadworkBuffer"),
+        "{main}"
+    );
+    assert!(main.contains("pub r#type: Inner,"), "{main}");
+    assert!(main.contains("pub self_: Option<Box<Record>>,"), "{main}");
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("main.rs");
+    std::fs::write(&source, main).unwrap();
+    let output = std::process::Command::new(
+        std::env::var("WIRECRAFT_TEST_RUSTC").unwrap_or_else(|_| "rustc".into()),
+    )
+    .args([
+        "--edition",
+        "2021",
+        "-D",
+        "warnings",
+        "--emit=metadata",
+        "-o",
+    ])
+    .arg(temp.path().join("main.rmeta"))
+    .arg(&source)
+    .output()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{main}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+#[tokio::test]
+async fn real_rust_library_signatures_forward_through_the_instance() {
+    let project = compiler::generate(
+        &rust_signature_graph("rust", "single-file"),
+        "root",
+        CompileOptions::default(),
+    )
+    .unwrap();
+    let main = &project.files[0].content;
+    assert!(
+        main.contains("// use std::fmt::Display; (duplicate)"),
+        "{main}"
+    );
+    assert!(!main.contains("fn inner(self"), "{main}");
+    run_cases(&[("rust", "single-file")], rust_signature_graph).await;
+}
 #[tokio::test]
 #[ignore = "requires Kotlin 2.2+ and Java 21; kotlinc on PATH or WIRECRAFT_TEST_KOTLINC"]
 async fn real_kotlin_generated_dataflows() {
@@ -105,6 +262,11 @@ fn library_graph(set: &str, layout: &str) -> Document {
             "func maximum(left int, right int) int {\n\tif left > right {\n\t\treturn left\n\t}\n\treturn right\n}",
             "if threadworkRunner.IsRunning() { push(packet, numbers.maximum(39, 40)) }",
             "var item int; if pop(packet, &item) { fmt.Println(\"RESULT\", math.maximum(item, 42)); threadworkRunner.ShutdownRequest() }",
+        ),
+        "rust" => (
+            "fn maximum(left: i64, right: i64) -> i64 {\n    if left > right { left } else { right }\n}",
+            "if threadwork_runner.is_running() { push(packet, numbers.maximum(39, 40)); }",
+            "if let Some(item) = pop::<i64>(packet) { println!(\"RESULT {}\", math.maximum(item, 42)); threadwork_runner.shutdown_request(); }",
         ),
         "nodejs" | "systemjs" => (
             "function maximum(left, right) {\n  return left > right ? left : right;\n}",
@@ -168,6 +330,7 @@ fn library_links_lend_one_shared_instance_named_by_each_link() {
         ("php", "single-file"),
         ("php", "direct-file-system-homomorphism"),
         ("systemjs", "single-file"),
+        ("rust", "single-file"),
     ] {
         let project = compiler::generate(
             &library_graph(set, layout),
@@ -183,6 +346,7 @@ fn library_links_lend_one_shared_instance_named_by_each_link() {
             .join("\n");
         let declaration = match set {
             "go" => "var lib_math_library = &Lib_mathLibrary{",
+            "rust" => "static lib_math_library: Lib_mathLibrary = Lib_mathLibrary;",
             "kotlin" => "val lib_math_library = Lib_mathLibrary",
             "php" => "$lib_math_library = new class {",
             _ => "const lib_math_library = Object.freeze({ maximum });",
@@ -198,6 +362,7 @@ fn library_links_lend_one_shared_instance_named_by_each_link() {
         }
         let parameter = match set {
             "go" => "math *Lib_mathLibrary",
+            "rust" => "math: &Lib_mathLibrary",
             "kotlin" => "math: Lib_mathLibrary",
             "php" => "mixed $math",
             _ => ", math)",
@@ -307,6 +472,8 @@ async fn run_cases(cases: &[(&str, &str)], build: fn(&str, &str) -> Document) {
                     ".js"
                 } else if set == "go" {
                     ".go"
+                } else if set == "rust" {
+                    ".rs"
                 } else if set == "nodejs" {
                     ".js"
                 } else {
@@ -323,6 +490,23 @@ async fn run_cases(cases: &[(&str, &str)], build: fn(&str, &str) -> Document) {
                     "go",
                     vec![
                         "build".into(),
+                        "-o".into(),
+                        executable.clone(),
+                        files[0].clone(),
+                    ],
+                    &out,
+                )
+                .await;
+                run(&jobs, &executable, vec![], &out).await
+            }
+            "rust" => {
+                let executable = temp.path().join("network").to_string_lossy().to_string();
+                run(
+                    &jobs,
+                    &std::env::var("WIRECRAFT_TEST_RUSTC").unwrap_or_else(|_| "rustc".into()),
+                    vec![
+                        "--edition".into(),
+                        "2021".into(),
                         "-o".into(),
                         executable.clone(),
                         files[0].clone(),
@@ -452,7 +636,7 @@ async fn http_mcp_template_catalog_compile_export_and_reuse_share_services() {
                     .as_array()
                     .unwrap()
                     .len(),
-                6
+                7
             );
         }
     }
