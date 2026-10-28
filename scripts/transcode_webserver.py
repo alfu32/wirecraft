@@ -8,7 +8,8 @@ Each examples/webserver-transcoded/<language>/ holds that language's bodies as
 design keeps the C17 topology: the same entities, IDs, links, composite, layout and
 IO marks. Only the technology, the bodies and the type fields change: field types
 become the language-neutral `string`/`number` (nested types stay references), so
-every type template can map them. Writes examples/webserver-<language>.orch.
+every type template can map them; Rust keeps `int`, which its template maps to i64.
+Writes examples/webserver-<language>.orch.
 """
 import copy, json, pathlib, sys, uuid
 
@@ -23,8 +24,11 @@ TECHNOLOGIES = {
     "php": ("php", "php", "PHP"),
     # Engine-neutral scripts (formerly the QuickJS set); this design runs on Bun.
     "systemjs": ("javascript", "systemjs", "systemJS"),
+    "rust": ("rust", "rust", "Rust"),
 }
 FIELD_TYPES = {"char *": "string", "const char *": "string", "int": "number", "string": "string"}
+# Languages whose type template keeps C integers integral (Rust: i64).
+INTEGER_LANGUAGES = {"rust"}
 
 
 def transcode(language: str) -> pathlib.Path:
@@ -46,7 +50,8 @@ def transcode(language: str) -> pathlib.Path:
             if n["kind"] == "Type":
                 for field in n["typeDefinition"]["fields"]:
                     if field.get("typeId") in FIELD_TYPES:
-                        field["typeId"] = FIELD_TYPES[field["typeId"]]
+                        if not (language in INTEGER_LANGUAGES and field["typeId"] == "int"):
+                            field["typeId"] = FIELD_TYPES[field["typeId"]]
             continue
         # Every C body must have a counterpart; leaving C text behind would not compile.
         for section in ("source", "initialization"):

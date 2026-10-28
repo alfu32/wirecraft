@@ -1,0 +1,2441 @@
+{
+  "id": "657cab83-a68a-5efc-a611-9548f590f8e9",
+  "name": "WebServerRust",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "WebServerRust",
+      "kind": "Processor",
+      "parentId": null,
+      "children": [
+        "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "node_afca91af-9db7-4648-894e-948214e6b2d8",
+        "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+        "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+        "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+        "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+        "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+        "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+        "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+        "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+        "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+        "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+        "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+        "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+        "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+        "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "992f1269-5aa2-4929-91a3-5745c23f6cb9",
+        "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+        "95f28f57-d01a-4781-bc3c-ecca3987459d",
+        "cfd0b99d-078f-42a7-8a14-c4a6fe1ad098",
+        "252792fd-dd23-4ac7-96f4-b77ffb328e71",
+        "link_1eb6b930-6980-40be-8710-8ed323817aa7"
+      ],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "single-file",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Transcoded from examples/WebServer.orch (C17) into Rust by scripts/transcode_webserver.py to test the Rust generator. Same topology, routes, limits and access log; only the bodies, the libraries and the type field types differ. The C17 specification follows.\n\nWebServer — a single-process HTTP/1.1 server expressed as a Wirecraft C17 dataflow network.\n\nPURPOSE\nServe three fixed routes plus a fallback, demonstrating typed links, a self-feedback loop,\nlibrary instances lent by dependency links, and composite routing.\n\nCONFIGURATION (environment, read once at start)\n- WEBSERVER_PORT: TCP port, default 8080 (1–65535).\n- WEBSERVER_BIND_ANY=1: listen on every IPv4 address; otherwise loopback 127.0.0.1 only.\n- WEBSERVER_MAX_REQUESTS=N: request shutdown after N resolved requests; 0 or unset = unlimited.\nSIGINT/SIGTERM also request shutdown through the generated runner.\n\nROUTES\n| Method   | Path          | Status | Content-Type                  | Entity              |\n| GET/HEAD | /home/about   | 200    | text/plain; charset=utf-8     | routeHomeAbout      |\n| GET/HEAD | /home/version | 200    | text/plain; charset=utf-8     | routeHomeVersion    |\n| GET/HEAD | /api/user     | 200    | application/json              | routeApiUserDetails |\n| other    | known path    | 405 (+ Allow: GET, HEAD)                | routeNotFound       |\n| any      | unknown path  | 404                                     | routeNotFound       |\n| —        | unparsable request line | 400                           | routeNotFound       |\nThe query string is ignored for matching. HEAD returns the GET header without a body.\nEvery response carries Content-Type, Content-Length, Connection: close and Server.\n\nFLOW (one ReqRep packet per request)\nsocket_accept --request--> router --route*Request--> route --route*Response--> socket_respond\n--response--> socket_accept, which writes the reply and closes the connection.\nWhile a request is in flight its pending copy circulates on awaitResponseLoop.\n\nOWNERSHIP OF ReqRep STRINGS (packets are copied by value)\n- The pending copy on awaitResponseLoop owns id, request.header and request.body.\n- Router and route copies only borrow those strings.\n- The route allocates response.body; socket_respond allocates response.header.\n- socket_accept frees both sets exactly once when it resolves the request\n  (lib_http_server.http_resolve). content_type always points to a string literal.\n\nLIMITS AND ERRORS\nHeader ≤ 8 KiB (else 431), body ≤ 64 KiB by Content-Length (else 413), 2 s receive timeout\n(408 when nothing arrives, 400 on a truncated request). These connections are answered by the library and never enter the network.\nAllocation or socket failures end the run with THREADWORK_ERROR; the process exits non-zero.\n\nEXECUTION MODEL AND LIMITATIONS\nSingle-threaded cooperative loop: each tick runs every entity once and each link moves at most\none packet. When nothing is pending, socket_accept waits up to 25 ms for a connection, so an\nidle server does not spin. Reading a request blocks for up to 2 s per connection, so a slow\nclient delays others. No TLS, keep-alive, chunked encoding or IPv6.\n\nSHUTDOWN\nAfter shutdown is requested, socket_accept stops accepting, resolves every pending request,\nthen closes the listener; the runner's drain ends once no packet moves.\n\nACCESS LOG\nsocket_accept prints one line per resolved request on stdout:\n\"<id> <method> <path> <status> <body bytes>\"; startup prints the listening URL.\n",
+        "specificationLanguageId": "markdown",
+        "tests": "Build: compile with wirecraft.compile_c17 into a new directory, then\n  clang -std=c17 -Wall -Wextra -pedantic WebServer.c -o webserver\nRun: WEBSERVER_PORT=18080 WEBSERVER_MAX_REQUESTS=6 ./webserver\nExpect (curl -s -i):\n1. GET /home/about   → 200, text/plain, body names the example.\n2. GET /home/version → 200, text/plain, body \"WebServer 0.1.0 (Wirecraft C17)\".\n3. GET /api/user?x=1 → 200, application/json, valid JSON with \"name\":\"Ada Lovelace\".\n4. GET /missing      → 404, body \"404 Not Found: /missing\".\n5. POST /home/about  → 405 with \"Allow: GET, HEAD\".\n6. HEAD /home/about  → 200 header with Content-Length of the GET body and no body.\nAfter the sixth request the process exits 0 and has printed six access-log lines.\n",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "rust",
+        "technologyId": "rust",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T17:25:24Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "name": "socket_accept",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "992f1269-5aa2-4929-91a3-5745c23f6cb9",
+        "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+        "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+        "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd"
+      ],
+      "outgoingLinks": [
+        "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+        "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd"
+      ],
+      "layout": {
+        "x": 222.32325019058075,
+        "y": 1098.441268190992,
+        "width": 200.0,
+        "height": 138.0,
+        "closedWidth": 200.0,
+        "closedHeight": 138.0,
+        "openWidth": 200.0,
+        "openHeight": 138.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "// Counters that a C body keeps in statics live in the run context.\nlet mut sequence = *context.state::<u64>(\"socket_accept.sequence\");\nlet mut resolved_total = *context.state::<u64>(\"socket_accept.resolved\");\nlet limit = *context\n    .state::<Option<u64>>(\"socket_accept.limit\")\n    .get_or_insert_with(|| {\n        std::env::var(\"WEBSERVER_MAX_REQUESTS\")\n            .ok()\n            .and_then(|text| text.parse().ok())\n            .unwrap_or(0)\n    });\n// Both buffers of the awaitResponseLoop self-link hold the pending copies.\nlet pending = [awaitResponseLoop_in, awaitResponseLoop_out];\n\n// 1. Resolve every response against its pending copy, rotating each loop buffer once.\nwhile !response.is_empty() {\n    let item = pop::<ReqRep>(response)\n        .ok_or(\"webserver: response buffer holds a value that is not a ReqRep\")?;\n    let mut found = false;\n    for side in pending {\n        for _ in 0..side.len() {\n            let waiting = pop::<ReqRep>(side)\n                .ok_or(\"webserver: pending buffer holds a value that is not a ReqRep\")?;\n            if found || waiting.id != item.id {\n                push(side, waiting);\n                continue;\n            }\n            found = true;\n            if libhttp.http_resolve(&waiting, &item) != 0 {\n                eprintln!(\"webserver: client closed the connection early\");\n            }\n        }\n    }\n    if !found {\n        return Err(format!(\"webserver: response {} has no pending request\", item.id).into());\n    }\n    resolved_total += 1;\n    if limit > 0 && resolved_total >= limit {\n        threadwork_runner.shutdown_request();\n    }\n}\n// 2. Accept at most one connection; wait briefly only when nothing is in flight.\nlet idle = awaitResponseLoop_in.is_empty() && awaitResponseLoop_out.is_empty();\nif threadwork_runner.is_running() {\n    if libhttp.http_wait(if idle { 25 } else { 0 }) {\n        sequence += 1;\n        if let Some(accepted) = libhttp.http_accept(sequence) {\n            push(request, accepted.clone());\n            push(awaitResponseLoop_out, accepted);\n        }\n    }\n} else if idle {\n    libhttp.http_close();\n}\n*context.state::<u64>(\"socket_accept.sequence\") = sequence;\n*context.state::<u64>(\"socket_accept.resolved\") = resolved_total;",
+        "sourceLanguageId": "",
+        "initialization": "let port: i64 = match std::env::var(\"WEBSERVER_PORT\") {\n    Ok(text) if !text.is_empty() => text.parse().unwrap_or(0),\n    _ => 8080,\n};\nlet any_address = std::env::var(\"WEBSERVER_BIND_ANY\").as_deref() == Ok(\"1\");\nif let Err(error) = libhttp.http_listen(port, any_address) {\n    eprintln!(\"webserver: cannot listen on port {port}\");\n    return Err(error.into());\n}\nlet host = if any_address { \"0.0.0.0\" } else { \"127.0.0.1\" };\nprintln!(\"webserver: listening on http://{host}:{port}\");",
+        "initializationLanguageId": "",
+        "specification": "Entry and exit point of every request.\n\nInitialization: read WEBSERVER_PORT and WEBSERVER_BIND_ANY, open the listener with\nlibhttp.http_listen and print \"webserver: listening on http://<address>:<port>\".\nFailure to listen is an error (the process exits non-zero).\n\nEach tick:\n1. Pop every resolved ReqRep from `response` and find its pending copy by id in the\n   awaitResponseLoop self-link. Both of its buffers (awaitResponseLoop_in and\n   awaitResponseLoop_out) are searched by rotating each once, so the copies that do not\n   match keep their order. Resolve the match with libhttp.http_resolve (write the reply,\n   log it, close, free). A response without a pending copy is an error.\n2. While running, accept at most one connection with libhttp.http_accept and push the new\n   ReqRep to both `request` (router) and awaitResponseLoop_out (pending copy). Wait up to\n   25 ms for a connection only when nothing is pending.\n3. Count resolutions; at WEBSERVER_MAX_REQUESTS request shutdown.\nAfter shutdown, stop accepting and close the listener once nothing is pending.",
+        "specificationLanguageId": "markdown",
+        "tests": "- With an unused port, startup prints the listening URL and the process keeps running.\n- With the port already in use, initialization fails and the process exits non-zero.\n- Two concurrent clients receive the responses matching their own requests (ids differ).\n- WEBSERVER_MAX_REQUESTS=1 exits 0 after exactly one access-log line.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T01:40:13Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:12:54.564349361Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:28.009712855Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:35.158933431Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null,
+      "io": "in"
+    },
+    {
+      "id": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+      "name": "router",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5"
+      ],
+      "outgoingLinks": [
+        "cfd0b99d-078f-42a7-8a14-c4a6fe1ad098",
+        "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+        "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+        "link_ea685463-77d8-4af7-87d0-b4b485ff73bc"
+      ],
+      "layout": {
+        "x": -58.302269072193425,
+        "y": 943.3030217355443,
+        "width": 200.0,
+        "height": 138.0,
+        "closedWidth": 200.0,
+        "closedHeight": 138.0,
+        "openWidth": 200.0,
+        "openHeight": 138.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "while !request.is_empty() {\n    let item = pop::<ReqRep>(request)\n        .ok_or(\"router: request buffer holds a value that is not a ReqRep\")?;\n    let mut route = routeNotFoundRequest;\n    // The request line's first two words, as sscanf(\"%7s %255s\") reads them.\n    let fields: Vec<&str> = item.request.header.split_whitespace().take(2).collect();\n    if fields.len() == 2 && (fields[0] == \"GET\" || fields[0] == \"HEAD\") {\n        let path: String = fields[1].chars().take(255).collect();\n        route = match path.split('?').next().unwrap_or_default() {\n            \"/home/about\" => routeHomeAboutRequest,\n            \"/home/version\" => routeHomeVersionRequest,\n            \"/api/user\" => routeApiUserDetailsRequest,\n            _ => routeNotFoundRequest,\n        };\n    }\n    push(route, item);\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Dispatches each request to exactly one route.\n\nPop every ReqRep from `request`, read the request line \"<METHOD> <path> HTTP/x.y\" from\nrequest.header and strip any query string from the path. GET or HEAD for /home/about,\n/home/version or /api/user go to the matching route*Request link; everything else\n(other methods, unknown paths, unparsable request lines) goes to routeNotFoundRequest.\nThe router only borrows the request strings and never builds a response.",
+        "specificationLanguageId": "markdown",
+        "tests": "- \"GET /home/about?lang=en\" reaches routeHomeAbout.\n- \"POST /home/about\" and \"GET /nowhere\" reach routeNotFound.\n- A header without a request line reaches routeNotFound.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:12:56.876300881Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:22.476006624Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:32.958121103Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+      "name": "Request",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 1165.153249972568,
+        "y": 1194.5730952454144,
+        "width": 220.0,
+        "height": 86.0,
+        "closedWidth": 220.0,
+        "closedHeight": 86.0,
+        "openWidth": 220.0,
+        "openHeight": 86.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Raw HTTP request: `header` is the request line and header fields including the final empty line; `body` is the Content-Length body (empty string when absent). Both NUL-terminated.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "header",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "body",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T02:36:35Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "TESTING",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:13:05.623513924Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:18.160006967Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:39.023962690Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "TESTING"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+      "name": "Response",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 1246.256654834311,
+        "y": 1023.4797156451874,
+        "width": 220.0,
+        "height": 86.0,
+        "closedWidth": 220.0,
+        "closedHeight": 86.0,
+        "openWidth": 220.0,
+        "openHeight": 86.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "HTTP response under construction: `status` code, `content_type` (string literal), `header` rendered by socket_respond, `body` allocated by the route.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "status",
+            "typeId": "int",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "content_type",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "header",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "body",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T02:36:41Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "TESTING",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:13:15.208336751Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:19.542718491Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:40.291439401Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "TESTING"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+      "name": "ReqRep",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 1767.5226084067845,
+        "y": 917.7088418597278,
+        "width": 220.0,
+        "height": 268.0,
+        "closedWidth": 220.0,
+        "closedHeight": 268.0,
+        "openWidth": 220.0,
+        "openHeight": 268.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "One request/response exchange: `id` \"req-<n>\" unique per server run, `connection` socket descriptor, the parsed `request`, and the `response` filled downstream. See the ownership rules in the WebServer specification.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "id",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "connection",
+            "typeId": "int",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "request",
+            "typeId": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "response",
+            "typeId": "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+            "isReference": false,
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T02:36:45Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "TESTING",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:14:29.586825517Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:17.044081665Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:37.741160440Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "TESTING"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "link_66e6e8e4-5fb1-4171-8bc9-1d22a4323ec5",
+      "name": "request",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "New requests from socket_accept to the router (router copy; borrows strings).",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "sourcePortName": "out",
+        "targetNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+      "name": "awaitResponseLoop",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "single-file",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Self-feedback of pending ReqRep copies that own the request strings until resolution; both of its buffers are the store of in-flight requests that socket_accept searches by id.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+      "name": "socket_respond",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "252792fd-dd23-4ac7-96f4-b77ffb328e71",
+        "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+        "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+        "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+        "link_d40b1933-7e41-4f24-924d-f7fd683cedfd"
+      ],
+      "outgoingLinks": [
+        "link_47dfe6fa-791b-4863-99ff-002db0ff8f88"
+      ],
+      "layout": {
+        "x": 1424.8145626723751,
+        "y": 731.3664223096141,
+        "width": 200.0,
+        "height": 138.0,
+        "closedWidth": 200.0,
+        "closedHeight": 138.0,
+        "openWidth": 200.0,
+        "openHeight": 138.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "let answered = [\n    routeHomeAboutResponse,\n    routeHomeVersionResponse,\n    routeApiUserDetailsResponse,\n    routeNotFoundResponse,\n];\n\nfor buffer in answered {\n    while !buffer.is_empty() {\n        let mut item = pop::<ReqRep>(buffer)\n            .ok_or(\"socket_respond: response buffer holds a value that is not a ReqRep\")?;\n        item.response.header = libhttp.http_render_header(&item.response);\n        push(response, item);\n    }\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Completes each route response.\nPop every ReqRep from the four route*Response links (about, version, user, not-found order),\nset response.header with libhttp.http_render_header — status line, Content-Type, exact\nContent-Length of response.body, Connection: close, Server and, for 405, Allow — and push it\nto `response` for socket_accept.",
+        "specificationLanguageId": "markdown",
+        "tests": "- A 200 text body of 32 bytes yields \"Content-Length: 32\" and ends the header with an empty line.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:18:51.543616506Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:31.442193153Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "link_d40b1933-7e41-4f24-924d-f7fd683cedfd",
+      "name": "routeHomeAboutResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_4cc82930-d2e5-431c-a48c-8b676d08ad57",
+      "name": "routeApiUserDetailsResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_7392aa1b-0044-4e3a-a41b-84063ff15470",
+      "name": "routeHomeAboutRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+        "sourcePortName": "out",
+        "targetNodeId": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_ea685463-77d8-4af7-87d0-b4b485ff73bc",
+      "name": "routeHomeVersionRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+        "sourcePortName": "out",
+        "targetNodeId": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_1a170b1e-0115-44b9-9440-78eac48c77ce",
+      "name": "routeApiUserDetailsRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+        "sourcePortName": "out",
+        "targetNodeId": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+      "name": "response",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Completed responses (header rendered) from socket_respond back to socket_accept.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+      "name": "routes",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [
+        "node_10886e3b-8eac-4654-92e5-8461794ca831",
+        "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+        "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+        "a1832228-ea25-4e9b-9ece-07f7dd635b19"
+      ],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 405.5696049673733,
+        "y": 552.1725101582833,
+        "width": 672.4004575886731,
+        "height": 452.25130527879014,
+        "closedWidth": 200.0,
+        "closedHeight": 228.0,
+        "openWidth": 672.4004575886731,
+        "openHeight": 452.25130527879014,
+        "isExpanded": true,
+        "padding": {
+          "top": 0.0,
+          "right": 211.0,
+          "bottom": 13.0,
+          "left": 197.0
+        }
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Composite grouping the route handlers. It has no code of its own; its children receive their request links from the router and send to socket_respond.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:26:28.620849358Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:21.026192074Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:34.024863763Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_10886e3b-8eac-4654-92e5-8461794ca831",
+      "name": "routeApiUserDetails",
+      "kind": "Processor",
+      "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+      "children": [],
+      "incomingLinks": [
+        "link_1a170b1e-0115-44b9-9440-78eac48c77ce"
+      ],
+      "outgoingLinks": [
+        "link_4cc82930-d2e5-431c-a48c-8b676d08ad57"
+      ],
+      "layout": {
+        "x": 587.6455594831149,
+        "y": 857.3212503817717,
+        "width": 228.94454452582545,
+        "height": 70.7141822818528,
+        "closedWidth": 228.94454452582545,
+        "closedHeight": 70.7141822818528,
+        "openWidth": 298.0,
+        "openHeight": 108.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "const TEXT: &str = concat!(\n    r#\"{\"id\":1,\"name\":\"Ada Lovelace\",\"email\":\"ada@example.invalid\",\"roles\":[\"admin\",\"author\"]}\"#,\n    \"\\n\"\n);\n\nwhile !routeApiUserDetailsRequest.is_empty() {\n    let mut item = pop::<ReqRep>(routeApiUserDetailsRequest)\n        .ok_or(\"routeApiUserDetails: request buffer holds a value that is not a ReqRep\")?;\n    item.response.status = 200;\n    item.response.content_type = \"application/json\".into();\n    item.response.body = TEXT.into();\n    push(routeApiUserDetailsResponse, item);\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "GET/HEAD /api/user. Responds 200 application/json with a placeholder user document:\n{\"id\":1,\"name\":\"Ada Lovelace\",\"email\":\"ada@example.invalid\",\"roles\":[\"admin\",\"author\"]}\nfollowed by a newline. The data is static; no persistence is involved.",
+        "specificationLanguageId": "markdown",
+        "tests": "- Body parses as JSON and has name \"Ada Lovelace\" and two roles.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "/api/user",
+      "status": "FUNCTIONAL",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:16:43.530798189Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:25.377343173Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:29.226455905Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:41.624285275Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_92b69e7a-8f17-4fcb-9b2a-8e18966c9581",
+      "name": "routeHomeAbout",
+      "kind": "Processor",
+      "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+      "children": [],
+      "incomingLinks": [
+        "link_7392aa1b-0044-4e3a-a41b-84063ff15470"
+      ],
+      "outgoingLinks": [
+        "link_d40b1933-7e41-4f24-924d-f7fd683cedfd"
+      ],
+      "layout": {
+        "x": 586.9684797113987,
+        "y": 678.0589868790305,
+        "width": 233.00266921762648,
+        "height": 70.0,
+        "closedWidth": 233.00266921762648,
+        "closedHeight": 70.0,
+        "openWidth": 270.0,
+        "openHeight": 108.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "const TEXT: &str = \"Wirecraft WebServer example: a Rust dataflow HTTP server generated from a Wirecraft model.\\n\";\n\nwhile !routeHomeAboutRequest.is_empty() {\n    let mut item = pop::<ReqRep>(routeHomeAboutRequest)\n        .ok_or(\"routeHomeAbout: request buffer holds a value that is not a ReqRep\")?;\n    item.response.status = 200;\n    item.response.content_type = \"text/plain; charset=utf-8\".into();\n    item.response.body = TEXT.into();\n    push(routeHomeAboutResponse, item);\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "GET/HEAD /home/about. Responds 200 text/plain; charset=utf-8 with a heap-allocated one-line\ndescription of the example. Leaves response.header to socket_respond.",
+        "specificationLanguageId": "markdown",
+        "tests": "- Body: \"Wirecraft WebServer example: a C17 dataflow HTTP server generated from a Wirecraft model.\"",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "/home/about",
+      "status": "FUNCTIONAL",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:12:59.800867392Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:42.691024152Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+      "name": "routeHomeVersion",
+      "kind": "Processor",
+      "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+      "children": [],
+      "incomingLinks": [
+        "link_ea685463-77d8-4af7-87d0-b4b485ff73bc"
+      ],
+      "outgoingLinks": [
+        "link_1eb6b930-6980-40be-8710-8ed323817aa7"
+      ],
+      "layout": {
+        "x": 585.6574224798694,
+        "y": 768.7865225321237,
+        "width": 260.2531291510386,
+        "height": 71.459040888642,
+        "closedWidth": 260.2531291510386,
+        "closedHeight": 71.459040888642,
+        "openWidth": 307.0,
+        "openHeight": 108.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "const TEXT: &str = \"WebServer 0.1.0 (Wirecraft Rust)\\n\";\n\nwhile !routeHomeVersionRequest.is_empty() {\n    let mut item = pop::<ReqRep>(routeHomeVersionRequest)\n        .ok_or(\"routeHomeVersion: request buffer holds a value that is not a ReqRep\")?;\n    item.response.status = 200;\n    item.response.content_type = \"text/plain; charset=utf-8\".into();\n    item.response.body = TEXT.into();\n    push(routeHomeVersionResponse, item);\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "GET/HEAD /home/version. Responds 200 text/plain; charset=utf-8 with a heap-allocated body\n\"WebServer 0.1.0 (Wirecraft C17)\" and a trailing newline.",
+        "specificationLanguageId": "markdown",
+        "tests": "- Body equals \"WebServer 0.1.0 (Wirecraft C17)\\n\".",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "/home/version",
+      "status": "FUNCTIONAL",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:16:42.278545287Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:43.690713218Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "a1832228-ea25-4e9b-9ece-07f7dd635b19",
+      "name": "routeNotFound",
+      "kind": "Processor",
+      "parentId": "node_f0b2f552-0e45-4843-b328-9666bb3357db",
+      "children": [],
+      "incomingLinks": [
+        "cfd0b99d-078f-42a7-8a14-c4a6fe1ad098"
+      ],
+      "outgoingLinks": [
+        "252792fd-dd23-4ac7-96f4-b77ffb328e71"
+      ],
+      "layout": {
+        "x": 588.595023104322,
+        "y": 942.95587369488,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "const KNOWN: [&str; 3] = [\"/home/about\", \"/home/version\", \"/api/user\"];\n\nwhile !routeNotFoundRequest.is_empty() {\n    let mut item = pop::<ReqRep>(routeNotFoundRequest)\n        .ok_or(\"routeNotFound: request buffer holds a value that is not a ReqRep\")?;\n    let mut reason = \"Bad Request\";\n    let mut path = String::new();\n    item.response.status = 400;\n    let fields: Vec<&str> = item.request.header.split_whitespace().take(2).collect();\n    if fields.len() == 2 {\n        path = fields[1].chars().take(255).collect();\n        if let Some(query) = path.find('?') {\n            path.truncate(query);\n        }\n        path = path.chars().take(200).collect();\n        item.response.status = 404;\n        reason = \"Not Found\";\n        if KNOWN.contains(&path.as_str()) {\n            item.response.status = 405;\n            reason = \"Method Not Allowed\";\n        }\n    }\n    item.response.content_type = \"text/plain; charset=utf-8\".into();\n    item.response.body = if item.response.status == 400 {\n        format!(\"400 {reason}\\n\")\n    } else {\n        format!(\"{} {reason}: {path}\\n\", item.response.status)\n    };\n    push(routeNotFoundResponse, item);\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Fallback for everything the router does not match.\n- Unparsable request line: 400 \"400 Bad Request\".\n- Known path with a method other than GET/HEAD: 405 \"405 Method Not Allowed: <path>\"\n  (socket_respond adds \"Allow: GET, HEAD\").\n- Otherwise: 404 \"404 Not Found: <path>\".\nBodies are text/plain; charset=utf-8, heap-allocated, newline-terminated; the path is quoted\nwithout its query string and truncated to 200 bytes.",
+        "specificationLanguageId": "markdown",
+        "tests": "- \"GET /missing?q=1\" → 404 body \"404 Not Found: /missing\".\n- \"DELETE /api/user\" → 405.\n- \"garbage\" → 400.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:50:23Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "*",
+      "status": "BUSINESS",
+      "statusChanges": [
+        {
+          "userId": "local",
+          "changedDate": "2026-10-27T13:03:38Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+      "name": "base_lib",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [
+        "95f28f57-d01a-4781-bc3c-ecca3987459d",
+        "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8"
+      ],
+      "layout": {
+        "x": 1116.0601941435416,
+        "y": 626.5603955701995,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "// Platform modules for the server libraries: TCP sockets, threads, timeouts and shared state.\nuse std::collections::BTreeMap;\nuse std::io::{ErrorKind, Read, Write};\nuse std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};\nuse std::sync::atomic::{AtomicBool, Ordering};\nuse std::sync::mpsc::{Receiver, channel};\nuse std::sync::{Mutex, MutexGuard};\nuse std::time::Duration;",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Platform library: the POSIX socket, polling and errno headers shared by the server code,\nlent to socket_accept as `platform` and to lib_http_server. It declares no functions.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:31:21Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:29:17.242951872Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:14.546557084Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+      "name": "platform",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+      "name": "lib_http_server",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "95f28f57-d01a-4781-bc3c-ecca3987459d"
+      ],
+      "outgoingLinks": [
+        "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+        "992f1269-5aa2-4929-91a3-5745c23f6cb9"
+      ],
+      "layout": {
+        "x": -34.33555165710916,
+        "y": 631.2292609155311,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "// HTTP/1.1 helpers for the WebServer network. Lent to consumers as `libhttp`.\nconst HTTP_MAX_HEADER: usize = 8192;\nconst HTTP_MAX_BODY: usize = 65536;\n\n/// The standard library has no accept timeout, so a listening thread accepts and hands\n/// connections over `accepted`; http_wait waits on that channel. Also: the connection\n/// http_wait received (handed to the next http_accept) and the open connections, by the\n/// number a ReqRep carries in `connection`.\nstruct HttpServer {\n    accepted: Option<Receiver<TcpStream>>,\n    address: Option<SocketAddr>,\n    waiting: Option<TcpStream>,\n    connections: BTreeMap<i64, TcpStream>,\n    next_connection: i64,\n}\n\nstatic HTTP_SERVER: Mutex<HttpServer> = Mutex::new(HttpServer {\n    accepted: None,\n    address: None,\n    waiting: None,\n    connections: BTreeMap::new(),\n    next_connection: 0,\n});\n\n/// Tells the listening thread to drop the listening socket at its next connection.\nstatic HTTP_CLOSING: AtomicBool = AtomicBool::new(false);\n\nfn http_server() -> MutexGuard<'static, HttpServer> {\n    HTTP_SERVER.lock().unwrap_or_else(|poisoned| poisoned.into_inner())\n}\n\nfn http_status_text(status: i64) -> &'static str {\n    match status {\n        200 => \"OK\",\n        400 => \"Bad Request\",\n        404 => \"Not Found\",\n        405 => \"Method Not Allowed\",\n        408 => \"Request Timeout\",\n        413 => \"Content Too Large\",\n        431 => \"Request Header Fields Too Large\",\n        500 => \"Internal Server Error\",\n        _ => \"Unknown\",\n    }\n}\n\n/// Non-negative integer value of a header field (case-insensitive name), or -1.\nfn http_header_number(header: &str, name: &str) -> i64 {\n    for line in header.split(\"\\r\\n\").skip(1) {\n        if line.is_empty() {\n            break;\n        }\n        let Some((field, value)) = line.split_once(':') else {\n            continue;\n        };\n        if !field.eq_ignore_ascii_case(name) {\n            continue;\n        }\n        let value = value.trim_start_matches([' ', '\\t']);\n        let digits = value.bytes().take_while(u8::is_ascii_digit).count();\n        if digits == 0 {\n            return -1;\n        }\n        // Like strtol, an out-of-range value saturates instead of failing.\n        return value[..digits].parse().unwrap_or(i64::MAX);\n    }\n    -1\n}\n\n/// Answers a connection that never became a request, then closes it.\nfn http_reject(mut connection: TcpStream, status: i64) {\n    let text = http_status_text(status);\n    let reply = format!(\n        \"HTTP/1.1 {status} {text}\\r\\nContent-Type: text/plain; charset=utf-8\\r\\nContent-Length: {}\\r\\n\\\n         Connection: close\\r\\nServer: Wirecraft-WebServer/0.1\\r\\n\\r\\n{status} {text}\\n\",\n        text.len() + 5\n    );\n    let _ = connection.write_all(reply.as_bytes());\n    // Closing with unread request bytes would reset the connection and lose the reply:\n    // finish sending, then discard what the client still sends (bounded by the 2 s timeout).\n    if connection.shutdown(Shutdown::Write).is_ok() {\n        let mut discard = [0u8; 4096];\n        let mut drained = 0;\n        while drained < HTTP_MAX_BODY {\n            match connection.read(&mut discard) {\n                Ok(0) | Err(_) => break,\n                Ok(count) => drained += count,\n            }\n        }\n    }\n}\n\nfn http_listen(port: i64, any_address: bool) -> std::io::Result<()> {\n    if !(1..=65535).contains(&port) {\n        return Err(std::io::Error::new(ErrorKind::InvalidInput, \"port out of range\"));\n    }\n    let host = if any_address { \"0.0.0.0\" } else { \"127.0.0.1\" };\n    let listener = TcpListener::bind((host, port as u16))?;\n    let (sender, accepted) = channel();\n    std::thread::spawn(move || {\n        for connection in listener.incoming() {\n            if HTTP_CLOSING.load(Ordering::SeqCst) {\n                break;\n            }\n            if let Ok(connection) = connection {\n                if sender.send(connection).is_err() {\n                    break;\n                }\n            }\n        }\n    });\n    let mut server = http_server();\n    server.accepted = Some(accepted);\n    server.address = Some(SocketAddr::from(([127, 0, 0, 1], port as u16)));\n    Ok(())\n}\n\n/// Waits up to `timeout_ms` for a connection; true when http_accept has one to read.\nfn http_wait(timeout_ms: u64) -> bool {\n    let mut server = http_server();\n    if server.waiting.is_some() {\n        return true;\n    }\n    let Some(accepted) = &server.accepted else {\n        return false;\n    };\n    let connection = if timeout_ms == 0 {\n        accepted.try_recv().ok()\n    } else {\n        accepted.recv_timeout(Duration::from_millis(timeout_ms)).ok()\n    };\n    let ready = connection.is_some();\n    server.waiting = connection;\n    ready\n}\n\nfn http_close() {\n    let mut server = http_server();\n    server.waiting = None;\n    server.accepted = None;\n    // A connection of our own wakes the listening thread, which then closes the socket.\n    if let Some(address) = server.address.take() {\n        HTTP_CLOSING.store(true, Ordering::SeqCst);\n        let _ = TcpStream::connect_timeout(&address, Duration::from_secs(1));\n    }\n}\n\n/// Reads one request from the waiting connection; None when there is none or when the\n/// connection was answered here instead (408, 400, 413, 431).\nfn http_accept(sequence: u64) -> Option<ReqRep> {\n    let mut connection = http_server().waiting.take()?;\n    let _ = connection.set_read_timeout(Some(Duration::from_secs(2)));\n    let mut buffer = Vec::with_capacity(HTTP_MAX_HEADER);\n    let mut chunk = [0u8; 4096];\n    let end = loop {\n        if buffer.len() >= HTTP_MAX_HEADER {\n            http_reject(connection, 431);\n            return None;\n        }\n        let room = chunk.len().min(HTTP_MAX_HEADER - buffer.len());\n        match connection.read(&mut chunk[..room]) {\n            Ok(count) if count > 0 => {\n                buffer.extend_from_slice(&chunk[..count]);\n                if let Some(end) = buffer.windows(4).position(|w| w == b\"\\r\\n\\r\\n\") {\n                    break end;\n                }\n            }\n            result => {\n                let timeout = matches!(&result, Err(error)\n                    if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut));\n                http_reject(connection, if buffer.is_empty() && timeout { 408 } else { 400 });\n                return None;\n            }\n        }\n    };\n    let header_length = end + 4;\n    let header = String::from_utf8_lossy(&buffer[..header_length]).into_owned();\n    let body_length = http_header_number(&header, \"Content-Length\").max(0) as usize;\n    if body_length > HTTP_MAX_BODY {\n        http_reject(connection, 413);\n        return None;\n    }\n    while buffer.len() < header_length + body_length {\n        let room = chunk.len().min(header_length + body_length - buffer.len());\n        match connection.read(&mut chunk[..room]) {\n            Ok(count) if count > 0 => buffer.extend_from_slice(&chunk[..count]),\n            _ => {\n                http_reject(connection, 400);\n                return None;\n            }\n        }\n    }\n    let body = String::from_utf8_lossy(&buffer[header_length..header_length + body_length]);\n    let mut server = http_server();\n    server.next_connection += 1;\n    let number = server.next_connection;\n    server.connections.insert(number, connection);\n    Some(ReqRep {\n        id: format!(\"req-{sequence}\"),\n        connection: number,\n        request: Request {\n            header,\n            body: body.into_owned(),\n        },\n        ..Default::default()\n    })\n}\n\nfn http_render_header(response: &Response) -> String {\n    let content_type = if response.content_type.is_empty() {\n        \"text/plain; charset=utf-8\"\n    } else {\n        &response.content_type\n    };\n    let allow = if response.status == 405 { \"Allow: GET, HEAD\\r\\n\" } else { \"\" };\n    format!(\n        \"HTTP/1.1 {} {}\\r\\nContent-Type: {content_type}\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\\n         Server: Wirecraft-WebServer/0.1\\r\\n{allow}\\r\\n\",\n        response.status,\n        http_status_text(response.status),\n        response.body.len()\n    )\n}\n\n/// Writes the response to the pending request's connection, logs it and closes it; 0 on success.\nfn http_resolve(pending: &ReqRep, resolved: &ReqRep) -> i32 {\n    let connection = http_server().connections.remove(&pending.connection);\n    let head = pending.request.header.starts_with(\"HEAD \");\n    let status = match connection {\n        None => -1,\n        Some(mut connection) => {\n            let mut written = connection.write_all(resolved.response.header.as_bytes());\n            if written.is_ok() && !head && !resolved.response.body.is_empty() {\n                written = connection.write_all(resolved.response.body.as_bytes());\n            }\n            // Dropping the stream closes the connection.\n            if written.is_ok() { 0 } else { -1 }\n        }\n    };\n    let mut fields = pending.request.header.split_whitespace();\n    let (method, path) = match (fields.next(), fields.next()) {\n        (Some(method), Some(path)) => (method, path),\n        _ => (\"\", \"\"),\n    };\n    println!(\n        \"{} {method} {path} {} {}\",\n        pending.id,\n        resolved.response.status,\n        resolved.response.body.len()\n    );\n    status\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "HTTP/1.1 socket helpers lent as `libhttp` to socket_accept and socket_respond.\n- http_listen(port, any_address): non-blocking IPv4 listener with SO_REUSEADDR; 0 or -1.\n- http_wait(timeout_ms): 1 when a connection is ready to accept.\n- http_accept(sequence, out): accept one connection, read the header (≤ 8 KiB, up to the\n  blank line) and Content-Length body (≤ 64 KiB) with a 2 s timeout, then fill a ReqRep with\n  id \"req-<sequence>\", the connection and heap copies of header and body. Returns 1 for a\n  request, 0 when nothing was accepted or the connection was answered directly (408, 400,\n  413, 431, 500), -1 on a listener failure.\n- http_status_text(status): reason phrase.\n- http_render_header(response): heap-allocated response header; NULL on allocation failure.\n- http_resolve(pending, resolved): write header and (except for HEAD) body, print the access\n  log line, close the connection and free the strings each copy owns; 0 or -1 on write error.\n- http_close(): close the listener.\nWrites retry on EINTR and suppress SIGPIPE.",
+        "specificationLanguageId": "markdown",
+        "tests": "- A request split over several TCP segments is assembled before routing.\n- A 9 KiB header is answered 431 without entering the network.\n- A client that disconnects early does not terminate the server.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T23:08:15Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "BUSINESS",
+      "statusChanges": [
+        {
+          "userId": "local",
+          "changedDate": "2026-10-27T09:02:20Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "992f1269-5aa2-4929-91a3-5745c23f6cb9",
+      "name": "libhttp",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+      "name": "libhttp",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "95f28f57-d01a-4781-bc3c-ecca3987459d",
+      "name": "platform",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+        "sourcePortName": "out",
+        "targetNodeId": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "cfd0b99d-078f-42a7-8a14-c4a6fe1ad098",
+      "name": "routeNotFoundRequest",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Requests that match no route, use another method, or cannot be parsed.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_afca91af-9db7-4648-894e-948214e6b2d8",
+        "sourcePortName": "out",
+        "targetNodeId": "a1832228-ea25-4e9b-9ece-07f7dd635b19",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:07:50Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "252792fd-dd23-4ac7-96f4-b77ffb328e71",
+      "name": "routeNotFoundResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "400/404/405 responses from routeNotFound.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "a1832228-ea25-4e9b-9ece-07f7dd635b19",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:07:50Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "link_1eb6b930-6980-40be-8710-8ed323817aa7",
+      "name": "routeHomeVersionResponse",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_be823219-b2e9-43bf-bb78-005e6e9119e9",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [
+          "node_f0b2f552-0e45-4843-b328-9666bb3357db"
+        ],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    }
+  ],
+  "metadata": {},
+  "masterRevision": {
+    "name": "",
+    "date": ""
+  },
+  "users": []
+}
