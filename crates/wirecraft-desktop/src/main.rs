@@ -105,6 +105,8 @@ struct Wirecraft {
     mode: Mode,
     show_sheets: bool,
     sheet_contours: Vec<wirecraft_core::viewport::Rect>,
+    /// Title block and parts list contours of the assembled sheet.
+    sheet_blocks: Vec<wirecraft_core::sheets::SheetBlock>,
     link_source: Option<String>,
     /// Link mode started on empty root canvas: the link will leave a new Exterior here.
     exterior_source: Option<[f64; 2]>,
@@ -264,6 +266,7 @@ impl Wirecraft {
             mode: Mode::Select,
             show_sheets: false,
             sheet_contours: Vec::new(),
+            sheet_blocks: Vec::new(),
             link_source: None,
             exterior_source: None,
             hover_world: None,
@@ -787,6 +790,7 @@ impl Wirecraft {
     /// Recomputes page contours for the current parent; only while the overlay is shown.
     fn refresh_sheets(&mut self) {
         self.sheet_contours.clear();
+        self.sheet_blocks.clear();
         if !self.show_sheets {
             return;
         }
@@ -795,7 +799,10 @@ impl Wirecraft {
             &self.parent,
             &self.export_settings.sheet,
         ) {
-            Ok(plan) => self.sheet_contours = plan.world_tiles,
+            Ok(plan) => {
+                self.sheet_contours = plan.world_tiles;
+                self.sheet_blocks = plan.world_blocks;
+            }
             Err(error) => self.status = format!("Sheet contours unavailable: {}", error.message),
         }
     }
@@ -1796,6 +1803,7 @@ impl Render for Wirecraft {
             let rubber = self.rubber_band();
             let link_ends = self.link_end_handles();
             let sheets = self.sheet_contours.clone();
+            let sheet_blocks = self.sheet_blocks.clone();
             let parent_name = self.snapshot.document.qualified_name(&self.parent);
             content = content
                 .child(
@@ -1894,7 +1902,7 @@ impl Render for Wirecraft {
                                     }
                                     for page in &sheets {
                                         let p = view.screen([page.x, page.y]);
-                                        window.paint_quad(quad(
+                                        scene::dashed_outline(
                                             Bounds::new(
                                                 b.origin + point(px(p[0] as f32), px(p[1] as f32)),
                                                 size(
@@ -1902,12 +1910,15 @@ impl Render for Wirecraft {
                                                     px((page.height * view.zoom) as f32),
                                                 ),
                                             ),
-                                            px(0.),
-                                            rgba(0x00000000),
-                                            px(1.),
-                                            crate::chrome::color(0x9bb0c3),
-                                            BorderStyle::Dashed,
-                                        ));
+                                            1.,
+                                            10.,
+                                            6.,
+                                            rgb(0x9bb0c3),
+                                            window,
+                                        );
+                                    }
+                                    for block in &sheet_blocks {
+                                        scene.paint_sheet_block(block, b.origin, view, window, cx);
                                     }
                                     if let Some(r) = resize {
                                         let p = view.screen([r.x, r.y]);

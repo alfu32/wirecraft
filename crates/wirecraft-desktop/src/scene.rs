@@ -108,7 +108,7 @@ pub fn paint_link_end(end: [f64; 2], origin: Point<Pixels>, view: Viewport, wind
 /// Contour and badge color of entities the user marked as doing IO.
 const IO_COLOR: u32 = 0xe8a33d;
 /// Strokes a rectangle with dashes that continue around its corners.
-fn dashed_outline(
+pub fn dashed_outline(
     rect: Bounds<Pixels>,
     width: f32,
     dash: f32,
@@ -1188,6 +1188,46 @@ impl Scene {
             BorderStyle::Solid,
         ));
         let _ = line.paint(origin + point(px(5.), px(0.)), px(height), window, cx);
+    }
+    /// A title block or parts list contour of the sheet preview, labelled at its top left.
+    pub fn paint_sheet_block(
+        &self,
+        block: &wirecraft_core::sheets::SheetBlock,
+        origin: Point<Pixels>,
+        view: Viewport,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let r = block.rect;
+        let s = view.screen([r.x, r.y]);
+        let bounds = Bounds::new(
+            origin + point(px(s[0] as f32), px(s[1] as f32)),
+            size(
+                px((r.width * view.zoom) as f32),
+                px((r.height * view.zoom) as f32),
+            ),
+        );
+        let color = rgb(0x9bb0c3);
+        window.paint_quad(fill(bounds, rgba(0x9bb0c310)));
+        dashed_outline(bounds, 1., 6., 4., color, window);
+        let font_size = (11. * view.zoom as f32).clamp(8., 13.);
+        let run = TextRun {
+            len: block.label.len(),
+            font: font(self.appearance.designer_font.clone()),
+            color: color.into(),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+        };
+        let line = window
+            .text_system()
+            .shape_line(block.label.into(), px(font_size), &[run], None);
+        let _ = line.paint(
+            bounds.origin + point(px(4.), px(2.)),
+            px(font_size + 4.),
+            window,
+            cx,
+        );
     }
     fn port_label(
         &self,
