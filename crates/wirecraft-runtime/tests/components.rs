@@ -562,7 +562,10 @@ fn link_ends_reconnect_to_entities_or_to_a_new_port() {
             .any(|p| p.name == "values")
     );
     assert!(s.document.nodes[&b].incoming_links.is_empty());
-    assert_eq!(s.document.nodes[&c].incoming_links, [link.clone()]);
+    assert_eq!(
+        s.document.nodes[&c].incoming_links,
+        std::slice::from_ref(&link)
+    );
     // Dropped on empty canvas inside the composite, the source end becomes an input port.
     let moved = run(
         &mut s,
