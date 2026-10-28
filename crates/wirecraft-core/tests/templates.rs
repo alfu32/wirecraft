@@ -52,7 +52,13 @@ fn rendered_output_is_bounded_and_overrides_are_case_insensitive() {
     let mut set = TemplateSet::builtin("go").unwrap();
     set.overlay(&d).unwrap();
     assert_eq!(set.roles["processor.declaration"], "case-insensitive");
-    for name in ["go", "nodejs", "kotlin", "php", "quickjs"] {
+    // Projects stored with the former QuickJS technology still select the systemJS set.
+    assert_eq!(
+        wirecraft_core::compiler::template_set_id("quickjs"),
+        "systemjs"
+    );
+    assert_eq!(TemplateSet::builtin("quickjs").unwrap().id, "systemjs");
+    for name in ["go", "nodejs", "kotlin", "php", "systemjs"] {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../../examples/{name}.orch"));
         let d = wirecraft_core::store::load(&path).unwrap();

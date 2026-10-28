@@ -44,7 +44,8 @@ pub fn template_set_id(technology: &str) -> &'static str {
         "kotlin-jvm" => "kotlin",
         "nodejs" => "nodejs",
         "php" => "php",
-        "quickjs" => "quickjs",
+        // Stored Threadworks projects may still name the systemJS set by its former name.
+        "systemjs" | "quickjs" => "systemjs",
         "compiler-template-set" | "compiler-compiler" => "generic",
         _ => "literal",
     }
@@ -263,7 +264,7 @@ impl Plan<'_> {
                 format!("Unsupported compiler layout {value}"),
             ));
         }
-        if ["go", "quickjs"].contains(&self.set.id.as_str()) && value != "single-file" {
+        if ["go", "systemjs"].contains(&self.set.id.as_str()) && value != "single-file" {
             return Err(Error::new(
                 "unsupported",
                 format!("{} supports single-file layout", self.set.id),

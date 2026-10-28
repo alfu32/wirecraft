@@ -124,7 +124,7 @@ pub fn instance(set: &str, library: &Node, module_export: bool) -> LibraryInstan
                 comment("//")
             )
         }
-        "nodejs" | "quickjs" => {
+        "nodejs" | "systemjs" => {
             let value = if instantiation.is_empty() {
                 let names = top_level(
                     source,

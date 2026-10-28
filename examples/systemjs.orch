@@ -12,7 +12,7 @@
       ],
       "technology": {
         "languageId": "javascript",
-        "technologyId": "quickjs"
+        "technologyId": "systemjs"
       },
       "fileLayoutStrategyId": "single-file"
     },
@@ -22,7 +22,7 @@
       "kind": "Processor",
       "parentId": "root",
       "text": {
-        "source": "if (threadworkRunner.isRunning()) { console.log(\"Hello from Wirecraft QuickJS\"); threadworkRunner.shutdownRequest(); }"
+        "source": "if (threadworkRunner.isRunning()) { console.log(\"Hello from Wirecraft systemJS\"); threadworkRunner.shutdownRequest(); }"
       }
     }
   ]

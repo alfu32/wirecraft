@@ -107,7 +107,7 @@ impl Wirecraft {
                     "kotlin-jvm",
                     "nodejs",
                     "php",
-                    "quickjs",
+                    "systemjs",
                     "compiler-template-set",
                     "file-export",
                     "multi-tech",

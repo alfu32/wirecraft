@@ -1,0 +1,88 @@
+{# QuickJS runtime state for one generated application. #}
+class ThreadworkRunner {
+  constructor() {
+    this.running = true;
+    this.shutdownSignal = 0;
+    this.transit = 0;
+    this.shutdownPreviousTransit = 0;
+    this.shutdownIdleTicks = 0;
+    this.shutdownRemainingTicks = 0;
+  }
+
+  /** Install optional QuickJS host signal handlers and request network shutdown. */
+  installShutdownHandlers() {
+    const hostProcess = globalThis.process;
+    if (hostProcess && typeof hostProcess.on === "function") {
+      for (const [name, signalNumber] of [["SIGINT", 2], ["SIGTERM", 15]]) {
+        hostProcess.on(name, () => {
+          this.shutdownSignal = signalNumber;
+          this.shutdownRequest();
+        });
+      }
+      return;
+    }
+    const hostOs = globalThis.os;
+    if (!hostOs || typeof hostOs.signal !== "function") return;
+    const requestShutdown = (signalNumber) => {
+      this.shutdownSignal = signalNumber;
+      this.shutdownRequest();
+    };
+    hostOs.signal(2, () => requestShutdown(2));
+    hostOs.signal(15, () => requestShutdown(15));
+  }
+
+  /** Request shutdown; modeled nodes decide whether they continue emitting packets. */
+  shutdownRequest() {
+    this.running = false;
+  }
+
+  /** Return the last OS shutdown signal observed by this runtime, or zero. */
+  getShutdownSignal() {
+    return this.shutdownSignal || 0;
+  }
+
+  /** Return the requested running state for modeled code to inspect. */
+  isRunning() {
+    return this.running;
+  }
+
+  /** Increment the count of packets completed by modeled transports. */
+  recordTransit() {
+    this.transit += 1;
+  }
+
+  /** End an idle wait between ticks early; event handlers call it when they have work. */
+  wake() {
+    const wake = this.idleWake;
+    this.idleWake = null;
+    if (wake) wake();
+  }
+
+  /** Start the bounded idle window used to drain residual network traffic. */
+  beginShutdownDrain(idleTicks) {
+    this.shutdownPreviousTransit = this.transit;
+    this.shutdownIdleTicks = idleTicks;
+    this.shutdownRemainingTicks = idleTicks;
+  }
+
+  /** Return true while transport activity or the idle drain window remains. */
+  hasRecentTransit() {
+    if (this.transit !== this.shutdownPreviousTransit) {
+      this.shutdownPreviousTransit = this.transit;
+      this.shutdownRemainingTicks = this.shutdownIdleTicks;
+      return true;
+    }
+    if (this.shutdownRemainingTicks === 0) return false;
+    this.shutdownRemainingTicks -= 1;
+    return true;
+  }
+}
+
+const threadworkRunnerKey = Symbol.for("threadwork.runner");
+const threadworkRunner = globalThis[threadworkRunnerKey] ??= new ThreadworkRunner();
+globalThis.threadworkRunner ??= threadworkRunner;
+
+/** Create the shared context passed to generated QuickJS nodes. */
+function createRuntimeContext() {
+  return { imports: Object.create(null) };
+}
