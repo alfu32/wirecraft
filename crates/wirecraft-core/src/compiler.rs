@@ -155,6 +155,9 @@ pub fn generate(d: &Document, root: &str, options: CompileOptions) -> Result<Gen
     };
     let artifact = plan.compile(root)?;
     let mut files = artifact.files;
+    if plan.set.id == "go" {
+        files.iter_mut().for_each(hoist_go_imports);
+    }
     let project_context = plan.project_context();
     for file in &plan.set.project_files {
         if !file.layouts.is_empty() && !file.layouts.contains(&artifact.layout) {
@@ -318,15 +321,22 @@ impl Plan<'_> {
                 ));
             }
         }
+        // A data link whose ends sit in different composites is declared and transported
+        // by its owner; in a single file its buffers are visible to the nested end.
         if let Some(link) = &n.link
             && !capability(self.d, &n)
             && (self.d.node(&link.source_node_id)?.parent_id != n.parent_id
                 || self.d.node(&link.target_node_id)?.parent_id != n.parent_id)
         {
-            return Err(Error::new(
-                "unsupported",
-                "Template compiler composite boundary channels are not migrated yet",
-            ));
+            let ends = [&link.source_node_id, &link.target_node_id];
+            for end in ends {
+                if self.layout(self.d.node(end)?)? != "single-file" || layout != "single-file" {
+                    return Err(Error::new(
+                        "unsupported",
+                        "Template compiler composite boundary channels need the single-file layout",
+                    ));
+                }
+            }
         }
         // Supplier products must be available before rendering capability links.
         if let Some(link) = &n.link
@@ -854,6 +864,71 @@ impl Plan<'_> {
             }
         }
         maps
+    }
+}
+/// A Go file has one import list, before any declaration, but service libraries are
+/// rendered further down. Their `import` declarations move into the file's first import
+/// block; each original line stays as a comment, and source maps below the block shift
+/// by the lines added to it.
+fn hoist_go_imports(file: &mut VirtualFile) {
+    let lines: Vec<&str> = file.content.lines().collect();
+    let Some(open) = lines.iter().position(|l| l.trim() == "import (") else {
+        return;
+    };
+    let Some(close) = lines[open..]
+        .iter()
+        .position(|l| l.trim() == ")")
+        .map(|i| open + i)
+    else {
+        return;
+    };
+    let mut present: BTreeSet<String> = lines[open + 1..close]
+        .iter()
+        .map(|l| l.trim().to_string())
+        .collect();
+    let mut added = vec![];
+    let mut out: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+    let mut block = false;
+    for (i, line) in lines.iter().enumerate().skip(close + 1) {
+        let trimmed = line.trim();
+        let spec = if block {
+            if trimmed == ")" {
+                block = false;
+                out[i] = format!("// {trimmed} (hoisted)");
+                continue;
+            }
+            Some(trimmed)
+        } else if trimmed == "import (" {
+            block = true;
+            out[i] = format!("// {trimmed} (hoisted)");
+            continue;
+        } else {
+            trimmed.strip_prefix("import ").map(str::trim)
+        };
+        let Some(spec) = spec.filter(|s| s.contains('"')) else {
+            continue;
+        };
+        out[i] = format!("// import {spec} (hoisted)");
+        if present.insert(spec.to_string()) {
+            added.push(format!("\t{spec}"));
+        }
+    }
+    if added.is_empty() {
+        return;
+    }
+    let shift = added.len();
+    out.splice(close..close, added);
+    let mut content = out.join("\n");
+    if file.content.ends_with('\n') {
+        content.push('\n');
+    }
+    file.content = content;
+    // Maps use one-based lines; everything after the block's opening line moves down.
+    for map in &mut file.source_map {
+        if map.generated_start_line > open + 1 {
+            map.generated_start_line += shift;
+            map.generated_end_line += shift;
+        }
     }
 }
 fn marked(n: &Node, section: &str, text: &str) -> String {
