@@ -21,6 +21,11 @@ pub struct Shape {
     pub diagnostics: usize,
     /// Set for an Exterior, drawn as a circle instead of a box.
     pub exterior: Option<ExteriorView>,
+    /// User-designated IO role badge ("IO-in", "IO-out", "IO-in/out").
+    pub io: Option<&'static str>,
+    /// A port inside this collapsed composite, drawn beside it rather than at its
+    /// stored layout; it cannot be dragged from there.
+    pub pinned_to: Option<String>,
 }
 #[derive(Clone)]
 pub struct ExteriorView {
@@ -130,6 +135,7 @@ impl Drawing {
             );
         }
         let mut visited = BTreeSet::new();
+        let mut pinned = Vec::new();
         while let Some((id, depth, hidden)) = stack.pop() {
             if !visited.insert(id.clone()) {
                 continue;
@@ -141,6 +147,11 @@ impl Drawing {
                 continue;
             }
             if let Some(ancestor) = hidden {
+                // Ports stay visible on a collapsed composite; placed once its size is known.
+                if crate::components::is_exterior(n) {
+                    pinned.push((id.clone(), depth, ancestor));
+                    continue;
+                }
                 visible_ancestor.insert(id.clone(), ancestor.clone());
                 stack.extend(
                     n.children
@@ -218,6 +229,8 @@ impl Drawing {
             shapes.insert(
                 id.clone(),
                 Shape {
+                    io: crate::analysis::io_badge(n).filter(|_| !exterior),
+                    pinned_to: None,
                     exterior: exterior.then(|| ExteriorView {
                         output: false,
                         link_right: true,
@@ -262,6 +275,39 @@ impl Drawing {
                     },
                 )
             }));
+        }
+        for (id, depth, ancestor) in &pinned {
+            let n = &d.nodes[id];
+            let diameter = crate::components::EXTERIOR_DIAMETER;
+            shapes.insert(
+                id.clone(),
+                Shape {
+                    name: n.name.clone(),
+                    detail: n.name_detail.clone(),
+                    kind: n.kind,
+                    rect: Rect {
+                        x: n.layout.x,
+                        y: n.layout.y,
+                        width: diameter,
+                        height: diameter,
+                    },
+                    depth: *depth,
+                    composite: false,
+                    expanded: false,
+                    role: crate::components::EXTERIOR.into(),
+                    technology: String::new(),
+                    fields: vec![],
+                    diagnostics: 0,
+                    exterior: Some(ExteriorView {
+                        output: false,
+                        link_right: true,
+                        type_name: String::new(),
+                    }),
+                    io: None,
+                    pinned_to: Some(ancestor.clone()),
+                },
+            );
+            visible_ancestor.insert(id.clone(), id.clone());
         }
         // Stable port order, independently for incoming and outgoing links.
         let mut projected = Vec::new();
@@ -381,6 +427,7 @@ impl Drawing {
             }
         }
         auto_size(d, &mut shapes, &edges, &callouts);
+        place_pinned(d, &mut shapes);
         let centers: BTreeMap<String, f64> = shapes
             .iter()
             .map(|(id, s)| (id.clone(), s.rect.x + s.rect.width / 2.))
@@ -636,6 +683,37 @@ pub fn composite_padding(n: &crate::Node) -> Padding {
             left: side(sides.get("left")),
         },
         value => Padding::uniform(side(value)),
+    }
+}
+/// Ports inside a collapsed composite line up beside it: outputs on the right,
+/// inputs on the left, in their stored vertical order.
+fn place_pinned(d: &Document, shapes: &mut BTreeMap<String, Shape>) {
+    const GAP: f64 = 140.;
+    const SPACING: f64 = 12.;
+    let mut sides: BTreeMap<(String, bool), Vec<(f64, String)>> = BTreeMap::new();
+    for (id, shape) in shapes.iter() {
+        if let Some(owner) = &shape.pinned_to {
+            let output = !d.nodes[id].incoming_links.is_empty();
+            sides
+                .entry((owner.clone(), output))
+                .or_default()
+                .push((d.nodes[id].layout.y, id.clone()));
+        }
+    }
+    for ((owner, output), mut ports) in sides {
+        let Some(owner) = shapes.get(&owner).map(|s| s.rect) else {
+            continue;
+        };
+        ports.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        for (i, (_, id)) in ports.iter().enumerate() {
+            let rect = &mut shapes.get_mut(id).unwrap().rect;
+            rect.x = if output {
+                owner.x + owner.width + GAP
+            } else {
+                owner.x - GAP - rect.width
+            };
+            rect.y = owner.y + i as f64 * (rect.height + SPACING);
+        }
     }
 }
 /// Text width estimate for the canvas sans-serif face; slightly generous so

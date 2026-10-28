@@ -165,9 +165,31 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
             "ServiceLibrary" => ("#f1f2ff", "#626bd5"),
             "CompilerTemplate" => ("#fff4dc", "#aa6a00"),
             "ErrorHandler" => ("#fff2f2", "#bd5555"),
+            "Reference" => ("#f3efff", "#6f4fc2"),
             _ => ("#f4f7fa", "#334e68"),
         };
-        write!(out,"<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"0\" fill=\"{fill}\" stroke=\"{stroke}\" {}/><text x=\"{}\" y=\"{}\" font-size=\"14\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"10\">{}</text>",r.x,r.y,r.width,r.height,if s.composite&&s.expanded{"stroke-dasharray=\"8 4\""}else{""},r.x+8.,r.y+20.,escape(&format!("{} {}",n.name,n.name_detail)),r.x+8.,r.y+37.,escape(&s.role)).unwrap();
+        if let Some(exterior) = &s.exterior {
+            let radius = r.width / 2.;
+            let (cx, cy) = (r.x + radius, r.y + radius);
+            let sign = if exterior.output != exterior.link_right {
+                1.
+            } else {
+                -1.
+            };
+            let arm = r.width * 0.16;
+            write!(out,"<circle class=\"exterior\" cx=\"{cx}\" cy=\"{cy}\" r=\"{radius}\" fill=\"#e3f2fa\" stroke=\"#1f7fb0\" stroke-width=\"2.5\"/><polyline points=\"{},{} {},{} {},{}\" fill=\"none\" stroke=\"#1f7fb0\" stroke-width=\"3\"/><text x=\"{}\" y=\"{}\" text-anchor=\"{}\" font-size=\"13\">{}</text>",cx-arm*0.5*sign,cy-arm,cx+arm*0.5*sign,cy,cx-arm*0.5*sign,cy+arm,if exterior.link_right{r.x-9.}else{r.x+r.width+9.},cy+4.,if exterior.link_right{"end"}else{"start"},escape(&if exterior.type_name.is_empty(){s.name.clone()}else{format!("{}: {}",s.name,exterior.type_name)})).unwrap();
+            continue;
+        }
+        let (stroke, outline) = match s.io {
+            Some(_) => ("#c47f17", "stroke-width=\"2\" stroke-dasharray=\"14 6\""),
+            None if s.composite && s.expanded => (stroke, "stroke-dasharray=\"9 7\""),
+            None => (stroke, ""),
+        };
+        write!(out,"<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"0\" fill=\"{fill}\" stroke=\"{stroke}\" {}/><text x=\"{}\" y=\"{}\" font-size=\"14\">{}</text><text x=\"{}\" y=\"{}\" font-size=\"10\">{}</text>",r.x,r.y,r.width,r.height,outline,r.x+8.,r.y+20.,escape(&format!("{} {}",n.name,n.name_detail)),r.x+8.,r.y+37.,escape(&s.role)).unwrap();
+        if let Some(badge) = s.io {
+            let width = badge.chars().count() as f64 * 6.2 + 10.;
+            write!(out,"<rect class=\"io-badge\" x=\"{}\" y=\"{}\" width=\"{width}\" height=\"16\" rx=\"8\" fill=\"#e8a33d\"/><text x=\"{}\" y=\"{}\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f1606\">{badge}</text>",r.x+10.,r.y-8.,r.x+15.,r.y+4.).unwrap();
+        }
         if s.diagnostics > 0 {
             write!(out,"<circle cx=\"{}\" cy=\"{}\" r=\"7\" fill=\"#d94f54\"/><text x=\"{}\" y=\"{}\" fill=\"white\" text-anchor=\"middle\" font-size=\"10\">!</text>",r.x+r.width-11.,r.y+11.,r.x+r.width-11.,r.y+14.).unwrap();
         }

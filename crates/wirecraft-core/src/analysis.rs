@@ -68,6 +68,17 @@ fn named(name: &str, tokens: &[&str]) -> bool {
                 .any(|c| name.starts_with(&format!("{t}{c}")) || name.ends_with(&format!("{c}{t}")))
     })
 }
+/// Extra key holding a user's IO designation: `in`, `out` or `inout`.
+pub const IO: &str = "io";
+/// Badge for an entity the user marked as doing meaningful IO.
+pub fn io_badge(n: &Node) -> Option<&'static str> {
+    match n.extra.get(IO)?.as_str()? {
+        "in" => Some("IO-in"),
+        "out" => Some("IO-out"),
+        "inout" => Some("IO-in/out"),
+        _ => None,
+    }
+}
 pub fn stereotype(d: &Document, n: &Node) -> &'static str {
     if n.is_link() {
         return "Link";

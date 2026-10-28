@@ -328,13 +328,6 @@ pub fn diagnostics(d: &Document) -> Vec<Diagnostic> {
     };
     let mut published = BTreeMap::<String, usize>::new();
     for n in d.nodes.values().filter(|n| is_exterior(n)) {
-        if n.parent_id.as_deref() != Some(d.root_node_id.as_str()) {
-            add(
-                "Error",
-                &n.id,
-                "An Exterior must be placed directly under the design root".into(),
-            );
-        }
         if !n.children.is_empty()
             || [&n.text.source, &n.text.initialization, &n.text.tests]
                 .iter()
@@ -348,15 +341,24 @@ pub fn diagnostics(d: &Document) -> Vec<Diagnostic> {
         }
         let links = attached(d, n);
         let [(link, output)] = links[..] else {
-            add(
-                "Error",
-                &n.id,
-                format!(
-                    "An Exterior needs exactly one link; '{}' has {}",
-                    n.name,
-                    links.len()
-                ),
-            );
+            // A freshly placed port is not published until it is linked.
+            if links.is_empty() {
+                add(
+                    "Warning",
+                    &n.id,
+                    format!("Port '{}' is not linked yet; link it to publish it", n.name),
+                );
+            } else {
+                add(
+                    "Error",
+                    &n.id,
+                    format!(
+                        "An Exterior needs exactly one link; '{}' has {}",
+                        n.name,
+                        links.len()
+                    ),
+                );
+            }
             continue;
         };
         *published.entry(derived_name(link, output)).or_default() += 1;

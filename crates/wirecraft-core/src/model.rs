@@ -1018,6 +1018,12 @@ impl Document {
             }
         }
         let mut n: Node = serde_json::from_value(value)?;
+        // A null patch value clears an extension field instead of storing null.
+        for (k, v) in obj {
+            if v.is_null() && n.extra.get(k).is_some_and(Value::is_null) {
+                n.extra.remove(k);
+            }
+        }
         if current.link.is_some() && (n.kind != NodeKind::Link || n.link.is_none()) {
             return Err(Error::new(
                 "invalid_input",
