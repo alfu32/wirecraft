@@ -2,6 +2,10 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Rust generator (0.20.0)
+
+At the user's request, Wirecraft has a Rust code generator: technology `rust`, single-file. Threadworks has no Rust template set, so it is a hand-written set in `resources/compiler-templates-native/rust/`, outside the byte-identical baseline. The output is one dependency-free source file plus `Cargo.toml`; library instances are unit structs whose methods forward to the library's functions. `examples/rust.orch` is the hello example. The WebServer is transcoded into Rust and passes the same HTTP exchange; it idles at 0 % CPU, and SIGINT/SIGTERM exit 0. The tests use `rustc` by default, so they are not ignored. Contract and pending scope are in [compiler-templates.md](compiler-templates.md#rust-template-set-wirecraft-addition-0200).
+
 ## systemJS (0.19.0)
 
 At the user's request, the QuickJS template set is renamed systemJS, because it emits engine-neutral scripts, and it is tested on Bun. Stored `quickjs` technologies still select it. Its runner now yields to host timers and handles `process` signals. The WebServer is transcoded into systemJS too and passes on Bun. Details are in [compiler-templates.md](compiler-templates.md#webserver-transcodings-wirecraft-viability-test-0160).

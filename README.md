@@ -51,7 +51,7 @@ Literal filesystem generation supports `file-export` / `multi-tech` entities, te
 
 ## Compiler template sets
 
-**Generate → Generate Project (effective technology)** supports C17, Go, Kotlin, Node.js, PHP and systemJS (engine-neutral JavaScript scripts, formerly QuickJS; stored `quickjs` technologies still select it). Choose the language and technology in the inspector and Apply; inherited settings apply to descendants. Templates are embedded, so no source checkout is needed. [Compiler scope and compatibility](docs/migration/compiler-templates.md) distinguishes tested workflows from remaining parity.
+**Generate → Generate Project (effective technology)** supports C17, Go, Kotlin, Node.js, PHP, systemJS (engine-neutral JavaScript scripts, formerly QuickJS; stored `quickjs` technologies still select it) and Rust (a Wirecraft-authored set with no Threadworks counterpart; one dependency-free file plus `Cargo.toml`). Choose the language and technology in the inspector and Apply; inherited settings apply to descendants. Templates are embedded, so no source checkout is needed. [Compiler scope and compatibility](docs/migration/compiler-templates.md) distinguishes tested workflows from remaining parity.
 
 ```sh
 cargo run -p wirecraft-runtime -- templates
@@ -71,7 +71,7 @@ clang -std=c17 -Wall -Wextra -pedantic /tmp/wirecraft-webserver/WebServerApp.c -
 WEBSERVER_PORT=8080 /tmp/wirecraft-webserver/webserver   # then: curl -i http://127.0.0.1:8080/home/about
 ```
 
-The same server is transcoded into Go, Kotlin, Node.js (also run on Bun), PHP and systemJS (on Bun) as `examples/webserver-<language>.orch` by `scripts/transcode_webserver.py`; `tests/transcoded_webservers.rs` builds each and runs the same HTTP exchange (see [compiler-templates.md](docs/migration/compiler-templates.md#webserver-transcodings-wirecraft-viability-test-0160)).
+The same server is transcoded into Go, Kotlin, Node.js (also run on Bun), PHP, systemJS (on Bun) and Rust as `examples/webserver-<language>.orch` by `scripts/transcode_webserver.py`; `tests/transcoded_webservers.rs` builds each and runs the same HTTP exchange (see [compiler-templates.md](docs/migration/compiler-templates.md#webserver-transcodings-wirecraft-viability-test-0160)).
 
 Routes: `/home/about`, `/home/version`, `/api/user`; other paths answer 404, other methods 405, malformed requests 400. Set `WEBSERVER_MAX_REQUESTS=N` to exit after N requests and `WEBSERVER_BIND_ANY=1` to listen beyond loopback. After editing the component, run `cargo run -p wirecraft-runtime -- update-references examples/webserver.orch` (or **Graph → Update Component Reference**) to re-pin it.
 
@@ -149,7 +149,7 @@ Pending capabilities include remaining C17 capability/template features and Go/K
 
 C editor Ctrl-Space suggestions show identifiers and signatures. Hover shows clangd function/type declarations, complete emitted struct definitions, and signatures/provenance of injected library functions. The backend/MCP workbench operations `semantic_tokens` and `hover` accept the same nodeId/section/text context (`offset` is UTF-8 bytes for hover). clangd receives the full generated C program, runtime, connected dependencies and companion files, with results remapped to the visible body. Syntax coloring remains available if clangd is missing.
 
-The compiler tests require Go and Node.js on PATH. Optional external Kotlin/PHP/systemJS tests run with:
+The compiler tests require Go, Node.js and rustc on PATH (`WIRECRAFT_TEST_RUSTC` overrides rustc). Optional external Kotlin/PHP/systemJS tests run with:
 
 ```sh
 WIRECRAFT_TEST_KOTLINC=/path/to/kotlin-2.2.0/bin/kotlinc \

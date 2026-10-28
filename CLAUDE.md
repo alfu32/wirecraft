@@ -21,7 +21,7 @@ cargo run -p wirecraft-runtime -- validate|compile|update-references|serve|templ
 ```
 
 - The binary built from `wirecraft-runtime` is named `wirecraft`.
-- The compiler tests need clang, clangd, Go and Node.js on PATH. Kotlin, PHP and QuickJS tests are `#[ignore]`d unless `WIRECRAFT_TEST_KOTLINC` / `WIRECRAFT_TEST_PHP` / `WIRECRAFT_TEST_QJS` are set (see README).
+- The compiler tests need clang, clangd, Go, Node.js and rustc on PATH. Kotlin, PHP and systemJS (run on Bun) tests are `#[ignore]`d unless run with `--include-ignored`; `WIRECRAFT_TEST_KOTLINC` / `WIRECRAFT_TEST_PHP` / `WIRECRAFT_TEST_BUN` point at the tools (see README).
 - Native desktop smokes are the `scripts/*_smoke.py` files. They launch their own window process with temporary state and need a real X11/XWayland display with Vulkan, plus xdotool and ImageMagick; Xvfb does not work here. Screenshots go under `target/<name>-smoke/` and should be inspected.
 
 ## Architecture
@@ -35,7 +35,7 @@ Three crates. Business logic is shared, never duplicated per transport.
   - `drawing.rs`: a single projection of topology into shapes and ports, shared by the desktop canvas and SVG/PDF export.
   - `routing.rs`: 45° link routing.
   - `c17.rs`: the typed C17 emitter.
-  - `compiler.rs` + `templates.rs`: template compilers for Go, Kotlin, Node.js, PHP and QuickJS, using MiniJinja with Pebble compatibility. The templates under `resources/compiler-templates*` are embedded by `build.rs`.
+  - `compiler.rs` + `templates.rs`: template compilers for Go, Kotlin, Node.js, PHP, systemJS (the baseline QuickJS set) and Rust, using MiniJinja with Pebble compatibility. The templates under `resources/compiler-templates*` are embedded by `build.rs`: the byte-identical baseline, its generated overlay (`scripts/template_overlay.py`, which rewrites that directory) and `compiler-templates-native/` for hand-written sets without a baseline (Rust).
   - `components.rs`: pluggable components (Exterior/Reference nodes, resolve/pin/normalize/expand).
   - Mutations run on a candidate document and are committed only after `ensure_valid`.
 - **`wirecraft-runtime`**: the application service and its adapters.
