@@ -48,7 +48,8 @@ At the user's request, `examples/WebServer.orch` (the single-file C17 HTTP serve
 | Kotlin | Passes (Kotlin 2.4.21, Java 21; `--include-ignored`) | None beyond the boundary channels. Bodies rebuild the immutable data classes with `copy`; `base_lib` mirrors the C platform headers with `typealias` declarations, because imports must precede every declaration |
 | Node.js | Passes (Node.js 22.17) | Asynchronous runner that yields to the event loop between ticks, with idle back-off and `threadworkRunner.wake()`; runtime emitted once per single file (nested composites redeclared `ThreadworkRunner`) |
 | PHP | Pending (no interpreter installed here) | |
-| QuickJS | Pending (no interpreter installed here) | |
+| Bun | Passes (Bun 1.3.5; `--include-ignored`, `WIRECRAFT_TEST_BUN`) | None: Bun runs the Node.js set's CommonJS output unchanged, including the asynchronous runner, SIGTERM and the 1 % idle CPU |
+| QuickJS | Not transcoded | QuickJS's `std`/`os` modules have no socket API, so a self-contained HTTP server is not possible. At the user's direction the JavaScript server runs on Bun instead; the QuickJS set keeps its non-network tests |
 
 **Composite boundary channels.** A data link whose ends sit in different composites, such as `router` → `routes/routeHomeAbout`, is declared and transported by its owning composite. In a single-file layout its buffers are file-scope symbols, so the nested end receives them like any other link. File-based layouts still return an explicit `unsupported` error for such links, since one file cannot see another's buffers.
 

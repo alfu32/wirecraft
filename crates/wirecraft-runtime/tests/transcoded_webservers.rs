@@ -237,3 +237,18 @@ fn nodejs_webserver() {
     node.arg(main);
     exercise(node, "Node.js");
 }
+
+/// Bun runs the Node.js set's CommonJS output unchanged; QuickJS has no sockets.
+#[test]
+#[ignore = "needs bun; set WIRECRAFT_TEST_BUN or put bun on PATH"]
+fn bun_runs_the_nodejs_webserver() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = generate("nodejs", temp.path());
+    let main = files
+        .iter()
+        .find(|f| f.extension().is_some_and(|e| e == "js"))
+        .unwrap();
+    let mut bun = Command::new(tool("WIRECRAFT_TEST_BUN", "bun"));
+    bun.arg("run").arg(main);
+    exercise(bun, "Node.js");
+}
