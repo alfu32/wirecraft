@@ -51,9 +51,13 @@ func http_header_number(header string, name string) int {
 		for digits < len(value) && value[digits] >= '0' && value[digits] <= '9' {
 			digits++
 		}
-		number, err := strconv.Atoi(value[:digits])
-		if digits == 0 || err != nil {
+		if digits == 0 {
 			return -1
+		}
+		// Like strtol, an out-of-range value saturates instead of failing.
+		number, err := strconv.Atoi(value[:digits])
+		if err != nil {
+			return int(^uint(0) >> 1)
 		}
 		return number
 	}
