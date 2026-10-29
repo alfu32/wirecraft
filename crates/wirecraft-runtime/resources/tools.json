@@ -818,7 +818,7 @@
     },
     {
       "name": "wirecraft.workbench",
-      "description": "Shared workbench services: archetype/export preview, technical sheets and documentation, clipboard task prompts, settings, MCP controls and optional CUPS printing. Printing is a mutating external operation and must be explicitly requested. Compiler-backed C body context and Ctrl-Space completion use real clangd; text/offset describe an uncommitted draft. Compile projects with the shared graph generator; inspect six embedded template sets and export portable model-override compiler bundles. compile_project accepts templateSet, layout and bundle.",
+      "description": "Shared workbench services: archetype/export preview, technical sheets and documentation, clipboard task prompts, settings, MCP controls and optional CUPS printing. Printing is a mutating external operation and must be explicitly requested. Compiler-backed C and Rust body context, Ctrl-Space completion, hover, definition and references use real clangd or rust-analyzer; text/offset (UTF-8 bytes) describe an uncommitted draft. definition/references return model locations: body (entity, section, line, column), entity, generated or external. Compile projects with the shared graph generator; inspect six embedded template sets and export portable model-override compiler bundles. compile_project accepts templateSet, layout and bundle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -842,7 +842,9 @@
               "compiler_templates",
               "export_compiler",
               "semantic_tokens",
-              "hover"
+              "hover",
+              "definition",
+              "references"
             ]
           },
           "arguments": {

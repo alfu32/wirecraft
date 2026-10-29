@@ -431,6 +431,121 @@ async fn stage_project(
 }
 
 impl GeneratedAnalysis {
+    /// `textDocument/definition` or `textDocument/references` at a body offset, with
+    /// every location mapped to the model (`BodyContext::locate`). Locations in other
+    /// files are `generated` (staged companions) or `external` (system headers, the
+    /// Rust standard library).
+    pub async fn locations(
+        &self,
+        context: &wirecraft_core::editor::BodyContext,
+        text: &str,
+        offset: usize,
+        method: &str,
+    ) -> Result<Value> {
+        use crate::lsp::{offset as byte_offset, position};
+        let local = position(text, offset, "utf-32")?;
+        let line =
+            context.source.generated_start_line - 1 + local["line"].as_u64().unwrap() as usize;
+        let column =
+            context.source.generated_column_offset + local["character"].as_u64().unwrap() as usize;
+        let generated = byte_offset(&self.file.content, line, column, "utf-32")?;
+        let mut params = json!({"textDocument":{"uri":self.uri},"position":position(&self.file.content,generated,&self.session.encoding)?});
+        if method == "textDocument/references" {
+            params["context"] = json!({"includeDeclaration":true});
+        }
+        let response = self.session.request(method, params.clone()).await?;
+        let start = text[..offset]
+            .char_indices()
+            .rev()
+            .take_while(|(_, c)| c.is_alphanumeric() || *c == '_')
+            .last()
+            .map_or(offset, |(i, _)| i);
+        let end = offset
+            + text[offset..]
+                .find(|c: char| !c.is_alphanumeric() && c != '_')
+                .unwrap_or(text.len() - offset);
+        let identifier = &text[start..end];
+        // Location, Location[] or LocationLink[]; a link's selection range is the name.
+        let flatten = |response: Value| match response {
+            Value::Array(entries) => entries,
+            Value::Null => vec![],
+            single => vec![single],
+        };
+        let mut entries = flatten(response);
+        if method == "textDocument/references" {
+            for (line, character) in context.related_positions(identifier) {
+                let generated = byte_offset(&self.file.content, line, character, "utf-32")?;
+                params["position"] =
+                    position(&self.file.content, generated, &self.session.encoding)?;
+                entries.extend(flatten(self.session.request(method, params.clone()).await?));
+            }
+        }
+        let mut locations = Vec::new();
+        for entry in entries {
+            let Some(uri) = entry["uri"].as_str().or(entry["targetUri"].as_str()) else {
+                continue;
+            };
+            let range = if entry["targetSelectionRange"].is_object() {
+                &entry["targetSelectionRange"]
+            } else if entry["targetRange"].is_object() {
+                &entry["targetRange"]
+            } else {
+                &entry["range"]
+            };
+            let (Some(row), Some(character)) = (
+                range["start"]["line"].as_u64(),
+                range["start"]["character"].as_u64(),
+            ) else {
+                continue;
+            };
+            let location = if uri == self.uri {
+                let Ok(byte) = byte_offset(
+                    &self.file.content,
+                    row as usize,
+                    character as usize,
+                    &self.session.encoding,
+                ) else {
+                    continue;
+                };
+                let p = position(&self.file.content, byte, "utf-32")?;
+                context.locate(
+                    p["line"].as_u64().unwrap() as usize,
+                    p["character"].as_u64().unwrap() as usize,
+                    identifier,
+                )
+            } else {
+                let path = url::Url::parse(uri)
+                    .ok()
+                    .and_then(|u| u.to_file_path().ok())
+                    .unwrap_or_default();
+                match path.strip_prefix(self.directory.path()) {
+                    Ok(relative) => {
+                        json!({"kind":"generated","path":relative.to_string_lossy(),"line":row+1,"column":character+1,"text":""})
+                    }
+                    Err(_) => {
+                        json!({"kind":"external","path":path.to_string_lossy(),"line":row+1,"column":character+1,"text":""})
+                    }
+                }
+            };
+            if !locations.contains(&location) {
+                locations.push(location);
+            }
+        }
+        // Authored bodies first, then entities, then generated and external code.
+        locations.sort_by_key(|l| {
+            (
+                ["body", "entity", "generated", "external"]
+                    .iter()
+                    .position(|k| l["kind"] == *k),
+                l["source"]["nodeId"].as_str().map(str::to_string),
+                l["source"]["line"].as_u64().or(l["line"].as_u64()),
+                l["source"]["column"].as_u64().or(l["column"].as_u64()),
+            )
+        });
+        Ok(
+            json!({"locations":locations,"identifier":identifier,"version":self.version,"pid":self.session.pid()}),
+        )
+    }
     pub async fn hover(
         &self,
         context: &wirecraft_core::editor::BodyContext,

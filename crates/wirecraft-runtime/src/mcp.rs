@@ -69,6 +69,8 @@ pub async fn handle(app: &Application, request: Value) -> Option<Value> {
                         "complete" => "editor.complete",
                         "semantic_tokens" => "editor.tokens",
                         "hover" => "editor.hover",
+                        "definition" => "editor.definition",
+                        "references" => "editor.references",
                         "stop_editor" => "editor.stop",
                         "preview_archetype" => "archetypes.preview",
                         "preview_export" => "export.preview",

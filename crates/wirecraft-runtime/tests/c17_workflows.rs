@@ -623,6 +623,47 @@ if (!done) { printf("first %d\n", math->maximum(2, 4)); done = 1; }"#,
                 || i["label"].as_str().is_some_and(|l| l.contains("maximum"))),
         "{completion}"
     );
+    // Navigation: a member called through the instance's function pointer is the
+    // function in the library body; the instance argument is the library.
+    let body = d.nodes[&first].text.source.clone();
+    let at = |command: &str, word: &str| {
+        Request::new(
+            command,
+            json!({"nodeId":first,"section":"source","text":body,"offset":body.find(word).unwrap()+1}),
+        )
+    };
+    let found = app
+        .execute(at("editor.definition", "maximum"))
+        .await
+        .unwrap();
+    let target = &found["locations"][0];
+    assert_eq!(target["kind"], "body", "{found}");
+    assert_eq!(target["source"]["nodeId"], library);
+    assert_eq!(target["source"]["line"], 8);
+    assert_eq!(target["source"]["column"], 5);
+    let found = app.execute(at("editor.definition", "math")).await.unwrap();
+    assert_eq!(found["locations"][0]["kind"], "entity", "{found}");
+    assert_eq!(found["locations"][0]["source"]["nodeId"], library);
+    let found = app
+        .execute(at("editor.definition", "printf"))
+        .await
+        .unwrap();
+    assert_eq!(found["locations"][0]["kind"], "external", "{found}");
+    // References: the definition and the calls through both lent instances.
+    let found = app
+        .execute(at("editor.references", "maximum"))
+        .await
+        .unwrap();
+    let bodies = found["locations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|l| l["kind"] == "body")
+        .map(|l| (l["source"]["nodeId"].clone(), l["source"]["line"].clone()))
+        .collect::<Vec<_>>();
+    for (node, line) in [(&library, 8), (&first, 2), (&second, 2)] {
+        assert!(bodies.contains(&(json!(node), json!(line))), "{found}");
+    }
     app.shutdown().await;
 
     let (_, output) = build_run(d).await;

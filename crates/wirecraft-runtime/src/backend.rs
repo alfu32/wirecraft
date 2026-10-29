@@ -173,7 +173,8 @@ impl Application {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
             }
-            "editor.context" | "editor.complete" | "editor.tokens" | "editor.hover" => {
+            "editor.context" | "editor.complete" | "editor.tokens" | "editor.hover"
+            | "editor.definition" | "editor.references" => {
                 let node = required(a, "nodeId")?.to_string();
                 let section = a["section"].as_str().unwrap_or("source").to_string();
                 let draft = a["text"].as_str().map(str::to_string);
@@ -252,6 +253,14 @@ impl Application {
                     session.hover(&context, &text, offset).await?
                 } else if r.command == "editor.tokens" {
                     session.semantic_tokens(&context, &text).await?
+                } else if r.command == "editor.definition" {
+                    session
+                        .locations(&context, &text, offset, "textDocument/definition")
+                        .await?
+                } else if r.command == "editor.references" {
+                    session
+                        .locations(&context, &text, offset, "textDocument/references")
+                        .await?
                 } else {
                     session.complete(&context, &text, offset).await?
                 };

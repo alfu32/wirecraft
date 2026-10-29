@@ -314,3 +314,193 @@ async fn rust_analyzer_cargo_check_maps_graph_errors_to_bodies() {
     assert_eq!(moved["source"]["column"], 12);
     app.shutdown().await;
 }
+
+fn line_of(context: &wirecraft_core::editor::BodyContext, needle: &str) -> usize {
+    context
+        .file
+        .content
+        .lines()
+        .position(|l| l.contains(needle))
+        .unwrap_or_else(|| panic!("no generated line with {needle}"))
+}
+
+#[test]
+fn generated_positions_map_to_bodies_entities_and_library_functions() {
+    let (d, producer, consumer, library) = network();
+    let context = body_context(&d, &consumer, "source", None).unwrap();
+    let packet = d
+        .nodes
+        .values()
+        .find(|n| n.name == "packet")
+        .unwrap()
+        .id
+        .clone();
+    // Inside the edited body: authored line and column, without the indentation.
+    let body = context.locate(context.source.generated_start_line, 4 + 4, "println");
+    assert_eq!(body["kind"], "body");
+    assert_eq!(body["current"], true);
+    assert_eq!(body["source"]["nodeId"], consumer);
+    assert_eq!(body["source"]["line"], 2);
+    assert_eq!(body["source"]["column"], 5);
+    // Another entity's body.
+    let other = body_context(&d, &producer, "source", None).unwrap();
+    let start = other.source.generated_start_line - 1;
+    let mapped = context.locate(start, 4, "if");
+    assert_eq!(mapped["source"]["nodeId"], producer);
+    assert_eq!(mapped["current"], false);
+    // Model arguments in the generated header are their link or library.
+    let header = line_of(&context, "fn run_consumer_");
+    assert_eq!(
+        context.locate(header, 0, "packet")["source"]["nodeId"],
+        packet
+    );
+    assert_eq!(
+        context.locate(header, 0, "math")["source"]["nodeId"],
+        library
+    );
+    assert_eq!(context.locate(header, 0, "math")["kind"], "entity");
+    // Elsewhere the argument's name is another symbol.
+    let runtime = line_of(&context, "pub struct ThreadworkBuffer");
+    assert_eq!(context.locate(runtime, 0, "packet")["kind"], "generated");
+    // The library instance's forwarding method continues to the library function.
+    let forwarder = line_of(&context, "fn maximum(self");
+    let function = context.locate(forwarder, 7, "maximum");
+    assert_eq!(function["kind"], "body");
+    assert_eq!(function["source"]["nodeId"], library);
+    assert_eq!(function["source"]["line"], 2);
+    assert_eq!(function["source"]["column"], 4);
+    let instance = line_of(&context, "struct Lib_mathLibrary;");
+    assert_eq!(
+        context.locate(instance, 7, "Lib_mathLibrary")["source"]["nodeId"],
+        library
+    );
+    // Runtime code stays generated, with its text.
+    let runtime = line_of(&context, "fn shutdown_request(&self)");
+    let generated = context.locate(runtime, 11, "shutdown_request");
+    assert_eq!(generated["kind"], "generated");
+    assert!(
+        generated["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("pub fn shutdown_request")
+    );
+    // References also start at the instance member and the library function.
+    let related = context.related_positions("maximum");
+    assert!(related.contains(&(forwarder, line_of_column(&context, forwarder, "maximum"))));
+    assert_eq!(related.len(), 2, "{related:?}");
+    assert!(context.related_positions("shutdown_request").is_empty());
+}
+fn line_of_column(
+    context: &wirecraft_core::editor::BodyContext,
+    line: usize,
+    needle: &str,
+) -> usize {
+    let text = context.file.content.lines().nth(line).unwrap();
+    text[..text.find(needle).unwrap()].chars().count()
+}
+
+#[tokio::test]
+#[ignore = "requires rust-analyzer on PATH or WIRECRAFT_RUST_ANALYZER, and cargo"]
+async fn rust_analyzer_definitions_and_references_map_to_the_model() {
+    let (d, producer, consumer, library) = network();
+    let packet = d
+        .nodes
+        .values()
+        .find(|n| n.name == "packet")
+        .unwrap()
+        .id
+        .clone();
+    let app = Application::new(Service::new(d, None), "fixture".into(), None);
+    let ask = |command: &str, node: &str, text: &str, offset: usize| {
+        Request::new(
+            command,
+            json!({"nodeId":node,"section":"source","text":text,"offset":offset}),
+        )
+    };
+    let definition = |word: &str, nth: usize| {
+        let offset = CONSUMER.match_indices(word).nth(nth).unwrap().0 + 1;
+        ask("editor.definition", &consumer, CONSUMER, offset)
+    };
+    let first = |value: &Value| value["locations"][0].clone();
+    // A library member called through the instance: the function in the library body.
+    let found = app.execute(definition("maximum", 0)).await.unwrap();
+    let target = first(&found);
+    assert_eq!(target["kind"], "body", "{found}");
+    assert_eq!(target["source"]["nodeId"], library);
+    assert_eq!(target["source"]["line"], 2);
+    assert_eq!(target["source"]["column"], 4);
+    // Model arguments: the library and the link.
+    let found = app.execute(definition("math", 0)).await.unwrap();
+    assert_eq!(first(&found)["source"]["nodeId"], library, "{found}");
+    let found = app.execute(definition("packet", 0)).await.unwrap();
+    assert_eq!(first(&found)["kind"], "entity", "{found}");
+    assert_eq!(first(&found)["source"]["nodeId"], packet);
+    // A local binding in the same body.
+    let found = app.execute(definition("item", 1)).await.unwrap();
+    let target = first(&found);
+    assert_eq!(target["current"], true, "{found}");
+    assert_eq!(target["source"]["line"], 1);
+    assert_eq!(target["source"]["column"], 13);
+    // Runtime methods are generated code; std items are external.
+    let found = app
+        .execute(definition("shutdown_request", 0))
+        .await
+        .unwrap();
+    assert_eq!(first(&found)["kind"], "generated", "{found}");
+    assert!(
+        first(&found)["text"]
+            .as_str()
+            .unwrap()
+            .contains("fn shutdown_request")
+    );
+    let found = app.execute(definition("println", 0)).await.unwrap();
+    assert_eq!(first(&found)["kind"], "external", "{found}");
+
+    // References of the library function, asked in the library body: its definition and
+    // the calls through the instance in both consumers.
+    let source = "/// The larger of two numbers.\nfn maximum(left: i64, right: i64) -> i64 {\n    if left > right { left } else { right }\n}";
+    let offset = source.find("maximum").unwrap() + 2;
+    let found = app
+        .execute(ask("editor.references", &library, source, offset))
+        .await
+        .unwrap();
+    let bodies = found["locations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|l| l["kind"] == "body")
+        .map(|l| {
+            (
+                l["source"]["nodeId"].as_str().unwrap().to_string(),
+                l["source"]["line"].as_u64().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    for expected in [
+        (library.clone(), 2),
+        (producer.clone(), 1),
+        (consumer.clone(), 2),
+    ] {
+        assert!(bodies.contains(&expected), "{expected:?} in {found}");
+    }
+    // The same set from a consumer's call.
+    let found = app
+        .execute(ask(
+            "editor.references",
+            &consumer,
+            CONSUMER,
+            CONSUMER.find("maximum").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let count = |value: &Value| {
+        value["locations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|l| l["kind"] == "body")
+            .count()
+    };
+    assert_eq!(count(&found), bodies.len(), "{found}");
+    app.shutdown().await;
+}
