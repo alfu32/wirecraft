@@ -184,7 +184,11 @@ pub fn instance(set: &str, library: &Node, module_export: bool) -> LibraryInstan
                 .map(|f| {
                     let call = format!("{}({})", f.name, f.arguments.join(", "));
                     format!(
-                        "    {}fn {}{}(self{}{}){} {{\n        {}\n    }}",
+                        "{}    {}fn {}{}(self{}{}){} {{\n        {}\n    }}",
+                        f.docs
+                            .iter()
+                            .map(|line| format!("    {line}\n"))
+                            .collect::<String>(),
                         if f.unsafe_ { "unsafe " } else { "" },
                         f.name,
                         f.generics,
@@ -221,6 +225,8 @@ pub fn instance(set: &str, library: &Node, module_export: bool) -> LibraryInstan
 /// A top-level Rust function a library instance forwards to.
 struct RustFunction {
     name: String,
+    /// `///` lines directly above the function, repeated on its forwarding method.
+    docs: Vec<String>,
     unsafe_: bool,
     /// `<...>` after the name, or empty.
     generics: String,
@@ -276,8 +282,21 @@ fn rust_functions(source: &str) -> Vec<RustFunction> {
                 format!("{argument}: {ty}")
             })
             .collect();
+        let docs = source[..capture.get(0).unwrap().start()]
+            .lines()
+            .rev()
+            .map(str::trim)
+            .skip_while(|line| line.is_empty())
+            .take_while(|line| line.starts_with("///") || line.starts_with("#["))
+            .filter(|line| line.starts_with("///"))
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
         functions.push(RustFunction {
             name,
+            docs,
             unsafe_: capture.get(1).is_some(),
             generics,
             parameters,
