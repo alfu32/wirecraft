@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Rust body editor regression: tree-sitter syntax, rust-analyzer colors, Ctrl-Space completion and the
-background cargo check of the generated program. Only owned PID and a temporary copy of the Rust WebServer.
+"""Rust body editor regression: tree-sitter syntax, rust-analyzer colors, Ctrl-Space completion, the
+background cargo check of the generated program, Go to definition (F12, Ctrl-click) and Find references. Only owned PID and a temporary copy of the Rust WebServer.
 Requires X11/XWayland with Vulkan, xdotool, ImageMagick, rust-analyzer and cargo.
 """
 import json,os,pathlib,shutil,subprocess,tempfile,time,urllib.request
@@ -12,6 +12,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-rust-editor-') as temporary:
  shutil.copy(ROOT/'examples/webserver-rust.orch',project)
  reference=json.loads(project.read_text());node=next(n['id'] for n in reference['nodes'] if n['name']=='router')
  original=next(n['text']['source'] for n in reference['nodes'] if n['id']==node)
+ named=lambda name:next(n['id'] for n in reference['nodes'] if n['name']==name)
  env=os.environ.copy();env.pop('WAYLAND_DISPLAY',None)
  log=open(ARTIFACT/'interaction.log','w');app=None;window=None
  def wait(check,timeout=30):
@@ -30,6 +31,13 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-rust-editor-') as temporary:
   if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
   return subprocess.run(['xdotool',*map(str,args)],env=env,check=True,capture_output=True,text=True).stdout.strip()
  def click(x,y):xd('mousemove','--window',window,x,y,'click',1);time.sleep(.3)
+ def inset():
+  text=subprocess.check_output(['xprop','-id',str(window),'_GTK_FRAME_EXTENTS'],env=env,text=True)
+  if '=' not in text:return (0,0)
+  values=[int(v.strip()) for v in text.split('=',1)[1].split(',')];return (values[0],values[2])
+ def at(x,y):
+  # Screenshots include the client-side frame; pointer coordinates do not.
+  dx,dy=inset();return (x-dx,y-dy)
  def shot(name):
   path=ARTIFACT/(name+'.png');time.sleep(.3);subprocess.run(['import','-window',window,str(path)],env=env,check=True);return path
  def ui():return json.loads((state/'ui.json').read_text())
@@ -69,6 +77,36 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-rust-editor-') as temporary:
   time.sleep(15);shot('rust-cargo-check-issue')
   command('Undo');wait(lambda:document()['nodes'][node]['text']['source']==original)
   time.sleep(10);shot('rust-cargo-check-cleared')
+  def source(name):return next(n['text']['source'] for n in reference['nodes'] if n['name']==name)
+  def cursor_on(name,needle,occurrence=-1):
+   # Character steps from the start are independent of soft wrapping and scrolling.
+   text=source(name);index=[i for i in range(len(text)) if text.startswith(needle,i)][occurrence]+1
+   # From the nearer end, so that few key events are sent.
+   click(600,350)
+   if index<len(text)-index:xd('key','ctrl+Home');xd('key','--delay',30,'--repeat',index,'Right')
+   else:xd('key','ctrl+End');xd('key','--delay',30,'--repeat',len(text)-index,'Left')
+   time.sleep(.3)
+  # F12 on `item` in `push(route, item);` jumps to its `let`; Shift-F12 there lists its uses.
+  cursor_on('router','item');xd('key','F12');time.sleep(2)
+  assert ui().get('draft') is None and ui()['selected']==node
+  xd('key','shift+F12');time.sleep(3);shot('rust-references-local');xd('key','Escape')
+  # F12 on a library function called through the lent instance opens the library body.
+  click(*at(127,778));wait(lambda:ui()['selected']==named('socket_respond'));time.sleep(1)
+  cursor_on('socket_respond','http_render_header');xd('key','F12')
+  wait(lambda:ui()['selected']==named('lib_http_server'));time.sleep(1)
+  # Shift-F12 at the definition lists the call in socket_respond's body.
+  def clean(name):
+   text=draft() if ui().get('draft') else source(name);original=source(name)
+   at=next((i for i,(a,b) in enumerate(zip(text,original)) if a!=b),min(len(text),len(original)))
+   assert ui().get('draft') is None,(name,at,repr(original[at-20:at+20]),repr(text[at-20:at+20]))
+  clean('lib_http_server')
+  xd('key','shift+F12');time.sleep(3);shot('rust-references-library');clean('lib_http_server');xd('key','Escape');time.sleep(.5);clean('lib_http_server')
+  # Ctrl-click on the modeled type in `pop::<ReqRep>` reveals the Type. Pointer coordinates:
+  # after ctrl+Home, line 1 of the default 1424x924 window is at y 326, 20 px per line.
+  click(*at(103,722));wait(lambda:ui()['selected']==node);time.sleep(1)
+  click(600,350);xd('key','ctrl+Home');time.sleep(.5)
+  xd('keydown','ctrl');xd('mousemove','--window',window,537,346,'click',1);xd('keyup','ctrl')
+  wait(lambda:ui()['selected']==named('ReqRep'));shot('rust-definition-type')
   generated=[int(p) for p in subprocess.check_output(['pgrep','-P',str(backend_pid)],text=True).split()]
   assert sum(any('rust-analyzer' in part for part in cmdline(pid)) for pid in generated)>=2,'editor and graph analyzers'
   width=int(subprocess.check_output(['xdotool','getwindowgeometry','--shell',window],env=env,text=True).split('WIDTH=')[1].splitlines()[0])
@@ -76,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-rust-editor-') as temporary:
   until=time.monotonic()+5
   while any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,*generated]) and time.monotonic()<until:time.sleep(.05)
   assert not any(pathlib.Path(f'/proc/{pid}').exists() for pid in [backend_pid,*generated])
-  print(json.dumps({'rustEditor':'passed','rustAnalyzer':True,'completionInsertion':True,'cargoCheckRound':True,'ownedChildrenStopped':True,'artifacts':str(ARTIFACT)}))
+  print(json.dumps({'rustEditor':'passed','rustAnalyzer':True,'completionInsertion':True,'cargoCheckRound':True,'definitions':True,'ownedChildrenStopped':True,'artifacts':str(ARTIFACT)}))
  finally:
   if app is not None and app.poll() is None:
    if window is not None:subprocess.run(['import','-window',window,str(ARTIFACT/'interaction-failure.png')],env=env,capture_output=True)

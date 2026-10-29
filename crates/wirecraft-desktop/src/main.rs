@@ -9,6 +9,7 @@ mod icons;
 mod inspector;
 mod inspector_widgets;
 mod interaction;
+mod navigation;
 mod options;
 mod preview;
 mod reports;
@@ -51,7 +52,9 @@ actions!(
         CommandPalette,
         ShowExport,
         ShowOptions,
-        Complete
+        Complete,
+        GoToDefinition,
+        FindReferences
     ]
 );
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -167,6 +170,9 @@ struct Wirecraft {
     inspector: Vec<workbench::FormField>,
     completion: Option<completion::Pending>,
     completion_generation: u64,
+    navigation: Option<navigation::Ticket>,
+    navigation_generation: u64,
+    references: Option<navigation::References>,
     function_header: String,
     token_timer: Option<Task<()>>,
     token_ticket: Option<editor_tokens::Ticket>,
@@ -339,6 +345,9 @@ impl Wirecraft {
             inspector,
             completion: None,
             completion_generation: 0,
+            navigation: None,
+            navigation_generation: 0,
+            references: None,
             function_header: String::new(),
             token_timer: None,
             token_ticket: None,
@@ -485,6 +494,12 @@ impl Wirecraft {
                     return;
                 }
                 self.completion = None;
+                if command
+                    .as_deref()
+                    .is_some_and(|c| ["editor.definition", "editor.references"].contains(&c))
+                {
+                    self.navigation = None;
+                }
                 self.status = message;
                 if self.move_pending {
                     self.clear_drag_preview();
@@ -580,6 +595,9 @@ impl Wirecraft {
                 }
                 if command == "editor.complete" {
                     self.accept_completions(&value, cx);
+                }
+                if ["editor.definition", "editor.references"].contains(&command.as_str()) {
+                    self.accept_navigation(&command, &value, window, cx);
                 }
                 if command == "editor.tokens" {
                     self.accept_tokens(value.clone(), cx);
@@ -1401,7 +1419,7 @@ impl Wirecraft {
         cx: &mut Context<Self>,
     ) {
         if self.has_draft(cx) || self.editor_request_pending {
-            self.status = "Apply the editor draft before revealing another diagnostic".into();
+            self.status = "Apply the editor draft before revealing another entity".into();
             cx.notify();
             return;
         }
@@ -2051,7 +2069,7 @@ impl Render for Wirecraft {
                         )),
                     )
             });
-        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).children(draft_notice).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
+        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(cx.listener(Self::go_to_definition)).on_action(cx.listener(Self::find_references)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).children(draft_notice).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
     }
 }
 fn main() -> anyhow::Result<()> {
@@ -2119,6 +2137,8 @@ fn main() -> anyhow::Result<()> {
             cx.bind_keys([
                 KeyBinding::new("ctrl-shift-p", CommandPalette, Some("Wirecraft")),
                 KeyBinding::new("ctrl-space", Complete, Some("Wirecraft")),
+                KeyBinding::new("f12", GoToDefinition, Some("Wirecraft")),
+                KeyBinding::new("shift-f12", FindReferences, Some("Wirecraft")),
                 KeyBinding::new(
                     "ctrl-home",
                     gpui_component::input::MoveToStart,

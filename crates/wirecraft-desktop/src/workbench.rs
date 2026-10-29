@@ -174,6 +174,20 @@ const COMMANDS: &[Command] = &[
         icon: "redo",
     },
     Command {
+        id: "definition",
+        group: "Edit",
+        label: "Go to Definition",
+        shortcut: "F12",
+        icon: "code",
+    },
+    Command {
+        id: "references",
+        group: "Edit",
+        label: "Find References",
+        shortcut: "Shift F12",
+        icon: "search",
+    },
+    Command {
         id: "cut",
         group: "Edit",
         label: "Cut",
@@ -543,6 +557,8 @@ impl Wirecraft {
             "save" => self.save(&Save, w, cx),
             "save-as" => self.save_as(&SaveAs, w, cx),
             "undo" => self.undo(&Undo, w, cx),
+            "definition" => self.request_navigation("editor.definition", cx),
+            "references" => self.request_navigation("editor.references", cx),
             "redo" => self.redo(&Redo, w, cx),
             "copy" => self.copy(&CopyEntities, w, cx),
             "cut" => self.cut(&CutEntities, w, cx),
@@ -985,6 +1001,8 @@ impl Wirecraft {
                     },
                 ));
             }
+        } else if group == "References" {
+            panel = panel.w(px(900.)).child(self.render_references(cx));
         } else if group == "Diagnostics" {
             panel = panel.w(px(900.)).child(
                 button("recheck-compiler", "Check compilation again")
@@ -1395,6 +1413,15 @@ impl Wirecraft {
                         MouseButton::Left,
                         cx.listener(|this, _, w, cx| {
                             this.editor.update(cx, |s, cx| s.focus(w, cx))
+                        }),
+                    )
+                    // Ctrl-click: the press placed the cursor on the clicked word.
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|this, event: &MouseUpEvent, _, cx| {
+                            if event.modifiers.secondary() {
+                                this.request_navigation("editor.definition", cx);
+                            }
                         }),
                     )
                     .child({
