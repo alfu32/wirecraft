@@ -22,6 +22,8 @@ struct Inner {
     pending: Mutex<BTreeMap<u64, oneshot::Sender<Result<Value>>>>,
     documents: Mutex<BTreeMap<String, i64>>,
     diagnostics: Mutex<BTreeMap<String, Value>>,
+    /// Last `experimental/serverStatus` (rust-analyzer), or null.
+    status: Mutex<Value>,
     next: AtomicU64,
     alive: AtomicBool,
     events: broadcast::Sender<Value>,
@@ -57,6 +59,15 @@ pub struct LanguageSession {
 }
 impl LanguageSession {
     pub async fn start(executable: &str, args: &[String], root: &Path) -> Result<Self> {
+        Self::start_with(executable, args, root, json!({})).await
+    }
+    /// `capabilities` is merged into the default client capabilities.
+    pub async fn start_with(
+        executable: &str,
+        args: &[String],
+        root: &Path,
+        capabilities: Value,
+    ) -> Result<Self> {
         let root = root.canonicalize()?;
         if !root.is_dir() {
             return Err(Error::new("invalid_input", "Workspace must be a directory"));
@@ -84,6 +95,7 @@ impl LanguageSession {
             pending: Mutex::new(BTreeMap::new()),
             documents: Mutex::new(BTreeMap::new()),
             diagnostics: Mutex::new(BTreeMap::new()),
+            status: Mutex::new(Value::Null),
             next: AtomicU64::new(1),
             alive: AtomicBool::new(true),
             events,
@@ -102,7 +114,9 @@ impl LanguageSession {
         let uri = url::Url::from_directory_path(&session.root)
             .map_err(|_| Error::new("invalid_input", "Invalid workspace URI"))?
             .to_string();
-        let initialized=session.request("initialize",json!({"processId":std::process::id(),"clientInfo":{"name":"wirecraft","version":env!("CARGO_PKG_VERSION")},"rootUri":uri,"workspaceFolders":[{"uri":uri,"name":session.root.file_name().unwrap_or_default().to_string_lossy()}],"capabilities":{"general":{"positionEncodings":["utf-16","utf-8","utf-32"]},"textDocument":{"synchronization":{"dynamicRegistration":false,"didSave":true},"publishDiagnostics":{"versionSupport":true},"completion":{"completionItem":{"snippetSupport":false}},"semanticTokens":{"requests":{"full":true},"tokenTypes":["namespace","type","class","enum","interface","struct","typeParameter","parameter","variable","property","enumMember","event","function","method","macro","keyword","modifier","comment","string","number","regexp","operator","decorator"],"tokenModifiers":["declaration","definition","readonly","static","deprecated","abstract","async","modification","documentation","defaultLibrary"],"formats":["relative"],"overlappingTokenSupport":false,"multilineTokenSupport":false}},"workspace":{"configuration":true,"workspaceFolders":true}},"initializationOptions":{}})).await;
+        let mut client = json!({"general":{"positionEncodings":["utf-16","utf-8","utf-32"]},"textDocument":{"synchronization":{"dynamicRegistration":false,"didSave":true},"publishDiagnostics":{"versionSupport":true},"completion":{"completionItem":{"snippetSupport":false}},"semanticTokens":{"requests":{"full":true},"tokenTypes":["namespace","type","class","enum","interface","struct","typeParameter","parameter","variable","property","enumMember","event","function","method","macro","keyword","modifier","comment","string","number","regexp","operator","decorator"],"tokenModifiers":["declaration","definition","readonly","static","deprecated","abstract","async","modification","documentation","defaultLibrary"],"formats":["relative"],"overlappingTokenSupport":false,"multilineTokenSupport":false}},"workspace":{"configuration":true,"workspaceFolders":true}});
+        merge(&mut client, capabilities);
+        let initialized=session.request("initialize",json!({"processId":std::process::id(),"clientInfo":{"name":"wirecraft","version":env!("CARGO_PKG_VERSION")},"rootUri":uri,"workspaceFolders":[{"uri":uri,"name":session.root.file_name().unwrap_or_default().to_string_lossy()}],"capabilities":client,"initializationOptions":{}})).await;
         let initialized = match initialized {
             Ok(v) => v,
             Err(e) => {
@@ -253,6 +267,9 @@ impl LanguageSession {
     pub fn diagnostics(&self) -> Value {
         json!(self.inner.diagnostics.lock().unwrap().clone())
     }
+    pub fn status(&self) -> Value {
+        self.inner.status.lock().unwrap().clone()
+    }
     pub async fn shutdown(&self) {
         if self.alive() {
             let _ = tokio::time::timeout(
@@ -367,6 +384,9 @@ async fn read_loop(output: tokio::process::ChildStdout, weak: Weak<Inner>) {
                     }
                 }
             } else {
+                if method == "experimental/serverStatus" {
+                    *inner.status.lock().unwrap() = v["params"].clone();
+                }
                 let _ = inner
                     .events
                     .send(json!({"type":"lsp.notification","method":method,"data":v["params"]}));
@@ -385,6 +405,16 @@ async fn read_loop(output: tokio::process::ChildStdout, weak: Weak<Inner>) {
     if let Some(inner) = weak.upgrade() {
         inner.alive.store(false, Ordering::SeqCst);
         fail_pending(&inner, "Invalid or closed language server stream");
+    }
+}
+fn merge(base: &mut Value, extra: Value) {
+    match (base, extra) {
+        (Value::Object(base), Value::Object(extra)) => {
+            for (key, value) in extra {
+                merge(base.entry(key).or_insert(Value::Null), value);
+            }
+        }
+        (base, extra) => *base = extra,
     }
 }
 fn fail_pending(inner: &Inner, message: &str) {

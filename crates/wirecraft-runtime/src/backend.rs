@@ -219,14 +219,15 @@ impl Application {
                     .map_err(|_| Error::new("internal", "Settings lock poisoned"))?
                     .0
                     .clone();
-                let executable =
-                    std::env::var("WIRECRAFT_CLANGD").unwrap_or(settings.clangd.executable);
+                let (executable, args) = language_server(&settings, &context.language);
                 let _lifecycle = self.lifecycle.lock().await;
                 if *self.stop.borrow() {
                     return Err(Error::new("unavailable", "Application is shutting down"));
                 }
                 let mut editor = self.editor.lock().await;
-                if editor.as_ref().is_some_and(|s| !s.alive())
+                if editor
+                    .as_ref()
+                    .is_some_and(|s| !s.alive() || s.language != context.language)
                     && let Some(old) = editor.take()
                 {
                     old.shutdown().await;
@@ -238,8 +239,9 @@ impl Application {
                     *editor = Some(
                         crate::generated_analysis::GeneratedAnalysis::start(
                             project,
+                            &context.language,
                             &executable,
-                            &settings.clangd.args,
+                            &args,
                         )
                         .await?,
                     );
@@ -275,7 +277,7 @@ impl Application {
             "editor.analyze_generated" => {
                 let service = self.service.clone();
                 let root = a["nodeId"].as_str().map(str::to_string);
-                let (project, revision) = tokio::task::spawn_blocking(move || {
+                let (project, language, revision) = tokio::task::spawn_blocking(move || {
                     let s = service
                         .lock()
                         .map_err(|_| Error::new("internal", "Project lock poisoned"))?;
@@ -285,13 +287,21 @@ impl Application {
                             "Generated analysis revision changed",
                         ));
                     }
-                    Ok::<_, Error>((
-                        wirecraft_core::c17::C17::generate(
-                            &s.document,
-                            root.as_deref().unwrap_or(&s.document.root_node_id),
-                        )?,
-                        s.revision,
-                    ))
+                    let root = root.as_deref().unwrap_or(&s.document.root_node_id);
+                    let (project, language) =
+                        if s.document.effective(root, "technologyId") == "rust" {
+                            // The program is analyzed first; its Cargo.toml is a companion.
+                            let mut project = wirecraft_core::compiler::generate(
+                                &s.document,
+                                root,
+                                Default::default(),
+                            )?;
+                            project.files.sort_by_key(|f| !f.path.ends_with(".rs"));
+                            (project, "rust")
+                        } else {
+                            (wirecraft_core::c17::C17::generate(&s.document, root)?, "c")
+                        };
+                    Ok::<_, Error>((project, language, s.revision))
                 })
                 .await
                 .map_err(|e| Error::new("internal", e.to_string()))??;
@@ -300,18 +310,39 @@ impl Application {
                     return Err(Error::new("unavailable", "Application is shutting down"));
                 }
                 let mut generated = self.generated.lock().await;
+                if generated.as_ref().is_some_and(|s| s.language != language)
+                    && let Some(old) = generated.take()
+                {
+                    old.shutdown().await;
+                }
                 if let Some(session) = generated.as_mut() {
                     session.update(project).await?;
                 } else {
-                    let args: Vec<String> = serde_json::from_value(
-                        a.get("args")
-                            .cloned()
-                            .unwrap_or(json!(["--background-index=false"])),
-                    )?;
+                    // The `executable`/`args` arguments select the C17 server; Rust
+                    // programs use the configured rust-analyzer.
+                    let (executable, args) = if language == "rust" {
+                        let settings = self
+                            .settings
+                            .lock()
+                            .map_err(|_| Error::new("internal", "Settings lock poisoned"))?
+                            .0
+                            .clone();
+                        language_server(&settings, language)
+                    } else {
+                        (
+                            a["executable"].as_str().unwrap_or("clangd").to_string(),
+                            serde_json::from_value(
+                                a.get("args")
+                                    .cloned()
+                                    .unwrap_or(json!(["--background-index=false"])),
+                            )?,
+                        )
+                    };
                     *generated = Some(
                         crate::generated_analysis::GeneratedAnalysis::start(
                             project,
-                            a["executable"].as_str().unwrap_or("clangd"),
+                            language,
+                            &executable,
                             &args,
                         )
                         .await?,
@@ -533,6 +564,19 @@ impl Application {
         self.shutdown().await;
         result
     }
+}
+/// Executable and arguments of the body/graph language server for an LSP language;
+/// `WIRECRAFT_CLANGD` / `WIRECRAFT_RUST_ANALYZER` override the configured executables.
+fn language_server(settings: &crate::config::Settings, language: &str) -> (String, Vec<String>) {
+    let (variable, tool) = if language == "rust" {
+        ("WIRECRAFT_RUST_ANALYZER", &settings.rust_analyzer)
+    } else {
+        ("WIRECRAFT_CLANGD", &settings.clangd)
+    };
+    (
+        std::env::var(variable).unwrap_or_else(|_| tool.executable.clone()),
+        tool.args.clone(),
+    )
 }
 fn required_text(a: &Value) -> Result<&str> {
     a["text"]

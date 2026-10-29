@@ -466,7 +466,7 @@ impl Service {
                     {"compilerId":"generic","compilerName":"Model-defined templates","languageId":"any","technologyId":"compiler-template-set"},
                     {"compilerId":"multi-tech","compilerName":"Literal filesystem export","languageId":"any","technologyId":"file-export"},
                     {"compilerId":"multi-tech","compilerName":"Literal filesystem export","languageId":"any","technologyId":"multi-tech"}]);
-                catalog["languageServers"] = json!([{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")}]);
+                catalog["languageServers"] = json!([{"languageIds":["c","cpp"],"executable":"clangd","available":executable_exists("clangd")},{"languageIds":["rust"],"executable":"rust-analyzer","available":executable_exists("rust-analyzer")}]);
                 catalog["note"] = json!(
                     "Template generation is separate from tool availability and editor intelligence. Representative Go/Node/Kotlin/PHP/systemJS/Rust dataflows are tested; execution requires their external tools. C17 model-template overrides and source/runnable capabilities remain pending. See docs/migration/compiler-templates.md for verified scope."
                 );

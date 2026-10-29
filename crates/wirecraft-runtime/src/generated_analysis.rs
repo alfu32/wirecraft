@@ -1,12 +1,16 @@
-//! A generated translation unit and its independent supervised clangd workspace.
+//! A generated translation unit and its independent supervised language server workspace:
+//! clangd for C17 units, rust-analyzer for Rust programs (with their `Cargo.toml`).
 use crate::lsp::LanguageSession;
 use serde_json::{Value, json};
 use std::time::Duration;
+use tokio::sync::broadcast;
 use wirecraft_core::{
     Error, Result,
     generation::{GeneratedProject, VirtualFile},
 };
 pub struct GeneratedAnalysis {
+    /// LSP language of the unit: `c` or `rust`.
+    pub language: String,
     directory: tempfile::TempDir,
     session: LanguageSession,
     uri: String,
@@ -17,11 +21,16 @@ pub struct GeneratedAnalysis {
 impl GeneratedAnalysis {
     pub async fn start(
         project: GeneratedProject,
+        language: &str,
         executable: &str,
         args: &[String],
     ) -> Result<Self> {
         let directory = tempfile::Builder::new()
-            .prefix("wirecraft-c17-analysis-")
+            .prefix(if language == "rust" {
+                "wirecraft-rust-analysis-"
+            } else {
+                "wirecraft-c17-analysis-"
+            })
             .tempdir()?;
         let (project, staged) = stage_project(project, directory.path().to_owned(), vec![]).await?;
         let file = project.files.into_iter().next().ok_or_else(|| {
@@ -31,8 +40,15 @@ impl GeneratedAnalysis {
         let uri = url::Url::from_file_path(&path)
             .map_err(|_| Error::new("invalid_input", "Invalid generated URI"))?
             .to_string();
-        let session = LanguageSession::start(executable, args, directory.path()).await?;
+        let session = if language == "rust" {
+            // Readiness, `cargo check` progress and Markdown hovers.
+            let capabilities = json!({"experimental":{"serverStatusNotification":true},"window":{"workDoneProgress":true},"textDocument":{"hover":{"contentFormat":["markdown","plaintext"]}}});
+            LanguageSession::start_with(executable, args, directory.path(), capabilities).await?
+        } else {
+            LanguageSession::start(executable, args, directory.path()).await?
+        };
         let mut analysis = Self {
+            language: language.into(),
             directory,
             session,
             uri,
@@ -41,7 +57,21 @@ impl GeneratedAnalysis {
             staged,
         };
         analysis.synchronize(None).await?;
+        if language == "rust" {
+            analysis.ready().await;
+        }
         Ok(analysis)
+    }
+    /// rust-analyzer answers before it has loaded the workspace and the standard
+    /// library, with incomplete results; wait until it reports itself quiescent.
+    async fn ready(&self) {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+        while self.session.alive()
+            && self.session.status()["quiescent"] != true
+            && tokio::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
     }
     async fn synchronize(&mut self, next: Option<VirtualFile>) -> Result<()> {
         if let Some(file) = next {
@@ -57,7 +87,7 @@ impl GeneratedAnalysis {
         .map_err(|e| Error::new("internal", e.to_string()))??;
         if self.version == 1 {
             self.session
-                .open(&self.uri, "c", &self.file.content, self.version)
+                .open(&self.uri, &self.language, &self.file.content, self.version)
                 .await
         } else {
             self.session
@@ -87,14 +117,106 @@ impl GeneratedAnalysis {
         }
         self.synchronize(Some(file)).await
     }
+    fn entries(&self, diagnostics: &[Value]) -> Vec<Value> {
+        diagnostics.iter().map(|d| {
+            let line = d["range"]["start"]["line"].as_u64().unwrap_or(0) as usize + 1;
+            let column = d["range"]["start"]["character"].as_u64().unwrap_or(0) as usize + 1;
+            json!({"message":d["message"],"severity":d["severity"],"code":d["code"],"source":self.file.source_location(line,column),"generated":{"uri":self.uri,"line":line,"column":column},"diagnostic":d})
+        }).collect()
+    }
+    /// rust-analyzer's own diagnostics, which it serves on request only.
+    async fn native_diagnostics(&self) -> Result<Vec<Value>> {
+        let report = self
+            .session
+            .request(
+                "textDocument/diagnostic",
+                json!({"textDocument":{"uri":self.uri}}),
+            )
+            .await?;
+        Ok(report["items"].as_array().cloned().unwrap_or_default())
+    }
+    /// Saving the staged program runs rust-analyzer's `cargo check`, whose rustc
+    /// diagnostics are authoritative. Without one (check disabled, no cargo) the
+    /// server's native diagnostics are reported instead.
+    async fn rust_diagnostics(&self) -> Result<Value> {
+        let mut events = self.session.subscribe();
+        self.session
+            .notify(
+                "textDocument/didSave",
+                json!({"textDocument":{"uri":self.uri}}),
+            )
+            .await?;
+        let flycheck = |event: &Value, kind: &str| {
+            event["method"] == "$/progress"
+                && event["data"]["token"]
+                    .as_str()
+                    .is_some_and(|t| t.contains("flycheck"))
+                && event["data"]["value"]["kind"] == kind
+        };
+        let mut checked = false;
+        let started = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                match events.recv().await {
+                    Ok(event) if flycheck(&event, "begin") => return true,
+                    Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(_) => return false,
+                }
+            }
+        })
+        .await
+        .unwrap_or(false);
+        if started {
+            // A check restarted while it runs (a workspace reload, another save)
+            // ends without results and begins again; wait for the last one.
+            checked = tokio::time::timeout(Duration::from_secs(120), async {
+                let mut running = true;
+                loop {
+                    let wait = if running {
+                        Duration::from_secs(120)
+                    } else {
+                        Duration::from_millis(500)
+                    };
+                    match tokio::time::timeout(wait, events.recv()).await {
+                        Err(_) => return true,
+                        Ok(Ok(event)) if flycheck(&event, "end") => running = false,
+                        Ok(Ok(event)) if flycheck(&event, "begin") => running = true,
+                        Ok(Ok(_) | Err(broadcast::error::RecvError::Lagged(_))) => {}
+                        Ok(Err(_)) => return false,
+                    }
+                }
+            })
+            .await
+            .map_err(|_| Error::new("timeout", "cargo check has not finished"))?;
+        }
+        if !self.session.alive() {
+            return Err(Error::new("process_failed", "rust-analyzer exited"));
+        }
+        let published = self.session.diagnostics();
+        let diagnostics = if checked {
+            if published[&self.uri]["version"] == self.version {
+                published[&self.uri]["diagnostics"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+            } else {
+                // A check without findings for an unchanged file publishes nothing.
+                vec![]
+            }
+        } else {
+            self.native_diagnostics().await?
+        };
+        Ok(
+            json!({"diagnostics":self.entries(&diagnostics),"checker":if checked {"cargo check"} else {"rust-analyzer"},"positionEncoding":self.session.encoding,"uri":self.uri,"version":self.version,"pid":self.session.pid()}),
+        )
+    }
     pub async fn diagnostics(&self) -> Result<Value> {
+        if self.language == "rust" {
+            return self.rust_diagnostics().await;
+        }
         let mut events = self.session.subscribe();
         tokio::time::timeout(Duration::from_secs(10),async{
    loop{let diagnostics=self.session.diagnostics();if diagnostics[&self.uri]["version"]==self.version{
-    let entries=diagnostics[&self.uri]["diagnostics"].as_array().cloned().unwrap_or_default().into_iter().map(|d|{
-     let line=d["range"]["start"]["line"].as_u64().unwrap_or(0)as usize+1;let column=d["range"]["start"]["character"].as_u64().unwrap_or(0)as usize+1;
-     json!({"message":d["message"],"severity":d["severity"],"code":d["code"],"source":self.file.source_location(line,column),"generated":{"uri":self.uri,"line":line,"column":column},"diagnostic":d})
-    }).collect::<Vec<_>>();return Ok(json!({"diagnostics":entries,"positionEncoding":self.session.encoding,"uri":self.uri,"version":self.version,"pid":self.session.pid()}));
+    let entries=self.entries(diagnostics[&self.uri]["diagnostics"].as_array().map_or(&[][..],|v|v));return Ok(json!({"diagnostics":entries,"positionEncoding":self.session.encoding,"uri":self.uri,"version":self.version,"pid":self.session.pid()}));
    }
    if !self.session.alive(){return Err(Error::new("process_failed","Generated-source clangd exited"));}
    events.recv().await.map_err(|e|Error::new("process_failed",e.to_string()))?;
@@ -202,7 +324,10 @@ impl GeneratedAnalysis {
             items.push(item);
         }
         // Model context adds direction/type details for the exact generated buffer arguments.
-        if !text[..start].ends_with('.') && !text[..start].ends_with("->") {
+        if !text[..start].ends_with('.')
+            && !text[..start].ends_with("->")
+            && !text[..start].ends_with("::")
+        {
             for symbol in &context.symbols {
                 let label = symbol["label"].as_str().unwrap();
                 if !label.starts_with(prefix) {
@@ -222,14 +347,38 @@ impl GeneratedAnalysis {
                 }
             }
         }
-        items.sort_by_cached_key(|i| {
-            i["sortText"]
+        // rust-analyzer leaves filtering to the client: keep items whose name contains the
+        // typed prefix's characters in order, and rank those starting with it first.
+        let name = |i: &Value| {
+            i["filterText"]
                 .as_str()
-                .or(i["filterText"].as_str())
                 .or(i["label"].as_str())
                 .unwrap_or("")
                 .trim()
-                .to_string()
+                .to_lowercase()
+        };
+        let typed = prefix.to_lowercase();
+        items.retain(|i| {
+            let mut rest = name(i);
+            typed.chars().all(|c| match rest.find(c) {
+                Some(at) => {
+                    rest.drain(..at + c.len_utf8());
+                    true
+                }
+                None => false,
+            })
+        });
+        items.sort_by_cached_key(|i| {
+            (
+                !name(i).starts_with(&typed),
+                i["sortText"]
+                    .as_str()
+                    .or(i["filterText"].as_str())
+                    .or(i["label"].as_str())
+                    .unwrap_or("")
+                    .trim()
+                    .to_string(),
+            )
         });
         Ok(
             json!({"items":items,"isIncomplete":response["isIncomplete"].as_bool().unwrap_or(false),"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"pid":self.session.pid(),"version":self.version}),
@@ -255,7 +404,11 @@ fn stage_files(project: &GeneratedProject, directory: &std::path::Path) -> Resul
         } else {
             file.content.as_bytes().to_vec()
         };
-        wirecraft_core::store::atomic_write(&directory.join(&file.path), &data)?;
+        // Rewriting an unchanged manifest would make rust-analyzer reload the workspace.
+        let path = directory.join(&file.path);
+        if std::fs::read(&path).ok().as_deref() != Some(&data[..]) {
+            wirecraft_core::store::atomic_write(&path, &data)?;
+        }
     }
     Ok(paths.into_iter().collect())
 }
@@ -318,11 +471,10 @@ impl GeneratedAnalysis {
             // Library aliases are function pointers in generated C. Show the
             // callable signature plus its model dependency, not an anonymous
             // pointer type whose provenance has been lost.
-            hover = json!({"contents":{"kind":"markdown","value":format!("```c\n{signature}\n```\n\n{provenance}")}});
+            hover = json!({"contents":{"kind":"markdown","value":format!("```{}\n{signature}\n```\n\n{provenance}",self.language)}});
         }
         if let Some(signature) = context.type_signatures.get(identifier) {
-            hover =
-                json!({"contents":{"kind":"markdown","value":format!("```c\n{signature}\n```")}});
+            hover = json!({"contents":{"kind":"markdown","value":format!("```{}\n{signature}\n```",self.language)}});
         }
         Ok(
             json!({"hover":hover,"identifier":identifier,"version":self.version,"pid":self.session.pid()}),
@@ -444,11 +596,13 @@ impl GeneratedAnalysis {
         // Do not wait for a separate diagnostics publication while holding the
         // editor session. Automatic compilation owns that wait independently.
         let published = self.session.diagnostics();
-        let current = published[&self.uri]["version"] == self.version;
-        let diagnostics = if current {
-            self.diagnostics().await?["diagnostics"].clone()
+        let (current, diagnostics) = if self.language == "rust" {
+            // Native diagnostics are computed for this exact version on request.
+            (true, json!(self.entries(&self.native_diagnostics().await?)))
+        } else if published[&self.uri]["version"] == self.version {
+            (true, self.diagnostics().await?["diagnostics"].clone())
         } else {
-            Value::Null
+            (false, Value::Null)
         };
         Ok(
             json!({"tokens":tokens,"diagnostics":diagnostics,"diagnosticsCurrent":current,"positionEncoding":"utf-32","serverPositionEncoding":self.session.encoding,"version":self.version,"pid":self.session.pid(),"generatedBytes":self.file.content.len(),"generatedFiles":self.staged.len()}),

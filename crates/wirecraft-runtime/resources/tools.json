@@ -796,7 +796,7 @@
     },
     {
       "name": "wirecraft.analyze_c17",
-      "description": "Analyze the generated C17 graph with a real clangd and map diagnostics to original node text sections. Uses an independent temporary workspace.",
+      "description": "Analyze the generated C17 graph with a real clangd, or a Rust design's generated program with rust-analyzer's cargo check, and map diagnostics to original node text sections. Uses an independent temporary workspace; executable/args select the C17 server only (Rust uses the configured rust-analyzer).",
       "inputSchema": {
         "type": "object",
         "properties": {

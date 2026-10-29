@@ -8,6 +8,12 @@ pub struct Tool {
     pub executable: String,
     pub args: Vec<String>,
 }
+fn rust_analyzer() -> Tool {
+    Tool {
+        executable: "rust-analyzer".into(),
+        args: vec![],
+    }
+}
 impl Default for Tool {
     fn default() -> Self {
         Self {
@@ -160,6 +166,8 @@ pub struct Settings {
     pub inference: Inference,
     pub editor_indent_spaces: usize,
     pub clangd: Tool,
+    #[serde(default = "rust_analyzer")]
+    pub rust_analyzer: Tool,
     pub c_compiler: String,
     pub cpp_compiler: String,
     pub legacy_preferences: BTreeMap<String, String>,
@@ -172,6 +180,7 @@ impl Default for Settings {
             inference: Inference::default(),
             editor_indent_spaces: 4,
             clangd: Tool::default(),
+            rust_analyzer: rust_analyzer(),
             c_compiler: "clang".into(),
             cpp_compiler: "clang++".into(),
             legacy_preferences: BTreeMap::new(),
@@ -191,6 +200,7 @@ impl Settings {
         if self.schema_version != 1
             || !(1..=16).contains(&self.editor_indent_spaces)
             || self.clangd.executable.trim().is_empty()
+            || self.rust_analyzer.executable.trim().is_empty()
         {
             return Err(Error::new(
                 "invalid_input",
