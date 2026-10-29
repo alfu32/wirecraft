@@ -955,8 +955,12 @@ impl Wirecraft {
             self.name.update(cx, |state, cx| {
                 state.set_value(self.base_name.clone(), window, cx)
             });
+            // Snapshots reload a clean editor; setting identical text would move the
+            // cursor to the start, losing a revealed or navigated position.
             self.editor.update(cx, |state, cx| {
-                state.set_value(self.base_text.clone(), window, cx)
+                if state.value().as_ref() != self.base_text {
+                    state.set_value(self.base_text.clone(), window, cx)
+                }
             });
             self.properties.update(cx, |state, cx| {
                 state.set_value(self.base_properties.clone(), window, cx)
