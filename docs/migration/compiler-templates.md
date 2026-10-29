@@ -98,7 +98,7 @@ At the user's request Wirecraft has a Rust generator. Threadworks has no Rust te
 - **Runner.** `threadwork_runner` (`shutdown_request`, `is_running`, `get_shutdown_signal`, the bounded shutdown drain) stores only atomics. SIGINT/SIGTERM are installed through the C library's `signal`; the handler stores atomics only. The drain trace is opt-in (`WIRECRAFT_TRACE`) on stderr, as in Go and PHP.
 - **Libraries** share the file's module scope. Repeated single-line file-scope `use` declarations stay in the file as `// use …; (duplicate)` comments, so line numbers and source maps are unchanged. Instance methods forward column-0 functions with their generics, `where` clauses, `unsafe` and parameter patterns; `async`/`extern` functions, `main` and `impl` members are not exported.
 
-Pending: file-based layouts (the set is single-file only, like Go), `run` capabilities (rejected, as in Go), and LSP/editor support for Rust bodies. `tests/template_compilers.rs` runs the producer/consumer, two-link library, nested-composite and library-signature graphs with `rustc` by default (`WIRECRAFT_TEST_RUSTC` overrides it), and checks the raw-identifier and duplicate-import handling.
+Library forwarding methods repeat the `///` comments of the functions they forward to. Rust bodies are edited with rust-analyzer (see the README's language intelligence section). Pending: file-based layouts (the set is single-file only, like Go) and `run` capabilities (rejected, as in Go). `tests/template_compilers.rs` runs the producer/consumer, two-link library, nested-composite and library-signature graphs with `rustc` by default (`WIRECRAFT_TEST_RUSTC` overrides it), and checks the raw-identifier and duplicate-import handling.
 
 ## Shared entry points
 

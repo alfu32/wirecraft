@@ -92,7 +92,7 @@ Two deliberate runtime corrections: single-packet transport updates counts per p
 
 ## Language intelligence and builds
 
-Install `clangd` and `clang`/`clang++` on PATH. Desktop **Tools** analyzes the selected Source section as a standalone C/C++ translation unit in an isolated intelligence workspace. It can also run an external C syntax check; refresh Build jobs to see authoritative stdout/stderr and exit status. `WIRECRAFT_CLANGD` and `WIRECRAFT_CC` select executable paths. **Analyze C17 graph** analyzes the generated translation unit and maps errors to node text sections. Click a mapped diagnostic to reveal its entity, section and position. The generated analyzer has an independent temporary workspace and stop control.
+Install `clangd` and `clang`/`clang++` on PATH. Desktop **Tools** analyzes the selected Source section as a standalone C/C++ translation unit in an isolated intelligence workspace. It can also run an external C syntax check; refresh Build jobs to see authoritative stdout/stderr and exit status. `WIRECRAFT_CLANGD` and `WIRECRAFT_CC` select executable paths. **Analyze C17/Rust graph** analyzes the generated translation unit (or Rust program) and maps errors to node text sections. Click a mapped diagnostic to reveal its entity, section and position. The generated analyzer has an independent temporary workspace and stop control.
 
 The backend supports other language servers through executable/argv/root configuration. Example commands (arguments are API JSON):
 
@@ -137,6 +137,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 python3 scripts/desktop_smoke.py
 python3 scripts/walkthrough_smoke.py
 python3 scripts/editor_smoke.py
+python3 scripts/rust_editor_smoke.py   # also needs rust-analyzer and cargo
 python3 scripts/canvas_smoke.py
 python3 scripts/package_smoke.py dist/wirecraft-0.4.1-linux-x86_64.tar.gz --desktop --walkthrough --editor --canvas
 ```
@@ -145,7 +146,9 @@ Full integration verification also needs clang/clangd, uuid-dev, poppler-utils (
 
 Ctrl-Space in C17 Declaration/Instantiation bodies queries the generated compilation context through clangd, showing runtime APIs, connected buffers, injected library functions and members of local typed values. Suggestions show signatures and insert into the draft; Enter/Tab accept, arrows select, Escape dismisses. A read-only generated function header identifies the wrapper. Unicode edits and stale replies are checked. Linux windows include minimize/maximize/restore/close controls.
 
-Pending capabilities include remaining C17 capability/template features and Go/Kotlin/JS/PHP/systemJS graph compiler parity, broader-language inline completion and LSP navigation, OAuth identity, editable canvas paper overlays and exact legacy layout fidelity. Network AI and automatic layout optimization were unfinished in the source as well. JVM plugin ABI is incompatible; plugin data survives. See the parity matrix for exact scope and continuation.
+Pending capabilities include remaining C17 capability/template features and Go/Kotlin/JS/PHP/systemJS graph compiler parity, inline completion for languages other than C and Rust, LSP navigation (go to definition, references), OAuth identity, editable canvas paper overlays and exact legacy layout fidelity. Network AI and automatic layout optimization were unfinished in the source as well. JVM plugin ABI is incompatible; plugin data survives. See the parity matrix for exact scope and continuation.
+
+Rust Declaration/Instantiation bodies (technology `rust`) get the same editor features through rust-analyzer (`rustup component add rust-analyzer`; `rustAnalyzer.executable` in settings or `WIRECRAFT_RUST_ANALYZER` selects it): tree-sitter syntax coloring, semantic colors, Ctrl-Space completion of runtime methods, link buffers and lent library instances (`math.maximum`), hover with the library function's `///` documentation and the model provenance of injected arguments, and native diagnostics while typing. rust-analyzer analyzes the whole generated program with its `Cargo.toml` in a temporary workspace, and its results are remapped to the visible body; the read-only header shows the generated `fn run_…`/`fn init_…` signature. The background compiler check of a Rust design runs rust-analyzer's `cargo check` on the applied graph and lists rustc errors in the status issue list, mapped to entity, section, line and column. The first request waits for rust-analyzer to load the workspace and standard library (about 5 s). Designs with component Exteriors or References are not checked, since the Rust generator rejects them.
 
 C editor Ctrl-Space suggestions show identifiers and signatures. Hover shows clangd function/type declarations, complete emitted struct definitions, and signatures/provenance of injected library functions. The backend/MCP workbench operations `semantic_tokens` and `hover` accept the same nodeId/section/text context (`offset` is UTF-8 bytes for hover). clangd receives the full generated C program, runtime, connected dependencies and companion files, with results remapped to the visible body. Syntax coloring remains available if clangd is missing.
 
@@ -155,6 +158,12 @@ The compiler tests require Go, Node.js and rustc on PATH (`WIRECRAFT_TEST_RUSTC`
 WIRECRAFT_TEST_KOTLINC=/path/to/kotlin-2.2.0/bin/kotlinc \
 WIRECRAFT_TEST_PHP=/path/to/php WIRECRAFT_TEST_BUN=/path/to/bun \
 cargo test -p wirecraft-runtime --test template_compilers --locked -- --include-ignored
+```
+
+The rust-analyzer editor tests are ignored unless requested; they need `rust-analyzer` on PATH (or `WIRECRAFT_RUST_ANALYZER`) and cargo:
+
+```sh
+cargo test -p wirecraft-runtime --test rust_editor --locked -- --include-ignored
 ```
 
 Inspector commit/recovered-draft checks use `python3 scripts/draft_smoke.py` (owned process and temporary state). Add `--draft` to installed package verification.
