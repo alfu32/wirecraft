@@ -1,4 +1,5 @@
 //! Compiler-backed body context. No editor framework or language-server dependency.
+//! C17 bodies are analyzed in the typed C17 unit; Rust bodies in the Rust template output.
 use crate::{
     Document, Error, Result,
     analysis::{Relation, relation},
@@ -8,6 +9,8 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 pub struct BodyContext {
+    /// LSP language of the generated unit: `c` or `rust`.
+    pub language: String,
     pub file: VirtualFile,
     pub companions: Vec<VirtualFile>,
     pub source: SourceMap,
@@ -23,7 +26,11 @@ impl BodyContext {
             files: std::iter::once(self.file.clone())
                 .chain(self.companions.iter().cloned())
                 .collect(),
-            capability: "c17-editor-context".into(),
+            capability: if self.language == "rust" {
+                "rust-editor-context".into()
+            } else {
+                "c17-editor-context".into()
+            },
         }
     }
 }
@@ -34,15 +41,45 @@ pub fn body_context(
     draft: Option<&str>,
 ) -> Result<BodyContext> {
     document.node(node_id)?;
-    if !["source", "initialization"].contains(&section)
-        || document.effective_text_language(node_id, section) != "c"
-        || document.effective(node_id, "technologyId") != "c-native"
-    {
-        return Err(Error::new(
+    match compiler_language(document, node_id, section) {
+        Some("c") => c17_body_context(document, node_id, section, draft),
+        Some(_) => rust_body_context(document, node_id, section, draft),
+        None => Err(Error::new(
             "unsupported",
-            "Compiler body context currently supports C17 Declaration and Instantiation sections",
-        ));
+            "Compiler body context currently supports C17 and Rust Declaration and Instantiation sections",
+        )),
     }
+}
+/// The generated-program language (`c` or `rust`) whose compiler and language server
+/// analyze this body, if any: Declaration and Instantiation sections of C17 or Rust
+/// entities.
+pub fn compiler_language(
+    document: &Document,
+    node_id: &str,
+    section: &str,
+) -> Option<&'static str> {
+    let node = document.nodes.get(node_id)?;
+    if !["source", "initialization"].contains(&section)
+        || node.is_link()
+        || matches!(node.kind, crate::NodeKind::Type | crate::NodeKind::Note)
+    {
+        return None;
+    }
+    match (
+        document.effective_text_language(node_id, section).as_str(),
+        document.effective(node_id, "technologyId").as_str(),
+    ) {
+        ("c", "c-native") => Some("c"),
+        ("rust", "rust") => Some("rust"),
+        _ => None,
+    }
+}
+fn c17_body_context(
+    document: &Document,
+    node_id: &str,
+    section: &str,
+    draft: Option<&str>,
+) -> Result<BodyContext> {
     let mut candidate = document.clone();
     let node = candidate
         .nodes
@@ -182,6 +219,7 @@ pub fn body_context(
         }
     }
     Ok(BodyContext {
+        language: "c".into(),
         type_signatures,
         file,
         companions: files.collect(),
@@ -190,4 +228,190 @@ pub fn body_context(
         symbols,
         excluded_library_prefixes,
     })
+}
+
+/// The body inside the single-file Rust program, located by the compiler's
+/// `wirecraft-source` markers. An empty body is generated as one blank line so that the
+/// cursor of an empty editor still has a position in the program.
+fn rust_body_context(
+    document: &Document,
+    node_id: &str,
+    section: &str,
+    draft: Option<&str>,
+) -> Result<BodyContext> {
+    let root = &document.root_node_id;
+    if document.effective(root, "technologyId") != "rust" {
+        return Err(Error::new(
+            "unsupported",
+            "Rust body context needs a design whose root technology is rust",
+        ));
+    }
+    let mut candidate = document.clone();
+    let node = candidate
+        .nodes
+        .get_mut(node_id)
+        .ok_or_else(|| Error::new("not_found", "Editor entity does not exist"))?;
+    let text = if section == "source" {
+        &mut node.text.source
+    } else {
+        &mut node.text.initialization
+    };
+    if let Some(draft) = draft {
+        *text = draft.into();
+    }
+    if text.is_empty() {
+        *text = " ".into();
+    }
+    let project = crate::compiler::generate(&candidate, root, Default::default())?;
+    let mut files = project.files;
+    let index = files
+        .iter()
+        .position(|f| {
+            f.path.ends_with(".rs")
+                && f.source_map
+                    .iter()
+                    .any(|m| m.node_id == node_id && m.section == section)
+        })
+        .ok_or_else(|| {
+            Error::new(
+                "unsupported",
+                "Selected entity has no editable Rust body in the generated program",
+            )
+        })?;
+    let file = files.remove(index);
+    let source = file
+        .source_map
+        .iter()
+        .find(|m| m.node_id == node_id && m.section == section)
+        .cloned()
+        .unwrap();
+    let library =
+        crate::analysis::stereotype(&candidate, &candidate.nodes[node_id]) == "ServiceLibrary";
+    // Processor and composite bodies sit in a one-line `fn init_…`/`fn run_…` header.
+    let header = file
+        .content
+        .lines()
+        .take(source.generated_start_line - 1)
+        .filter(|line| line.starts_with("fn "))
+        .last()
+        .filter(|_| !library)
+        .unwrap_or("// Rust service library items (file scope)")
+        .to_string();
+    let mut symbols = Vec::new();
+    for (name, ty) in rust_parameters(&header) {
+        let plain = name.trim_start_matches("r#");
+        if name == "context" {
+            symbols.push(json!({"label":name,"kind":6,"detail":format!("context: {ty}"),"documentation":"Per-node runtime context; keep state between ticks with context.state::<T>(\"key\")."}));
+            continue;
+        }
+        // Self-links appear as `<link>_in`/`<link>_out`; other arguments are named after the link.
+        let link = candidate.nodes.values().find(|n| {
+            n.link.as_ref().is_some_and(|l| {
+                (l.source_node_id == node_id || l.target_node_id == node_id)
+                    && [
+                        plain.to_string(),
+                        format!("{plain}_"),
+                        plain.trim_end_matches("_in").into(),
+                        plain.trim_end_matches("_out").into(),
+                    ]
+                    .contains(&crate::c17::identifier(&n.name))
+            })
+        });
+        let Some(link_node) = link else {
+            continue;
+        };
+        let l = link_node.link.as_ref().unwrap();
+        let documentation = match relation(&candidate, link_node) {
+            Some(Relation::Dependency) => {
+                let library = candidate
+                    .nodes
+                    .get(&l.source_node_id)
+                    .map_or(l.source_node_id.as_str(), |n| n.name.as_str());
+                format!(
+                    "Instance of library {library} lent by dependency {}; call its functions with {name}.function(...).",
+                    link_node.name
+                )
+            }
+            Some(Relation::Source) => format!(
+                "Materializes the declaration of {}: {name}.get_source(&parameters) replaces ${{name}} markers.",
+                candidate
+                    .nodes
+                    .get(&l.source_node_id)
+                    .map_or(l.source_node_id.as_str(), |n| n.name.as_str())
+            ),
+            _ => {
+                // Buffers hold any value; only a modeled struct names the popped type.
+                let modeled = candidate
+                    .nodes
+                    .get(&l.type_definition_id)
+                    .map(|n| crate::c17::identifier(&n.name));
+                let payload = modeled.clone().unwrap_or_else(|| {
+                    if l.type_name.is_empty() {
+                        "any value".into()
+                    } else {
+                        l.type_name.clone()
+                    }
+                });
+                let input = l.target_node_id == node_id
+                    && (l.source_node_id != node_id || plain.ends_with("_in"));
+                format!(
+                    "{} buffer of {payload}: {}\n\n{}:{} → {}:{}",
+                    if input { "Input" } else { "Output" },
+                    if input {
+                        format!(
+                            "pop::<{}>({name}) takes the next value",
+                            modeled.as_deref().unwrap_or("T")
+                        )
+                    } else {
+                        format!("push({name}, value) sends a value")
+                    },
+                    l.source_node_id,
+                    l.source_port_name,
+                    l.target_node_id,
+                    l.target_port_name
+                )
+            }
+        };
+        symbols.push(json!({"label":name,"kind":6,"detail":format!("{name}: {ty}"),"documentation":documentation}));
+    }
+    Ok(BodyContext {
+        language: "rust".into(),
+        file,
+        companions: files,
+        source,
+        header,
+        symbols,
+        type_signatures: BTreeMap::new(),
+        excluded_library_prefixes: BTreeSet::new(),
+    })
+}
+/// `name: type` pairs of a one-line generated Rust function header.
+fn rust_parameters(header: &str) -> Vec<(String, String)> {
+    let Some(list) = header
+        .split_once('(')
+        .and_then(|(_, rest)| rest.rsplit_once(") ->"))
+        .map(|(list, _)| list)
+    else {
+        return vec![];
+    };
+    // Generated parameter types contain no commas outside angle brackets.
+    let mut parameters = vec![];
+    let (mut depth, mut start) = (0i32, 0);
+    for (i, c) in list
+        .char_indices()
+        .chain(std::iter::once((list.len(), ',')))
+    {
+        match c {
+            '<' | '(' => depth += 1,
+            '>' | ')' => depth -= 1,
+            ',' if depth == 0 => {
+                if let Some((name, ty)) = list[start..i].split_once(':') {
+                    parameters.push((name.trim().to_string(), ty.trim().to_string()));
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    parameters
 }
