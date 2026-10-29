@@ -49,6 +49,10 @@ impl OptionsEditor {
                 "Mouse-wheel scroll rows".into(),
             ),
             ("/clangd/executable".into(), "clangd executable".into()),
+            (
+                "/rustAnalyzer/executable".into(),
+                "rust-analyzer executable".into(),
+            ),
             ("/cCompiler".into(), "C compiler executable".into()),
             ("/cppCompiler".into(), "C++ compiler executable".into()),
             (

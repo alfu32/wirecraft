@@ -7,7 +7,7 @@ impl Wirecraft {
     pub(super) fn refresh_compiler_issues(&mut self) {
         let mut issues = BTreeMap::new();
         let d = &self.snapshot.document;
-        let live_c17 = c17_checked(d);
+        let live_c17 = c17_checked(d) && d.effective(&d.root_node_id, "technologyId") == "c-native";
         for node in d.nodes.values() {
             for diagnostic in &node.diagnostics {
                 // Results persisted by the baseline C compiler are superseded by the live C17 check.
@@ -89,13 +89,25 @@ impl Wirecraft {
         }
     }
 }
-/// Whether the live C17 check owns this design's compiler diagnostics. A component
-/// (a design with Exterior ports) generates only through a design that references it.
+/// Whether the live C17 or Rust (`cargo check`) analysis owns this design's compiler
+/// diagnostics. A component (a design with Exterior ports) generates only through a
+/// design that references it; the Rust generator supports no components yet.
 fn c17_checked(d: &wirecraft_core::Document) -> bool {
-    d.effective(&d.root_node_id, "languageId") == "c"
-        && d.effective(&d.root_node_id, "technologyId") == "c-native"
-        && !d
-            .nodes
-            .values()
-            .any(wirecraft_core::components::is_exterior)
+    let root = &d.root_node_id;
+    let exterior = d
+        .nodes
+        .values()
+        .any(wirecraft_core::components::is_exterior);
+    match d.effective(root, "technologyId").as_str() {
+        "c-native" => d.effective(root, "languageId") == "c" && !exterior,
+        "rust" => {
+            d.effective(root, "languageId") == "rust"
+                && !exterior
+                && !d
+                    .nodes
+                    .values()
+                    .any(wirecraft_core::components::is_reference)
+        }
+        _ => false,
+    }
 }

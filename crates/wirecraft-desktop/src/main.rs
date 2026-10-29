@@ -939,14 +939,12 @@ impl Wirecraft {
                 .effective_text_language(&n.id, &self.section);
             self.editor
                 .update(cx, |state, cx| state.set_highlighter(language.clone(), cx));
-            if language == "c"
-                && !n.is_link()
-                && !matches!(
-                    n.kind,
-                    wirecraft_core::NodeKind::Type | wirecraft_core::NodeKind::Note
-                )
-                && self.snapshot.document.effective(&n.id, "technologyId") == "c-native"
-                && ["source", "initialization"].contains(&self.section.as_str())
+            if wirecraft_core::editor::compiler_language(
+                &self.snapshot.document,
+                &n.id,
+                &self.section,
+            )
+            .is_some()
             {
                 self.client.send(
                     "editor.context",
@@ -1988,7 +1986,7 @@ impl Render for Wirecraft {
               .child(button("build-c","Compiler check · C").on_click(cx.listener(|this,_,_,cx|this.analyze(false,true,cx))))
               .child(button("diagnostics","Refresh diagnostics").on_click(cx.listener(|this,_,_,_|this.tool("lsp.diagnostics"))))
               .child(button("jobs","Build jobs").on_click(cx.listener(|this,_,_,_|this.tool("jobs.list"))))
-              .child(button("analyze-c17","Analyze C17 graph").on_click(cx.listener(|this,_,_,_|this.tool("editor.analyze_generated")))).child(button("stop-graph","Stop graph analyzer").on_click(cx.listener(|this,_,_,_|this.tool("editor.stop_generated")))).child(button("stop-lsp","Stop standalone").on_click(cx.listener(|this,_,_,_|this.tool("lsp.stop")))))
+              .child(button("analyze-c17","Analyze C17/Rust graph").on_click(cx.listener(|this,_,_,_|this.tool("editor.analyze_generated")))).child(button("stop-graph","Stop graph analyzer").on_click(cx.listener(|this,_,_,_|this.tool("editor.stop_generated")))).child(button("stop-lsp","Stop standalone").on_click(cx.listener(|this,_,_,_|this.tool("lsp.stop")))))
              .child(div().id("tool-output").flex_1().overflow_y_scroll().p_4()
                 .children(self.generated_diagnostics.iter().enumerate().filter(|(_,d)|d["source"].is_object()).map(|(i,d)|{
                     let diagnostic=d.clone();let source=&d["source"];let label=format!("{}:{}:{} · {}",source["nodeId"].as_str().unwrap_or(""),source["line"],source["column"],d["message"].as_str().unwrap_or(""));

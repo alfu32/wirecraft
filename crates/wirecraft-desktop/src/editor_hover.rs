@@ -22,11 +22,12 @@ impl HoverProvider for Provider {
                     let node = this.editor_entity.clone()?;
                     if this.tab != "Editor"
                         || this.editor.read(cx).value().as_ref() != text
-                        || this
-                            .snapshot
-                            .document
-                            .effective_text_language(&node, &this.section)
-                            != "c"
+                        || wirecraft_core::editor::compiler_language(
+                            &this.snapshot.document,
+                            &node,
+                            &this.section,
+                        )
+                        .is_none()
                     {
                         return None;
                     }

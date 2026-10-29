@@ -32,6 +32,15 @@ pub(super) fn register_languages() {
         "",
     );
     LanguageRegistry::singleton().register("cpp", &cpp);
+    let rust = LanguageConfig::new(
+        "rust",
+        tree_sitter_rust::LANGUAGE.into(),
+        vec![],
+        tree_sitter_rust::HIGHLIGHTS_QUERY,
+        "",
+        "",
+    );
+    LanguageRegistry::singleton().register("rust", &rust);
 }
 impl Wirecraft {
     pub(super) fn queue_tokens(&mut self, cx: &mut Context<Self>) {
@@ -49,16 +58,13 @@ impl Wirecraft {
         let Some(node) = self.editor_entity.clone() else {
             return;
         };
-        let d = &self.snapshot.document;
         if self.tab != "Editor"
-            || !["source", "initialization"].contains(&self.section.as_str())
-            || d.effective_text_language(&node, &self.section) != "c"
-            || d.effective(&node, "technologyId") != "c-native"
-            || d.nodes[&node].is_link()
-            || matches!(
-                d.nodes[&node].kind,
-                wirecraft_core::NodeKind::Type | wirecraft_core::NodeKind::Note
+            || wirecraft_core::editor::compiler_language(
+                &self.snapshot.document,
+                &node,
+                &self.section,
             )
+            .is_none()
         {
             return;
         }
@@ -112,7 +118,9 @@ impl Wirecraft {
                 .filter_map(|v| {
                     let range = v["startByte"].as_u64()? as usize..v["endByte"].as_u64()? as usize;
                     let color = match v["kind"].as_str()? {
-                        "type" | "class" | "struct" | "enum" | "interface" | "typeParameter" => {
+                        // The last four are rust-analyzer's.
+                        "type" | "class" | "struct" | "enum" | "interface" | "typeParameter"
+                        | "builtinType" | "typeAlias" | "selfTypeKeyword" | "union" => {
                             if light {
                                 0x006d8f
                             } else {
