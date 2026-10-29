@@ -2,6 +2,26 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Go to Definition and Find References (0.22.0)
+
+At the user's request, C17 and Rust bodies support Go to Definition (F12, Ctrl-click, palette) and Find References (Shift-F12). `GeneratedAnalysis::locations` sends `textDocument/definition` / `references` to clangd or rust-analyzer and maps every reply through the pure `BodyContext::locate` in core:
+- authored bodies go through the source maps;
+- the edited body's generated header maps a model argument to its link or library;
+- generated type and library-instance structs map to their entity;
+- library members reached through the instance (Rust forwarding methods, C function-pointer fields) continue to the function in the lent library's text;
+- everything else is reported as generated code, or external (std, system headers).
+
+References are also requested at `BodyContext::related_positions`: the instance members and the library function's definition. So a library function and the calls through every lent instance are found together. The desktop moves the cursor within the edited body, reveals other entities as diagnostics do (the draft must be applied first), and lists references in a panel. Fixed on the way: a snapshot reloading a clean editor reset the cursor to the start even when the text was unchanged, losing any revealed position (diagnostic reveal included).
+
+Verification: core mapping tests run by default (`tests/rust_editor.rs`). A real clangd test (`c17_workflows`, by default) covers a library member through the function pointer, the instance argument, `printf` as external, and references in the library and both consumers. A real rust-analyzer test (opt-in) covers the same for Rust, plus a local binding, runtime methods and std. `scripts/rust_editor_smoke.py` passed in the native window on the Rust WebServer:
+- F12 on a local;
+- Shift-F12 there;
+- F12 from `socket_respond` into `lib_http_server` at line 208;
+- the references panel listing the definition, the call in `socket_respond` (12:40) and the generated forwarders;
+- Ctrl-click on `ReqRep` revealing the Type.
+
+The panel capture was inspected. Some other window captures repeated a stale frame, so those steps were checked through the UI session and request traces instead. One earlier smoke run saw an unexplained draft appear in `lib_http_server` around Shift-F12/Escape; it did not recur in later runs, which now assert that no draft exists at those steps. Pending: navigation in languages other than C and Rust, workspace symbol search, and rename.
+
 ## Rust body editing and rust-analyzer (0.21.0)
 
 At the user's request, Rust bodies get the editor intelligence that C17 bodies have, through rust-analyzer. `editor::body_context` now also builds the Rust context: the single-file program from the Rust template set, located by the compiler's `wirecraft-source` markers, with the generated function header and the model symbols (`context`, link buffers with their direction and payload, lent library instances with their library). `editor::compiler_language` decides which bodies have a compiler language, for both the backend and the desktop. The generated-source analysis is language-aware: it stages the program and its `Cargo.toml` and starts rust-analyzer with its server-status, progress and Markdown-hover capabilities, then waits until the server is quiescent. Completion, hover and semantic tokens are remapped exactly as for clangd. Completion items are narrowed to the typed prefix, because rust-analyzer leaves filtering to the client. Inline diagnostics use rust-analyzer's pull diagnostics. The graph check (`editor.analyze_generated`, the desktop's background compiler check) saves the program, waits for rust-analyzer's `cargo check` to finish (including restarted checks) and maps the rustc diagnostics to bodies. Unchanged staged files are no longer rewritten; a rewritten manifest made rust-analyzer reload the workspace and cancel the check. Library forwarding methods now repeat the functions' `///` comments, so hovering `math.maximum` shows the documentation. The desktop registers tree-sitter-rust, colors rust-analyzer's type kinds and adds a rust-analyzer executable option (`rustAnalyzer` in settings, `WIRECRAFT_RUST_ANALYZER`).
