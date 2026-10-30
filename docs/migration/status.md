@@ -2,6 +2,10 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Identifier default names (0.26.0)
+
+At the user's request, entities and links created without a name are named with valid, unique identifiers: the kind's base followed by the first counter no entity or link name uses (`processor1`, `Type1`, `packet1`, `group1`, `note1`, `node1`). Before, the canvas named them `New processor`, `New type` and `packet`, so names had spaces and repeated. Core `Document::default_name` picks the name; the service uses it when `create_entity`/`create_link` get no name (the MCP schemas no longer require one), and the canvas preview shows the same name before the click. Names the user types are kept as they are, and port names still come from their link. Verification: `tests/services.rs` `unnamed_entities_and_links_get_unique_identifier_names`. Pending: names typed by the user are not checked to be identifiers.
+
 ## Pinned generated header and component bodies (0.25.0)
 
 At the user's request, the generated code now sits inside the editor as its unnumbered first rows, like the baseline's pinned header (`GridCodeEditorAdapter.setPinnedHeader`), instead of a separate labelled panel. It starts at the body's text column, past the line-number gutter, shares the editor's frame, background and focus border, and stays pinned while the body scrolls.
