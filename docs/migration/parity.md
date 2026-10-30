@@ -43,7 +43,7 @@ Source baseline: Threadworks 2.6.7, `7d392d3a0e30b86445e00e7c03032a5188b26593`. 
 
 | Additional workflow | Reference | Rust component | Verification / remaining gap |
 |---|---|---|---|
-| Generated signature view (bodies, Types, links) | CCompiler `generatedFunctionHeader` (one-line C header) | core `editor::signature`; backend `editor.signature`; desktop read-only code view | Full multi-line headers, Type declarations and link code for C17 and all template technologies, highlighted; tests on six WebServers and the C17 walkthrough; native screenshots on Rust |
+| Generated signature view (bodies, Types, links) | CCompiler `generatedFunctionHeader` (one-line C header) | core `editor::signature`; backend `editor.signature`; desktop pinned unnumbered rows above the body | Generated header line (one parameter per line when wider than the editor), Type declarations and link code for C17 and all template technologies, component designs included, highlighted; tests on six WebServers, the C17 walkthrough and the C17 component; native screenshots on Rust and the C17 component |
 | Completion identifier + signature | photo 039; JVM compiler-context suggestions | completion.rs, generated_analysis.rs | real clangd runtime/library signatures; native insertion/undo/stale dismissal and signature rendering passed |
 | Function/struct hover + supplier | photo 040 | editor_hover.rs, editor.rs, generated_analysis.rs | real clangd Unicode/function/struct/library hover; native full struct and injected-function popups inspected |
 | Technical ports / reverse flow | photo 041 | shared port_glyphs, scene.rs, export.rs | outlined outputs, filled input arrows, channel:type labels; reverse links dashed |

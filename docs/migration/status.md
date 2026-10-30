@@ -2,6 +2,14 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Pinned generated header and component bodies (0.25.0)
+
+At the user's request, the generated code now sits inside the editor as its unnumbered first rows, like the baseline's pinned header (`GridCodeEditorAdapter.setPinnedHeader`), instead of a separate labelled panel. It starts at the body's text column, past the line-number gutter, shares the editor's frame, background and focus border, and stays pinned while the body scrolls.
+- **Body headers** are shown as the generator emits them: one line ending with the body's opening brace (C17 and PHP emit the brace on the next line, so ` {` is appended, as the baseline shows it). When that line is wider than the editor, `editor.signature`'s `wrapped` form puts one parameter per line and closes with `) {`. The choice follows the editor's width.
+- **Component designs:** a design with Exterior ports now gets headers, Type declarations and link code. Editor generation (`components::stub_exteriors`) treats its Exterior placements as plain processors, so a published port is the buffer parameter it is in a program that references the component. The component itself still never generates on its own. The same stubbed design feeds the body context of completion, hover, colors and navigation in component designs; only the header path was tested.
+
+Verification: `tests/signatures.rs` checks the generated lines and wrapped forms for C17 and the six template WebServers, and the header of a component body with its port buffer. `scripts/signature_smoke.py processor component` screenshots showed the Rust and C17 component headers pinned above line 1, aligned with the body and highlighted; the single-line form was not exercised in the window. Pending: signatures for Exterior and Reference entities themselves, function suffixes of component bodies (`_4`) that differ in the referencing program, and links whose consumer has no generated run function other than a library.
+
 ## Generated signatures, dropdowns and title bar (0.24.0)
 
 At the user's request, the editor shows the generated code of the selected entity read-only, highlighted, above the body, for C17 and every template technology. Core `editor::signature` (backend `editor.signature`, MCP workbench `signature`) returns:
