@@ -863,6 +863,27 @@ impl Document {
             ))
         }
     }
+    /// A default name for a new entity or link: an identifier made of the kind's base and
+    /// the first counter no entity or link name uses yet (`processor1`, `Type2`, `packet3`).
+    pub fn default_name(&self, kind: NodeKind) -> String {
+        let base = match kind {
+            NodeKind::Processor => "processor",
+            NodeKind::Type => "Type",
+            NodeKind::Link => "packet",
+            NodeKind::Group => "group",
+            NodeKind::Note => "note",
+            NodeKind::Node => "node",
+        };
+        let taken = self
+            .nodes
+            .values()
+            .map(|n| n.name.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        (1..)
+            .map(|i| format!("{base}{i}"))
+            .find(|name| !taken.contains(name.as_str()))
+            .unwrap()
+    }
     pub fn create(&mut self, parent: &str, name: &str, kind: NodeKind) -> Result<String> {
         self.node(parent)?;
         if kind == NodeKind::Link {

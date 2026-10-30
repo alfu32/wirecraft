@@ -214,7 +214,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Entity name"
+            "description": "Entity name; omitted, a unique identifier such as processor1, Type1 or group1"
           },
           "kind": {
             "type": "string",
@@ -239,9 +239,7 @@
             "additionalProperties": true
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": [],
         "additionalProperties": true
       },
       "annotations": {
@@ -342,7 +340,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Link name"
+            "description": "Link name; omitted, a unique identifier such as packet1"
           },
           "sourceNodeId": {
             "type": "string",
@@ -371,7 +369,6 @@
           }
         },
         "required": [
-          "name",
           "sourceNodeId",
           "sourcePortName",
           "targetNodeId",

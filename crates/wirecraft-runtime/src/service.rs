@@ -669,7 +669,12 @@ impl Service {
                     .filter(|s| !s.is_empty())
                     .unwrap_or(&candidate.root_node_id)
                     .to_string();
-                let id = candidate.create(&parent, required(a, "name")?, kind)?;
+                // Without a name the entity gets a unique identifier-safe default.
+                let name = match a["name"].as_str().filter(|s| !s.trim().is_empty()) {
+                    Some(name) => name.to_string(),
+                    None => candidate.default_name(kind),
+                };
+                let id = candidate.create(&parent, &name, kind)?;
                 if let Some(patch) = a.get("attributes") {
                     candidate.patch(&id, patch)?;
                 }
@@ -701,7 +706,11 @@ impl Service {
                 link.target_node_id = required(a, "targetNodeId")?.into();
                 link.source_port_name = a["sourcePortName"].as_str().unwrap_or("out").into();
                 link.target_port_name = a["targetPortName"].as_str().unwrap_or("in").into();
-                let id = candidate.create_link(required(a, "name")?, link)?;
+                let name = match a["name"].as_str().filter(|s| !s.trim().is_empty()) {
+                    Some(name) => name.to_string(),
+                    None => candidate.default_name(NodeKind::Link),
+                };
+                let id = candidate.create_link(&name, link)?;
                 entity(&candidate, &id)?
             }
             "components.publish" => {

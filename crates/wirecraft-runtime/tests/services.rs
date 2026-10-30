@@ -51,6 +51,44 @@ fn transactions_conflict_undo_save_and_unsaved_protection() {
     assert_eq!(wirecraft_core::store::load(&path).unwrap().nodes.len(), 2);
 }
 #[test]
+fn unnamed_entities_and_links_get_unique_identifier_names() {
+    let mut s = service();
+    let mut create = |command: &str, arguments: Value| {
+        let result = s.execute(Request::new(command, arguments)).unwrap();
+        let entity = &result["entity"];
+        (
+            entity["id"].as_str().unwrap().to_string(),
+            entity["name"].as_str().unwrap().to_string(),
+        )
+    };
+    let (a, first) = create("threadwork.create_entity", json!({}));
+    let (b, second) = create("threadwork.create_entity", json!({"kind":"Processor"}));
+    let (_, ty) = create("threadwork.create_entity", json!({"kind":"Type"}));
+    // A name the user typed is kept, and never reused as a default.
+    let (_, typed) = create("threadwork.create_entity", json!({"name":"processor3"}));
+    let (_, third) = create("threadwork.create_entity", json!({"name":"  "}));
+    let (_, link) = create(
+        "threadwork.create_link",
+        json!({"sourceNodeId":a,"targetNodeId":b}),
+    );
+    let (_, next) = create(
+        "threadwork.create_link",
+        json!({"sourceNodeId":b,"targetNodeId":a}),
+    );
+    assert_eq!(
+        [first, second, ty, typed, third, link, next],
+        [
+            "processor1",
+            "processor2",
+            "Type1",
+            "processor3",
+            "processor4",
+            "packet1",
+            "packet2"
+        ]
+    );
+}
+#[test]
 fn user_merge_and_partial_text_updates() {
     let mut s = service();
     for name in ["old", "new"] {
