@@ -1,10 +1,85 @@
 //! Compact value controls shared by inspector rows and inline tables.
 use super::*;
 use gpui_component::{
-    Sizable,
-    button::Button,
+    ActiveTheme, Icon, IconName, Selectable, Sizable,
     menu::{DropdownMenu, PopupMenuItem},
 };
+use std::collections::HashMap;
+/// Last laid-out width of each choice trigger, by its input: the menu opens exactly as
+/// wide as the trigger (the menu is built before the trigger's first paint after opening).
+#[derive(Default)]
+struct ChoiceWidths(HashMap<EntityId, Pixels>);
+impl Global for ChoiceWidths {}
+/// Dropdown trigger with its value aligned left and the caret at the right edge.
+#[derive(IntoElement)]
+struct ChoiceTrigger {
+    base: Stateful<Div>,
+    input: EntityId,
+    label: String,
+    selected: bool,
+}
+impl Styled for ChoiceTrigger {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self.base.style()
+    }
+}
+impl InteractiveElement for ChoiceTrigger {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        self.base.interactivity()
+    }
+}
+impl Selectable for ChoiceTrigger {
+    fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self
+    }
+    fn is_selected(&self) -> bool {
+        self.selected
+    }
+}
+impl DropdownMenu for ChoiceTrigger {}
+impl RenderOnce for ChoiceTrigger {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let input = self.input;
+        let theme = cx.theme();
+        self.base
+            .relative()
+            .h_6()
+            .px_2()
+            .flex()
+            .items_center()
+            .gap_1()
+            .rounded(theme.radius)
+            .border_1()
+            .border_color(theme.input)
+            .text_sm()
+            .cursor_default()
+            .when(self.selected, |b| b.bg(theme.secondary_active))
+            .when(!self.selected, |b| b.hover(|b| b.bg(theme.secondary_hover)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
+                    .child(self.label),
+            )
+            .child(Icon::new(IconName::ChevronDown).small())
+            .child(
+                canvas(
+                    move |bounds, _, cx| {
+                        cx.default_global::<ChoiceWidths>()
+                            .0
+                            .insert(input, bounds.size.width);
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .inset_0(),
+            )
+    }
+}
 pub(super) fn choices(
     input: &Entity<InputState>,
     mut values: Vec<(String, String)>,
@@ -23,30 +98,37 @@ pub(super) fn choices(
         .unwrap_or(empty)
         .to_string();
     let input = input.clone();
-    Button::new(("choice", input.entity_id()))
-        .label(label)
-        .small()
-        .outline()
-        .dropdown_caret(true)
-        .w_full()
-        .dropdown_menu_with_anchor(Corner::TopRight, move |menu, _, _| {
-            values.iter().fold(menu, |menu, (value, label)| {
-                let value = value.clone();
-                let input = input.clone();
-                menu.item(
-                    PopupMenuItem::new(if label.is_empty() {
-                        "None".to_string()
-                    } else {
-                        label.clone()
-                    })
-                    .checked(value == current)
-                    .on_click(move |_, w, cx| {
-                        input.update(cx, |s, cx| s.set_value(value.clone(), w, cx));
-                    }),
-                )
-            })
+    let id = input.entity_id();
+    ChoiceTrigger {
+        base: div().id(("choice", id)),
+        input: id,
+        label,
+        selected: false,
+    }
+    .w_full()
+    .dropdown_menu_with_anchor(Corner::TopLeft, move |menu, _, cx| {
+        // The item list sits inside the menu's one-pixel border.
+        let menu = match cx.try_global::<ChoiceWidths>().and_then(|w| w.0.get(&id)) {
+            Some(&width) => menu.min_w(width - px(2.)).max_w(width - px(2.)),
+            None => menu,
+        };
+        values.iter().fold(menu, |menu, (value, label)| {
+            let value = value.clone();
+            let input = input.clone();
+            menu.item(
+                PopupMenuItem::new(if label.is_empty() {
+                    "None".to_string()
+                } else {
+                    label.clone()
+                })
+                .checked(value == current)
+                .on_click(move |_, w, cx| {
+                    input.update(cx, |s, cx| s.set_value(value.clone(), w, cx));
+                }),
+            )
         })
-        .into_any_element()
+    })
+    .into_any_element()
 }
 pub(super) fn list(values: &[&str], empty: &str) -> Vec<(String, String)> {
     std::iter::once((String::new(), empty.to_string()))
