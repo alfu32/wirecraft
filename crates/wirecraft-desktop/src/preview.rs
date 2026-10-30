@@ -59,12 +59,13 @@ fn build(
     match key.mode {
         Mode::Node | Mode::Type => {
             let at = key.at?;
-            let (name, kind) = if key.mode == Mode::Type {
-                ("New type", NodeKind::Type)
+            let kind = if key.mode == Mode::Type {
+                NodeKind::Type
             } else {
-                ("New processor", NodeKind::Processor)
+                NodeKind::Processor
             };
-            let id = d.create(&key.parent, name, kind).ok()?;
+            // The name the backend gives an unnamed entity.
+            let id = d.create(&key.parent, &d.default_name(kind), kind).ok()?;
             d.patch(&id, &json!({"layout":{"x":at[0],"y":at[1]}}))
                 .ok()?;
             created.insert(id);
@@ -98,10 +99,12 @@ fn build(
                 target_port_name: "in".into(),
                 ..Default::default()
             };
-            created.insert(
-                d.create_link(if publishes { "port" } else { "packet" }, link)
-                    .ok()?,
-            );
+            let name = if publishes {
+                "port".to_string()
+            } else {
+                d.default_name(NodeKind::Link)
+            };
+            created.insert(d.create_link(&name, link).ok()?);
             let _ = wirecraft_core::components::normalize(&mut d);
         }
         Mode::Select => {

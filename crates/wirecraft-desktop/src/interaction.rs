@@ -100,7 +100,7 @@ impl Wirecraft {
         let hit = self.scene.pick(world, tolerance, self.mode == Mode::Select);
         match self.mode {
             Mode::Node | Mode::Type => {
-                self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"name":if self.mode==Mode::Type{"New type"}else{"New processor"},"kind":if self.mode==Mode::Type{"Type"}else{"Processor"},"attributes":{"layout":{"x":world[0],"y":world[1]}}}));
+                self.client.send("threadwork.create_entity",json!({"parentId":self.parent,"kind":if self.mode==Mode::Type{"Type"}else{"Processor"},"attributes":{"layout":{"x":world[0],"y":world[1]}}}));
             }
             Mode::Port => {
                 let diameter = wirecraft_core::components::EXTERIOR_DIAMETER;
@@ -119,7 +119,7 @@ impl Wirecraft {
                         );
                     }
                     (Some(id), Some(source), _) => {
-                        self.client.send("threadwork.create_link",json!({"name":"packet","sourceNodeId":source,"targetNodeId":id,"sourcePortName":"out","targetPortName":"in"}));
+                        self.client.send("threadwork.create_link",json!({"sourceNodeId":source,"targetNodeId":id,"sourcePortName":"out","targetPortName":"in"}));
                     }
                     (Some(id), None, None) => {
                         self.link_source = Some(id);
