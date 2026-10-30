@@ -173,12 +173,17 @@ struct Wirecraft {
     navigation: Option<navigation::Ticket>,
     navigation_generation: u64,
     references: Option<navigation::References>,
-    /// Read-only generated code of the selected entity: its body's function header, its
-    /// Type declaration or its link code; `signature_key` is the entity and section shown.
+    /// Read-only generated code of the selected entity, pinned as the editor's unnumbered
+    /// first rows: its body's function header, its Type declaration or its link code.
+    /// `signature_key` is the entity and section shown; a header too wide for the editor
+    /// shows its `signature_wrapped` form.
     signature: Entity<InputState>,
     signature_key: Option<(String, String)>,
     signature_lines: usize,
     signature_language: SharedString,
+    signature_text: String,
+    signature_wrapped: Option<String>,
+    signature_wraps: bool,
     /// Highlighter language of `editor`.
     editor_language: String,
     window_title: String,
@@ -366,6 +371,9 @@ impl Wirecraft {
             signature_key: None,
             signature_lines: 0,
             signature_language: "plain".into(),
+            signature_text: String::new(),
+            signature_wrapped: None,
+            signature_wraps: false,
             editor_language: "plain".into(),
             window_title: String::new(),
             token_timer: None,
@@ -509,7 +517,7 @@ impl Wirecraft {
                                 .split_once(": ")
                                 .map_or(message.as_str(), |(_, m)| m)
                         );
-                        self.show_signature("plain", text, window, cx);
+                        self.show_signature("plain", text, None, window, cx);
                     }
                     return;
                 }
@@ -632,6 +640,7 @@ impl Wirecraft {
                     self.show_signature(
                         value["language"].as_str().unwrap_or("plain").to_string(),
                         value["text"].as_str().unwrap_or("").to_string(),
+                        value["wrapped"].as_str().map(str::to_string),
                         window,
                         cx,
                     );
@@ -927,12 +936,13 @@ impl Wirecraft {
             .sender
             .send(Message::SaveUi(serde_json::to_value(state).unwrap()));
     }
-    /// Shows generated code above the editor for the selected entity and section; empty
-    /// text hides the view.
+    /// Pins generated code above the editor's body for the selected entity and section;
+    /// empty text hides it.
     fn show_signature(
         &mut self,
         language: impl Into<SharedString>,
         text: String,
+        wrapped: Option<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -940,6 +950,12 @@ impl Wirecraft {
             .selected
             .first()
             .map(|id| (id.clone(), self.section.clone()));
+        self.signature_text = text;
+        self.signature_wrapped = wrapped;
+        let text = match &self.signature_wrapped {
+            Some(wrapped) if self.signature_wraps => wrapped.clone(),
+            _ => self.signature_text.clone(),
+        };
         self.signature_lines = if text.is_empty() {
             0
         } else {
@@ -961,6 +977,16 @@ impl Wirecraft {
         });
         cx.notify();
     }
+    /// Switches the pinned header between its generated line and its wrapped form.
+    fn fit_signature(&mut self, wraps: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if wraps == self.signature_wraps {
+            return;
+        }
+        self.signature_wraps = wraps;
+        let text = std::mem::take(&mut self.signature_text);
+        let wrapped = self.signature_wrapped.take();
+        self.show_signature(self.signature_language.clone(), text, wrapped, window, cx);
+    }
     fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.token_inflight {
             self.token_ticket = None;
@@ -974,6 +1000,8 @@ impl Wirecraft {
         if key != self.signature_key {
             self.signature_key = None;
             self.signature_lines = 0;
+            self.signature_text.clear();
+            self.signature_wrapped = None;
             self.signature
                 .update(cx, |state, cx| state.set_value("", window, cx));
         }
@@ -2099,7 +2127,7 @@ impl Render for Wirecraft {
                         ),
                 );
         } else if self.tab == "Editor" {
-            content = content.child(self.render_editor(cx));
+            content = content.child(self.render_editor(window, cx));
         } else if self.tab == "Project Management" {
             content = content.child(self.render_management(cx));
         } else if self.tab == "Analysis" {

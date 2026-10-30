@@ -1,6 +1,6 @@
 //! Screenshot-driven workbench views. Mutations use the shared application service.
 use super::*;
-use gpui_component::Sizable;
+use gpui_component::{ActiveTheme, Sizable};
 use std::collections::BTreeMap;
 /// Menubar groups rendered as dropdowns anchored under their labels.
 pub(super) const MENUBAR: [&str; 7] = [
@@ -1300,7 +1300,39 @@ impl Wirecraft {
                 .into_any_element(),
         )
     }
-    pub(super) fn render_editor(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_editor(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        // The pinned header starts at the body's text column: past the editor's line-number
+        // gutter, measured as the editor measures it (five digit cells and 16px).
+        let editor_font = self.options.saved.appearance.editor_font.clone();
+        let text_size = window.rem_size() * 0.875;
+        let line_height = window.rem_size() * 1.25;
+        let measure = |text: &str, window: &mut Window| {
+            let run = TextRun {
+                len: text.len(),
+                font: font(editor_font.clone()),
+                color: black(),
+                background_color: None,
+                underline: None,
+                strikethrough: None,
+            };
+            window
+                .text_system()
+                .shape_line(text.to_string().into(), text_size, &[run], None)
+                .width
+        };
+        let gutter = measure("+++++", window) + px(16.);
+        // Its generated line, or one parameter per line when the editor is narrower.
+        let width = self.editor_bounds.get().size.width;
+        if self.signature_wrapped.is_some() && width > px(0.) {
+            let available = width - px(2.) - px(24.) - gutter - px(10.);
+            let wraps = measure(&self.signature_text, window) > available;
+            self.fit_signature(wraps, window, cx);
+        }
+        let focused = self.editor.read(cx).focus_handle(cx).is_focused(window);
         let mut tabs = div().flex().gap_1().p_2();
         for (key, title) in [
             ("source", "Declaration"),
@@ -1390,60 +1422,80 @@ impl Wirecraft {
                         }),
                     )),
             )
-            // Generated, so read-only: the body's full header, a Type's declaration or
-            // a link's code. Long signatures scroll inside a bounded height.
-            .when(self.signature_lines > 0, |b| {
-                b.child(
-                    div()
-                        .id("generated-signature")
-                        .flex_none()
-                        .px_3()
-                        .pb_2()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(crate::chrome::color(0x8fa6b5))
-                                .child("Generated (read-only)"),
-                        )
-                        .child(
-                            div()
-                                .h(px(self.signature_lines.min(14) as f32 * 20. + 14.))
-                                .font_family(self.options.saved.appearance.editor_font.clone())
-                                .child(Input::new(&self.signature).disabled(true).h_full()),
-                        ),
-                )
-            })
+            // Generated, so read-only and unnumbered: the body's header, a Type's
+            // declaration or a link's code, pinned above the body's first line as in the
+            // baseline editor. Long code scrolls inside a bounded height.
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
-                    .relative()
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|this, _, w, cx| {
-                            this.editor.update(cx, |s, cx| s.focus(w, cx))
-                        }),
-                    )
-                    // Ctrl-click: the press placed the cursor on the clicked word.
-                    .on_mouse_up(
-                        MouseButton::Left,
-                        cx.listener(|this, event: &MouseUpEvent, _, cx| {
-                            if event.modifiers.secondary() {
-                                this.request_navigation("editor.definition", cx);
-                            }
-                        }),
-                    )
-                    .child({
-                        let bounds = self.editor_bounds.clone();
-                        canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {})
-                            .absolute()
-                            .size_full()
+                    .flex()
+                    .flex_col()
+                    .bg({
+                        let theme = cx.theme();
+                        theme
+                            .highlight_theme
+                            .style
+                            .editor_background
+                            .unwrap_or(theme.background)
                     })
-                    .font_family(self.options.saved.appearance.editor_font.clone())
-                    .child(Input::new(&self.editor).h_full()),
+                    .rounded(cx.theme().radius)
+                    .border_1()
+                    .border_color(if focused {
+                        cx.theme().ring
+                    } else {
+                        cx.theme().input
+                    })
+                    .font_family(editor_font.clone())
+                    .when(self.signature_lines > 0, |b| {
+                        b.child(
+                            div()
+                                .id("generated-signature")
+                                .flex_none()
+                                .pl(gutter)
+                                .h(line_height * self.signature_lines.min(14) as f32 + px(8.))
+                                .child(
+                                    Input::new(&self.signature)
+                                        .appearance(false)
+                                        .disabled(true)
+                                        .pb_0()
+                                        .h_full(),
+                                ),
+                        )
+                    })
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_h_0()
+                            .relative()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, w, cx| {
+                                    this.editor.update(cx, |s, cx| s.focus(w, cx))
+                                }),
+                            )
+                            // Ctrl-click: the press placed the cursor on the clicked word.
+                            .on_mouse_up(
+                                MouseButton::Left,
+                                cx.listener(|this, event: &MouseUpEvent, _, cx| {
+                                    if event.modifiers.secondary() {
+                                        this.request_navigation("editor.definition", cx);
+                                    }
+                                }),
+                            )
+                            .child({
+                                let bounds = self.editor_bounds.clone();
+                                canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {})
+                                    .absolute()
+                                    .size_full()
+                            })
+                            .child(
+                                Input::new(&self.editor)
+                                    .appearance(false)
+                                    .when(self.signature_lines > 0, |i| i.pt_0())
+                                    .h_full(),
+                            ),
+                    ),
             );
         let mut inspector = div()
             .id("inspector-scroll")
