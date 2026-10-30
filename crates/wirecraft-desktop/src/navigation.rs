@@ -35,12 +35,10 @@ impl Wirecraft {
         let Some(node) = self.editor_entity.clone() else {
             return;
         };
-        if wirecraft_core::editor::compiler_language(&self.snapshot.document, &node, &self.section)
+        if wirecraft_core::editor::body_language(&self.snapshot.document, &node, &self.section)
             .is_none()
         {
-            self.status =
-                "Definitions and references need a C17 or Rust Declaration or Instantiation body"
-                    .into();
+            self.status = "Definitions and references need a Declaration or Instantiation body of a C17, Rust, Go, Kotlin, JavaScript or PHP entity".into();
             cx.notify();
             return;
         }
@@ -89,9 +87,14 @@ impl Wirecraft {
         }
         let identifier = value["identifier"].as_str().unwrap_or("").to_string();
         let locations = value["locations"].as_array().cloned().unwrap_or_default();
+        // Without a language server only model symbols resolve; say so when nothing did.
+        let unserved = value["serverError"]
+            .as_str()
+            .map(|e| format!(" (no language server: {e})"))
+            .unwrap_or_default();
         if command == "editor.references" {
             self.status = format!(
-                "{} reference{} to {identifier}",
+                "{} reference{} to {identifier}{unserved}",
                 locations.len(),
                 if locations.len() == 1 { "" } else { "s" }
             );
@@ -103,7 +106,7 @@ impl Wirecraft {
         } else if let Some(location) = locations.first() {
             self.reveal_location(location, w, cx);
         } else {
-            self.status = format!("No definition found for {identifier}");
+            self.status = format!("No definition found for {identifier}{unserved}");
         }
         cx.notify();
     }

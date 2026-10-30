@@ -53,6 +53,19 @@ impl OptionsEditor {
                 "/rustAnalyzer/executable".into(),
                 "rust-analyzer executable".into(),
             ),
+            ("/gopls/executable".into(), "gopls executable".into()),
+            (
+                "/kotlinLanguageServer/executable".into(),
+                "Kotlin language server executable".into(),
+            ),
+            (
+                "/javascriptLanguageServer/executable".into(),
+                "JavaScript language server executable (Node.js, systemJS)".into(),
+            ),
+            (
+                "/phpLanguageServer/executable".into(),
+                "PHP language server executable".into(),
+            ),
             ("/cCompiler".into(), "C compiler executable".into()),
             ("/cppCompiler".into(), "C++ compiler executable".into()),
             (
