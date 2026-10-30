@@ -173,6 +173,25 @@ impl Application {
                 let _ = self.stop.send(true);
                 return Ok(json!({"shuttingDown":true}));
             }
+            "editor.signature" => {
+                let node = required(a, "nodeId")?.to_string();
+                let section = a["section"].as_str().unwrap_or("source").to_string();
+                let service = self.service.clone();
+                let expected = r.expected_revision;
+                return tokio::task::spawn_blocking(move || {
+                    let service = service
+                        .lock()
+                        .map_err(|_| Error::new("internal", "Project lock poisoned"))?;
+                    if expected.is_some_and(|v| v != service.revision) {
+                        return Err(Error::new("conflict", "Editor context revision changed"));
+                    }
+                    let signature =
+                        wirecraft_core::editor::signature(&service.document, &node, &section)?;
+                    Ok(json!({"language":signature.language,"text":signature.text,"revision":service.revision,"nodeId":node,"section":section}))
+                })
+                .await
+                .map_err(|e| Error::new("internal", e.to_string()))?;
+            }
             "editor.context" | "editor.complete" | "editor.tokens" | "editor.hover"
             | "editor.definition" | "editor.references" => {
                 let node = required(a, "nodeId")?.to_string();

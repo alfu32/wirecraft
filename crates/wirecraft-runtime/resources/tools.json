@@ -818,7 +818,7 @@
     },
     {
       "name": "wirecraft.workbench",
-      "description": "Shared workbench services: archetype/export preview, technical sheets and documentation, clipboard task prompts, settings, MCP controls and optional CUPS printing. Printing is a mutating external operation and must be explicitly requested. Compiler-backed C and Rust body context, Ctrl-Space completion and hover use real clangd or rust-analyzer; definition and references also serve Go, Kotlin, JavaScript (Node.js, systemJS) and PHP bodies through the configured gopls, kotlin-language-server, typescript-language-server and intelephense, and follow library calls, model arguments and modeled types from the model when no server is available (serverError). text/offset (UTF-8 bytes) describe an uncommitted draft. definition/references return model locations: body (entity, section, line, column), entity, generated or external. Compile projects with the shared graph generator; inspect six embedded template sets and export portable model-override compiler bundles. compile_project accepts templateSet, layout and bundle.",
+      "description": "Shared workbench services: archetype/export preview, technical sheets and documentation, clipboard task prompts, settings, MCP controls and optional CUPS printing. Printing is a mutating external operation and must be explicitly requested. Compiler-backed C and Rust body context, Ctrl-Space completion and hover use real clangd or rust-analyzer; definition and references also serve Go, Kotlin, JavaScript (Node.js, systemJS) and PHP bodies through the configured gopls, kotlin-language-server, typescript-language-server and intelephense, and follow library calls, model arguments and modeled types from the model when no server is available (serverError). text/offset (UTF-8 bytes) describe an uncommitted draft. definition/references return model locations: body (entity, section, line, column), entity, generated or external. signature (nodeId, section) returns the read-only generated code of any template or C17 design: the full function header of a body (one parameter per line), a Type's declaration, or a link's port buffers and transport (or the argument a library/source link gives its consumer). Compile projects with the shared graph generator; inspect six embedded template sets and export portable model-override compiler bundles. compile_project accepts templateSet, layout and bundle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -844,7 +844,8 @@
               "semantic_tokens",
               "hover",
               "definition",
-              "references"
+              "references",
+              "signature"
             ]
           },
           "arguments": {
