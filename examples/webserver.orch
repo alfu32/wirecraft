@@ -1001,6 +1001,11 @@
         "path": "webserver-component.orch",
         "ports": [
           {
+            "direction": "Input",
+            "name": "listenerConfig",
+            "typeName": "ListenerConfig"
+          },
+          {
             "direction": "Output",
             "name": "request",
             "typeName": "ReqRep"
@@ -1011,7 +1016,7 @@
             "typeName": "ReqRep"
           }
         ],
-        "sha256": "a4803ee46802b7ec7716957658ec9ee89b25e67fadb2a22b302d78f4aa61950e"
+        "sha256": "352432e42fa9e9cc245e859d9badd7eabf0bf8b73b94aa867cd578fa349bf1ad"
       },
       "responsible": null,
       "revision": {
