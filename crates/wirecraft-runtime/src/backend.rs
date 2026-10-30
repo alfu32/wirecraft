@@ -187,7 +187,7 @@ impl Application {
                     }
                     let signature =
                         wirecraft_core::editor::signature(&service.document, &node, &section)?;
-                    Ok(json!({"language":signature.language,"text":signature.text,"revision":service.revision,"nodeId":node,"section":section}))
+                    Ok(json!({"language":signature.language,"text":signature.text,"wrapped":signature.wrapped,"revision":service.revision,"nodeId":node,"section":section}))
                 })
                 .await
                 .map_err(|e| Error::new("internal", e.to_string()))?;
