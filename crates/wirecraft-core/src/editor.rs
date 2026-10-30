@@ -1,5 +1,6 @@
 //! Compiler-backed body context. No editor framework or language-server dependency.
-//! C17 bodies are analyzed in the typed C17 unit; Rust bodies in the Rust template output.
+//! C17 bodies are analyzed in the typed C17 unit; Rust, Go, Kotlin, JavaScript (Node.js,
+//! systemJS) and PHP bodies in the single-file output of their template compiler.
 use crate::{
     Document, Error, Result,
     analysis::{Relation, relation},
@@ -9,7 +10,8 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 pub struct BodyContext {
-    /// LSP language of the generated unit: `c` or `rust`.
+    /// LSP language of the generated unit: `c`, `rust`, `go`, `kotlin`, `javascript` or
+    /// `php`.
     pub language: String,
     pub file: VirtualFile,
     pub companions: Vec<VirtualFile>,
@@ -22,6 +24,11 @@ pub struct BodyContext {
     pub declarations: BTreeMap<String, String>,
     /// Declaration texts of the libraries lent to this body, by entity id.
     pub library_sources: Vec<(String, String)>,
+    /// Declaration texts of every service library, by entity id.
+    pub libraries: BTreeMap<String, String>,
+    /// `(consumer, argument, library)` for each dependency link: the consumer's bodies
+    /// reach the library's functions through the argument named after the link.
+    pub library_arguments: Vec<(String, String, String)>,
 }
 impl BodyContext {
     pub fn project(&self, name: &str) -> GeneratedProject {
@@ -30,10 +37,10 @@ impl BodyContext {
             files: std::iter::once(self.file.clone())
                 .chain(self.companions.iter().cloned())
                 .collect(),
-            capability: if self.language == "rust" {
-                "rust-editor-context".into()
-            } else {
+            capability: if self.language == "c" {
                 "c17-editor-context".into()
+            } else {
+                format!("{}-editor-context", self.language)
             },
         }
     }
@@ -45,23 +52,29 @@ pub fn body_context(
     draft: Option<&str>,
 ) -> Result<BodyContext> {
     document.node(node_id)?;
-    match compiler_language(document, node_id, section) {
+    match body_language(document, node_id, section) {
         Some("c") => c17_body_context(document, node_id, section, draft),
-        Some(_) => rust_body_context(document, node_id, section, draft),
+        Some(language) => template_body_context(document, node_id, section, draft, language),
         None => Err(Error::new(
             "unsupported",
-            "Compiler body context currently supports C17 and Rust Declaration and Instantiation sections",
+            "Compiler body context supports Declaration and Instantiation sections of C17, Rust, Go, Kotlin, JavaScript and PHP entities",
         )),
     }
 }
 /// The generated-program language (`c` or `rust`) whose compiler and language server
-/// analyze this body, if any: Declaration and Instantiation sections of C17 or Rust
-/// entities.
+/// also check, complete, color and describe this body: Declaration and Instantiation
+/// sections of C17 or Rust entities.
 pub fn compiler_language(
     document: &Document,
     node_id: &str,
     section: &str,
 ) -> Option<&'static str> {
+    body_language(document, node_id, section).filter(|l| ["c", "rust"].contains(l))
+}
+/// The generated-program language of a Declaration or Instantiation body, for every
+/// technology with a body context: `c`, `rust`, `go`, `kotlin`, `javascript` (Node.js
+/// and systemJS) or `php`. Definitions and references are served for all of them.
+pub fn body_language(document: &Document, node_id: &str, section: &str) -> Option<&'static str> {
     let node = document.nodes.get(node_id)?;
     if !["source", "initialization"].contains(&section)
         || node.is_link()
@@ -75,6 +88,10 @@ pub fn compiler_language(
     ) {
         ("c", "c-native") => Some("c"),
         ("rust", "rust") => Some("rust"),
+        ("go", "go") => Some("go"),
+        ("kotlin", "kotlin-jvm") => Some("kotlin"),
+        ("javascript", "nodejs" | "systemjs" | "quickjs") => Some("javascript"),
+        ("php", "php") => Some("php"),
         _ => None,
     }
 }
@@ -235,6 +252,8 @@ fn c17_body_context(
         language: "c".into(),
         declarations,
         library_sources: lent_libraries(&candidate, node_id),
+        libraries: all_libraries(&candidate),
+        library_arguments: library_arguments(&candidate),
         type_signatures,
         file,
         companions: files.collect(),
@@ -245,22 +264,76 @@ fn c17_body_context(
     })
 }
 
-/// The body inside the single-file Rust program, located by the compiler's
-/// `wirecraft-source` markers. An empty body is generated as one blank line so that the
-/// cursor of an empty editor still has a position in the program.
-fn rust_body_context(
+/// Conventions of one template language's single-file program.
+struct Dialect {
+    extension: &'static str,
+    /// Keyword of the one-line `init_…`/`run_…` function headers around bodies.
+    function: &'static str,
+    /// Header shown for service libraries, whose items are at file scope.
+    scope: &'static str,
+    /// Member access through a library argument, as documented to the author.
+    member: &'static str,
+}
+fn dialect(language: &str) -> Dialect {
+    let (extension, function, scope, member) = match language {
+        "rust" => (
+            "rs",
+            "fn ",
+            "// Rust service library items (file scope)",
+            ".",
+        ),
+        "go" => (
+            "go",
+            "func ",
+            "// Go service library items (file scope)",
+            ".",
+        ),
+        "kotlin" => (
+            "kt",
+            "fun ",
+            "// Kotlin service library items (file scope)",
+            ".",
+        ),
+        "php" => (
+            "php",
+            "function ",
+            "// PHP service library items (file scope)",
+            "->",
+        ),
+        _ => (
+            "js",
+            "function ",
+            "// JavaScript service library items (file scope)",
+            ".",
+        ),
+    };
+    Dialect {
+        extension,
+        function,
+        scope,
+        member,
+    }
+}
+/// The body inside the single-file program of a template compiler, located by the
+/// compiler's `wirecraft-source` markers. An empty body is generated as one blank line so
+/// that the cursor of an empty editor still has a position in the program.
+fn template_body_context(
     document: &Document,
     node_id: &str,
     section: &str,
     draft: Option<&str>,
+    language: &str,
 ) -> Result<BodyContext> {
     let root = &document.root_node_id;
-    if document.effective(root, "technologyId") != "rust" {
+    let technology = document.effective(node_id, "technologyId");
+    if document.effective(root, "technologyId") != technology {
         return Err(Error::new(
             "unsupported",
-            "Rust body context needs a design whose root technology is rust",
+            format!("Body context needs a design whose root technology is {technology}"),
         ));
     }
+    let rust = language == "rust";
+    let dialect = dialect(language);
     let mut candidate = document.clone();
     let node = candidate
         .nodes
@@ -282,7 +355,7 @@ fn rust_body_context(
     let index = files
         .iter()
         .position(|f| {
-            f.path.ends_with(".rs")
+            f.path.ends_with(&format!(".{}", dialect.extension))
                 && f.source_map
                     .iter()
                     .any(|m| m.node_id == node_id && m.section == section)
@@ -290,10 +363,23 @@ fn rust_body_context(
         .ok_or_else(|| {
             Error::new(
                 "unsupported",
-                "Selected entity has no editable Rust body in the generated program",
+                "Selected entity has no editable body in the generated program",
             )
         })?;
     let file = files.remove(index);
+    match language {
+        // A build script would make the Kotlin server resolve the classpath with Gradle;
+        // the single file needs only the standard library.
+        "kotlin" => files.retain(|f| !f.path.ends_with(".gradle.kts")),
+        // gopls loads packages through a module.
+        "go" if !files.iter().any(|f| f.path == "go.mod") => files.push(VirtualFile {
+            path: "go.mod".into(),
+            content: "module wirecraft/editor\n\ngo 1.21\n".into(),
+            binary_content: None,
+            source_map: vec![],
+        }),
+        _ => {}
+    }
     let source = file
         .source_map
         .iter()
@@ -302,21 +388,34 @@ fn rust_body_context(
         .unwrap();
     let library =
         crate::analysis::stereotype(&candidate, &candidate.nodes[node_id]) == "ServiceLibrary";
-    // Processor and composite bodies sit in a one-line `fn init_…`/`fn run_…` header.
+    // Processor and composite bodies sit in a one-line `init_…`/`run_…` header.
     let header = file
         .content
         .lines()
         .take(source.generated_start_line - 1)
-        .filter(|line| line.starts_with("fn "))
+        .filter(|line| line.starts_with(dialect.function))
         .last()
         .filter(|_| !library)
-        .unwrap_or("// Rust service library items (file scope)")
+        .unwrap_or(dialect.scope)
         .to_string();
     let mut symbols = Vec::new();
-    for (name, ty) in rust_parameters(&header) {
+    for (name, ty) in parameters(language, &header) {
         let plain = name.trim_start_matches("r#");
+        // PHP arguments are variables; the identifier a request is made on has no `$`.
+        let shown = if language == "php" {
+            format!("${name}")
+        } else {
+            name.clone()
+        };
+        let detail = if ty.is_empty() {
+            shown.clone()
+        } else if language == "go" || language == "php" {
+            format!("{shown} {ty}")
+        } else {
+            format!("{shown}: {ty}")
+        };
         if name == "context" {
-            symbols.push(json!({"label":name,"kind":6,"detail":format!("context: {ty}"),"documentation":"Per-node runtime context; keep state between ticks with context.state::<T>(\"key\")."}));
+            symbols.push(json!({"label":name,"kind":6,"detail":detail,"documentation":if rust {"Per-node runtime context; keep state between ticks with context.state::<T>(\"key\")."} else {"Per-node runtime context shared with the generated runtime."}}));
             continue;
         }
         // Self-links appear as `<link>_in`/`<link>_out`; other arguments are named after the link.
@@ -340,24 +439,21 @@ fn rust_body_context(
             Some(Relation::Dependency | Relation::Source) => l.source_node_id.clone(),
             _ => link_node.id.clone(),
         };
+        let provider = candidate
+            .nodes
+            .get(&l.source_node_id)
+            .map_or(l.source_node_id.as_str(), |n| n.name.as_str());
         let documentation = match relation(&candidate, link_node) {
-            Some(Relation::Dependency) => {
-                let library = candidate
-                    .nodes
-                    .get(&l.source_node_id)
-                    .map_or(l.source_node_id.as_str(), |n| n.name.as_str());
-                format!(
-                    "Instance of library {library} lent by dependency {}; call its functions with {name}.function(...).",
-                    link_node.name
-                )
-            }
-            Some(Relation::Source) => format!(
-                "Materializes the declaration of {}: {name}.get_source(&parameters) replaces ${{name}} markers.",
-                candidate
-                    .nodes
-                    .get(&l.source_node_id)
-                    .map_or(l.source_node_id.as_str(), |n| n.name.as_str())
+            Some(Relation::Dependency) => format!(
+                "Instance of library {provider} lent by dependency {}; call its functions with {shown}{}function(...).",
+                link_node.name, dialect.member
             ),
+            Some(Relation::Source) if rust => format!(
+                "Materializes the declaration of {provider}: {name}.get_source(&parameters) replaces ${{name}} markers."
+            ),
+            Some(Relation::Source) => {
+                format!("Materializes the declaration of {provider}, replacing ${{name}} markers.")
+            }
             _ => {
                 // Buffers hold any value; only a modeled struct names the popped type.
                 let modeled = candidate
@@ -373,17 +469,19 @@ fn rust_body_context(
                 });
                 let input = l.target_node_id == node_id
                     && (l.source_node_id != node_id || plain.ends_with("_in"));
+                let usage = if !rust {
+                    String::new()
+                } else if input {
+                    format!(
+                        ": pop::<{}>({name}) takes the next value",
+                        modeled.as_deref().unwrap_or("T")
+                    )
+                } else {
+                    format!(": push({name}, value) sends a value")
+                };
                 format!(
-                    "{} buffer of {payload}: {}\n\n{}:{} → {}:{}",
+                    "{} buffer of {payload}{usage}\n\n{}:{} → {}:{}",
                     if input { "Input" } else { "Output" },
-                    if input {
-                        format!(
-                            "pop::<{}>({name}) takes the next value",
-                            modeled.as_deref().unwrap_or("T")
-                        )
-                    } else {
-                        format!("push({name}, value) sends a value")
-                    },
                     l.source_node_id,
                     l.source_port_name,
                     l.target_node_id,
@@ -391,10 +489,10 @@ fn rust_body_context(
                 )
             }
         };
-        symbols.push(json!({"label":name,"kind":6,"nodeId":entity,"detail":format!("{name}: {ty}"),"documentation":documentation}));
+        symbols.push(json!({"label":name,"kind":6,"nodeId":entity,"detail":detail,"documentation":documentation}));
     }
     Ok(BodyContext {
-        language: "rust".into(),
+        language: language.into(),
         file,
         companions: files,
         source,
@@ -407,40 +505,62 @@ fn rust_body_context(
             .values()
             .filter(|n| n.kind == crate::NodeKind::Type)
             .map(|n| (crate::c17::identifier(&n.name), n.id.clone()))
-            .chain(libraries(&candidate).map(|n| (crate::libraries::symbols(n).0, n.id.clone())))
+            .chain(libraries(&candidate).flat_map(|n| {
+                let (ty, value) = crate::libraries::symbols(n);
+                [(ty, n.id.clone()), (value, n.id.clone())]
+            }))
             .collect(),
         library_sources: lent_libraries(&candidate, node_id),
+        libraries: all_libraries(&candidate),
+        library_arguments: library_arguments(&candidate),
     })
 }
-/// `name: type` pairs of a one-line generated Rust function header.
-fn rust_parameters(header: &str) -> Vec<(String, String)> {
-    let Some(list) = header
-        .split_once('(')
-        .and_then(|(_, rest)| rest.rsplit_once(") ->"))
-        .map(|(list, _)| list)
-    else {
+/// `(name, type)` pairs of a one-line generated function header: `name: type` (Rust,
+/// Kotlin), `name type` (Go), `name = default` (JavaScript) or `type &$name` (PHP).
+fn parameters(language: &str, header: &str) -> Vec<(String, String)> {
+    let Some(open) = header.find('(') else {
         return vec![];
     };
-    // Generated parameter types contain no commas outside angle brackets.
-    let mut parameters = vec![];
-    let (mut depth, mut start) = (0i32, 0);
-    for (i, c) in list
+    // Generated parameter types contain no commas outside brackets.
+    let mut parts = vec![];
+    let (mut depth, mut start) = (0i32, open + 1);
+    for (i, c) in header[open + 1..]
         .char_indices()
-        .chain(std::iter::once((list.len(), ',')))
+        .map(|(i, c)| (i + open + 1, c))
     {
         match c {
-            '<' | '(' => depth += 1,
-            '>' | ')' => depth -= 1,
+            '>' if header[..i].ends_with('-') => {}
+            '<' | '(' | '[' | '{' => depth += 1,
+            ')' if depth == 0 => {
+                parts.push(&header[start..i]);
+                break;
+            }
+            '>' | ')' | ']' | '}' => depth -= 1,
             ',' if depth == 0 => {
-                if let Some((name, ty)) = list[start..i].split_once(':') {
-                    parameters.push((name.trim().to_string(), ty.trim().to_string()));
-                }
+                parts.push(&header[start..i]);
                 start = i + 1;
             }
             _ => {}
         }
     }
-    parameters
+    parts
+        .into_iter()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .filter_map(|part| {
+            let (name, ty) = match language {
+                "go" => part.split_once(char::is_whitespace)?,
+                "javascript" => (part.split('=').next()?, ""),
+                "php" => {
+                    let part = part.split('=').next()?.trim();
+                    let (ty, name) = part.rsplit_once(char::is_whitespace).unwrap_or(("", part));
+                    (name.trim_start_matches(['&', '.']).strip_prefix('$')?, ty)
+                }
+                _ => part.split_once(':')?,
+            };
+            Some((name.trim().to_string(), ty.trim().to_string()))
+        })
+        .collect()
 }
 fn libraries(document: &Document) -> impl Iterator<Item = &crate::Node> {
     document
@@ -462,7 +582,63 @@ fn lent_libraries(document: &Document, node_id: &str) -> Vec<(String, String)> {
     lent.dedup();
     lent
 }
+fn all_libraries(document: &Document) -> BTreeMap<String, String> {
+    libraries(document)
+        .map(|n| (n.id.clone(), n.text.source.clone()))
+        .collect()
+}
+fn library_arguments(document: &Document) -> Vec<(String, String, String)> {
+    document
+        .nodes
+        .values()
+        .filter(|n| relation(document, n) == Some(Relation::Dependency))
+        .filter_map(|n| {
+            let l = n.link.as_ref()?;
+            Some((
+                l.target_node_id.clone(),
+                crate::c17::identifier(&n.name),
+                l.source_node_id.clone(),
+            ))
+        })
+        .collect()
+}
+/// The identifier around a body offset (start and end byte offsets); a PHP variable's
+/// `$` is not part of it.
+pub fn identifier_at(text: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(text.len());
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let start = text[..offset]
+        .char_indices()
+        .rev()
+        .take_while(|(_, c)| word(*c))
+        .last()
+        .map_or(offset, |(i, _)| i);
+    let end = offset
+        + text[offset..]
+            .find(|c: char| !word(c))
+            .unwrap_or(text.len() - offset);
+    (start, end)
+}
+fn regex(pattern: &str) -> regex::Regex {
+    regex::Regex::new(pattern).unwrap()
+}
 impl BodyContext {
+    /// The authored-body location of a generated position (0-based line, UTF-32
+    /// character), when it is inside a mapped section.
+    fn mapped(&self, line: usize, character: usize) -> Option<Value> {
+        let m = self
+            .file
+            .source_map
+            .iter()
+            .find(|m| (m.generated_start_line..=m.generated_end_line).contains(&(line + 1)))?;
+        let text = self.file.content.lines().nth(line).unwrap_or("").trim();
+        Some(
+            json!({"kind":"body","current":m.node_id==self.source.node_id&&m.section==self.source.section,"source":{"nodeId":m.node_id,"section":m.section,"line":line+1-m.generated_start_line+m.source_start_line,"column":character.saturating_sub(m.generated_column_offset)+1},"positionEncoding":"utf-32","text":text}),
+        )
+    }
+    fn entity(id: &str, text: &str) -> Value {
+        json!({"kind":"entity","source":{"nodeId":id,"section":"properties","line":1,"column":1},"positionEncoding":"utf-32","text":text})
+    }
     /// A model location for a position in the generated unit (0-based line, UTF-32
     /// character), in the shape of a mapped diagnostic (`source` is one-based):
     /// - `body`: inside an authored section (`current` when it is the edited one);
@@ -470,25 +646,13 @@ impl BodyContext {
     /// - `generated`: runtime or other scaffolding, with the generated line's text.
     ///
     /// `identifier` is the word the request was made on. Library members reach bodies
-    /// through generated instances (forwarding methods, function-pointer fields), so a
-    /// definition there continues to the function in the lent library's text.
+    /// through generated instances (forwarding methods, function-pointer fields, object
+    /// properties), so a definition there continues to the function in the library.
     pub fn locate(&self, line: usize, character: usize, identifier: &str) -> Value {
-        let text = self.file.content.lines().nth(line).unwrap_or("").trim();
-        let body = |node: &str, section: &str, line: usize, column: usize| json!({"kind":"body","current":node==self.source.node_id&&section==self.source.section,"source":{"nodeId":node,"section":section,"line":line+1,"column":column+1},"positionEncoding":"utf-32","text":text});
-        if let Some(m) = self
-            .file
-            .source_map
-            .iter()
-            .find(|m| (m.generated_start_line..=m.generated_end_line).contains(&(line + 1)))
-        {
-            return body(
-                &m.node_id,
-                &m.section,
-                line + 1 - m.generated_start_line + m.source_start_line - 1,
-                character.saturating_sub(m.generated_column_offset),
-            );
+        if let Some(body) = self.mapped(line, character) {
+            return body;
         }
-        let entity = |id: &str| json!({"kind":"entity","source":{"nodeId":id,"section":"properties","line":1,"column":1},"positionEncoding":"utf-32","text":text});
+        let text = self.file.content.lines().nth(line).unwrap_or("").trim();
         // A model argument is defined in the edited body's generated header; elsewhere
         // the same name is another symbol (a struct field, a local).
         if text == self.header.trim()
@@ -498,60 +662,252 @@ impl BodyContext {
                 .find(|s| s["label"] == identifier)
                 .and_then(|s| s["nodeId"].as_str())
         {
-            return entity(id);
+            return Self::entity(id, text);
         }
-        let word = |s: &str, name: &str| {
-            regex::Regex::new(&format!(r"\b{}\b", regex::escape(name))).is_ok_and(|r| r.is_match(s))
-        };
         if let Some(id) = self
             .declarations
             .iter()
-            .find(|(name, _)| word(text, &format!("struct {name}")))
+            .find(|(name, _)| self.declares(text, name))
             .map(|(_, id)| id)
         {
-            return entity(id);
+            return Self::entity(id, text);
         }
+        let word =
+            |s: &str, name: &str| regex(&format!(r"\b{}\b", regex::escape(name))).is_match(s);
         if !identifier.is_empty() && word(text, identifier) {
-            let definition = self.function_definition(identifier);
-            for (library, source) in &self.library_sources {
-                for (i, line) in source.lines().enumerate() {
-                    if let Some(name) = definition.captures(line).and_then(|c| c.get(1)) {
-                        let column = line[..name.start()].chars().count();
-                        return json!({"kind":"body","current":false,"source":{"nodeId":library,"section":"source","line":i+1,"column":column+1},"positionEncoding":"utf-32","text":line.trim()});
-                    }
+            for (library, _) in &self.library_sources {
+                if let Some(definition) = self.library_definition(library, identifier) {
+                    return definition;
                 }
             }
         }
         json!({"kind":"generated","path":self.file.path,"line":line+1,"column":character+1,"text":text})
     }
+    /// Whether a generated line declares the modeled type or library instance `name`.
+    fn declares(&self, line: &str, name: &str) -> bool {
+        let name = regex::escape(name);
+        regex(&match self.language.as_str() {
+            "go" => format!(r"\btype\s+{name}\b"),
+            "kotlin" => format!(r"\b(?:class|object|typealias)\s+{name}\b"),
+            "javascript" => {
+                format!(r"(?:@typedef\s*\{{[^}}]*\}}\s*|\b(?:const|let|var|class)\s+){name}\b")
+            }
+            "php" => format!(r"(?:\bclass\s+{name}\b|\${name}\s*=)"),
+            _ => format!(r"\bstruct\s+{name}\b"),
+        })
+        .is_match(line)
+    }
     /// A line defining function `name`; capture 1 is the name.
     fn function_definition(&self, name: &str) -> regex::Regex {
         let name = regex::escape(name);
-        regex::Regex::new(&if self.language == "rust" {
-            format!(
+        regex(&match self.language.as_str() {
+            "rust" => format!(
                 r#"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+"[^"]*"\s+)?fn\s+({name})\b"#
-            )
-        } else {
-            format!(r"^[A-Za-z_][\w \t\*]*?\b({name})\s*\([^;]*$")
+            ),
+            "go" => format!(r"^\s*func\s+(?:\([^)]*\)\s*)?({name})\s*[\[(]"),
+            "kotlin" => format!(
+                r"^\s*(?:(?:private|public|internal|protected|inline|suspend|tailrec|operator|infix)\s+)*fun\s+(?:<[^>]*>\s*)?({name})\s*\("
+            ),
+            "javascript" => format!(
+                r"^\s*(?:export\s+)?(?:async\s+)?(?:function\s*\*?\s*({name})\s*\(|(?:const|let|var)\s+({name})\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|\w+\s*=>))"
+            ),
+            "php" => format!(
+                r"^\s*(?:(?:public|private|protected|static|final|abstract)\s+)*function\s+&?\s*({name})\s*\("
+            ),
+            _ => format!(r"^[A-Za-z_][\w \t\*]*?\b({name})\s*\([^;]*$"),
         })
-        .unwrap()
+    }
+    /// Lines of an authored section as `(generated line, column offset, text)`: from the
+    /// generated unit when it renders the section, else the stored text.
+    fn section_lines(&self, node: &str, section: &str) -> Vec<(Option<usize>, String)> {
+        let lines: Vec<&str> = self.file.content.lines().collect();
+        if let Some(m) = self
+            .file
+            .source_map
+            .iter()
+            .find(|m| m.node_id == node && m.section == section)
+        {
+            return (m.generated_start_line - 1..m.generated_end_line)
+                .filter_map(|i| Some((Some(i), lines.get(i)?.to_string())))
+                .collect();
+        }
+        self.libraries
+            .get(node)
+            .filter(|_| section == "source")
+            .map(|text| text.lines().map(|l| (None, l.to_string())).collect())
+            .unwrap_or_default()
+    }
+    /// The location of a capture in a section line from `section_lines`.
+    fn section_location(
+        &self,
+        node: &str,
+        index: usize,
+        generated: Option<usize>,
+        line: &str,
+        start: usize,
+    ) -> Value {
+        let column = line[..start].chars().count();
+        generated
+            .and_then(|g| self.mapped(g, column))
+            .unwrap_or_else(|| json!({"kind":"body","current":false,"source":{"nodeId":node,"section":"source","line":index+1,"column":column+1},"positionEncoding":"utf-32","text":line.trim()}))
+    }
+    /// Where library `library` defines function `name`.
+    fn library_definition(&self, library: &str, name: &str) -> Option<Value> {
+        let definition = self.function_definition(name);
+        self.section_lines(library, "source")
+            .iter()
+            .enumerate()
+            .find_map(|(i, (generated, line))| {
+                let name = definition.captures(line)?.iter().skip(1).flatten().next()?;
+                Some(self.section_location(library, i, *generated, line, name.start()))
+            })
+    }
+    /// The library whose function the identifier at `[start, end)` of the edited body
+    /// names: a call through a lent library's argument (`math.f`, `math->f`,
+    /// `$math->f`), or a function the edited library itself defines. `None` for other
+    /// member accesses.
+    fn library_member(&self, text: &str, start: usize, end: usize) -> Option<String> {
+        let name = &text[start..end];
+        let before = text[..start].trim_end();
+        let receiver = ["?.", "->", "::", "."]
+            .iter()
+            .find_map(|access| before.strip_suffix(access))
+            .map(|rest| {
+                let rest = rest.trim_end();
+                let (s, e) = identifier_at(rest, rest.len());
+                &rest[s..e]
+            });
+        match receiver {
+            Some(receiver) => self
+                .library_arguments
+                .iter()
+                .find(|(consumer, argument, _)| {
+                    *consumer == self.source.node_id && argument == receiver
+                })
+                .map(|(_, _, library)| library.clone()),
+            None => self
+                .libraries
+                .contains_key(&self.source.node_id)
+                .then(|| self.source.node_id.clone())
+                .filter(|library| self.library_definition(library, name).is_some()),
+        }
+    }
+    /// Definitions found from the model alone, without a language server: a library
+    /// function called through a lent instance, a model argument of the edited body, a
+    /// modeled type or a library instance named in it.
+    pub fn model_definitions(&self, text: &str, offset: usize) -> Vec<Value> {
+        let (start, end) = identifier_at(text, offset);
+        let name = &text[start..end];
+        if name.is_empty() {
+            return vec![];
+        }
+        let line = text[..start].rsplit('\n').next().unwrap_or("");
+        let line = format!("{line}{}", text[start..].split('\n').next().unwrap_or(""));
+        let before = text[..start].trim_end();
+        if ["?.", "->", "::", "."].iter().any(|a| before.ends_with(a)) {
+            return self
+                .library_member(text, start, end)
+                .and_then(|library| self.library_definition(&library, name))
+                .into_iter()
+                .collect();
+        }
+        if let Some(library) = self.library_member(text, start, end) {
+            return self
+                .library_definition(&library, name)
+                .into_iter()
+                .collect();
+        }
+        self.symbols
+            .iter()
+            .find(|s| s["label"] == name)
+            .and_then(|s| s["nodeId"].as_str())
+            .or_else(|| self.declarations.get(name).map(String::as_str))
+            .map(|id| Self::entity(id, line.trim()))
+            .into_iter()
+            .collect()
+    }
+    /// References found from the model alone: for a library function, its definition,
+    /// the calls inside its library and every call through an argument lent by a
+    /// dependency link, in all consumers' bodies.
+    pub fn model_references(&self, text: &str, offset: usize) -> Vec<Value> {
+        let (start, end) = identifier_at(text, offset);
+        let name = &text[start..end];
+        let Some(library) = (!name.is_empty())
+            .then(|| self.library_member(text, start, end))
+            .flatten()
+        else {
+            return vec![];
+        };
+        let escaped = regex::escape(name);
+        let definition = self.function_definition(name);
+        let call = regex(&format!(r"(?:^|[^\w.$>:])({escaped})\s*\("));
+        let mut locations = vec![];
+        for (i, (generated, line)) in self.section_lines(&library, "source").iter().enumerate() {
+            let capture = definition
+                .captures(line)
+                .and_then(|c| c.iter().skip(1).flatten().next())
+                .or_else(|| call.captures(line).and_then(|c| c.get(1)));
+            if let Some(capture) = capture {
+                locations.push(self.section_location(
+                    &library,
+                    i,
+                    *generated,
+                    line,
+                    capture.start(),
+                ));
+            }
+        }
+        for (consumer, argument, _) in self
+            .library_arguments
+            .iter()
+            .filter(|(_, _, l)| *l == library)
+        {
+            let call = regex(&format!(
+                r"(?:^|[^\w$])\$?{}\s*(?:\?\.|\.|->|::)\s*({escaped})\b",
+                regex::escape(argument)
+            ));
+            for section in ["initialization", "source"] {
+                for (i, (generated, line)) in
+                    self.section_lines(consumer, section).iter().enumerate()
+                {
+                    for capture in call.captures_iter(line).filter_map(|c| c.get(1)) {
+                        if let Some(generated) = generated {
+                            let column = line[..capture.start()].chars().count();
+                            locations.extend(self.mapped(*generated, column));
+                        } else {
+                            locations.push(self.section_location(
+                                consumer,
+                                i,
+                                None,
+                                line,
+                                capture.start(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        locations
     }
     /// Generated positions (0-based line, UTF-32 character) that name the same library
     /// function as `identifier` under another symbol: instance members (Rust forwarding
-    /// methods, C function-pointer fields) and the function in a lent library's text.
-    /// References are requested at each, so that a library function and the calls
-    /// through its instance are found together.
+    /// methods, C and Go function fields, Kotlin properties, JavaScript object entries,
+    /// PHP forwarding methods) and the function in a lent library's text. References
+    /// are requested at each, so that a library function and the calls through its
+    /// instance are found together.
     pub fn related_positions(&self, identifier: &str) -> Vec<(usize, usize)> {
         if identifier.is_empty() {
             return vec![];
         }
         let name = regex::escape(identifier);
-        let member = regex::Regex::new(&if self.language == "rust" {
-            format!(r"\bfn\s+({name})\s*(?:<[^>]*>)?\s*\(\s*self\b")
-        } else {
-            format!(r"\(\s*\*\s*({name})\s*\)\s*\(")
-        })
-        .unwrap();
+        let member = regex(&match self.language.as_str() {
+            "rust" => format!(r"\bfn\s+({name})\s*(?:<[^>]*>)?\s*\(\s*self\b"),
+            "go" => format!(r"^\s*({name})\s+func\s*\("),
+            "kotlin" => format!(r"^\s*val\s+({name})\s*="),
+            "javascript" => format!(r"Object\.freeze\(\{{[^}}]*?\b({name})\b"),
+            "php" => format!(r"\bpublic function ({name})\(mixed \.\.\."),
+            _ => format!(r"\(\s*\*\s*({name})\s*\)\s*\("),
+        });
         let definition = self.function_definition(identifier);
         let mut positions = vec![];
         for (i, line) in self.file.content.lines().enumerate() {
@@ -567,7 +923,7 @@ impl BodyContext {
                 }
                 Some(_) => None,
             };
-            if let Some(name) = capture.and_then(|c| c.get(1)) {
+            if let Some(name) = capture.and_then(|c| c.iter().skip(1).flatten().next()) {
                 positions.push((i, line[..name.start()].chars().count()));
             }
         }
