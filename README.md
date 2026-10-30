@@ -150,11 +150,24 @@ Pending capabilities include remaining C17 capability/template features and Go/K
 
 Rust Declaration/Instantiation bodies (technology `rust`) get the same editor features through rust-analyzer (`rustup component add rust-analyzer`; `rustAnalyzer.executable` in settings or `WIRECRAFT_RUST_ANALYZER` selects it): tree-sitter syntax coloring, semantic colors, Ctrl-Space completion of runtime methods, link buffers and lent library instances (`math.maximum`), hover with the library function's `///` documentation and the model provenance of injected arguments, and native diagnostics while typing. rust-analyzer analyzes the whole generated program with its `Cargo.toml` in a temporary workspace, and its results are remapped to the visible body; the read-only header shows the generated `fn run_…`/`fn init_…` signature. The background compiler check of a Rust design runs rust-analyzer's `cargo check` on the applied graph and lists rustc errors in the status issue list, mapped to entity, section, line and column. The first request waits for rust-analyzer to load the workspace and standard library (about 5 s). Designs with component Exteriors or References are not checked, since the Rust generator rejects them.
 
-**Go to Definition** (F12, Ctrl-click, or the command palette) and **Find References** (Shift-F12) work in C17 and Rust bodies through the same clangd/rust-analyzer analysis, with every location mapped back to the model:
+**Go to Definition** (F12, Ctrl-click, or the command palette) and **Find References** (Shift-F12) work in C17, Rust, Go, Kotlin, JavaScript (Node.js and systemJS) and PHP bodies. The language server analyzes the generated single-file program, and every location is mapped back to the model:
 - **Bodies:** a target in an authored body moves the cursor there, or opens that entity's section at the line and column.
 - **Model elements:** a link buffer or library argument reveals its link or library entity; a modeled struct reveals its Type entity.
-- **Library members:** `math.maximum` resolves through the generated instance to the function in the library's body.
+- **Library members:** `math.maximum` (`math->maximum` in C, `$math->maximum` in PHP) resolves through the generated instance to the function in the library's body.
 - **Generated and external code:** the runtime and other scaffolding, and std or system headers, are named in the status bar.
+
+Language servers, each configurable in Options (settings key, environment override):
+
+| Bodies | Server | Settings | Override |
+| --- | --- | --- | --- |
+| C17 | clangd | `clangd` | `WIRECRAFT_CLANGD` |
+| Rust | rust-analyzer | `rustAnalyzer` | `WIRECRAFT_RUST_ANALYZER` |
+| Go | gopls (also found in `$GOPATH/bin` or `~/go/bin`) | `gopls` | `WIRECRAFT_GOPLS` |
+| Kotlin | kotlin-language-server | `kotlinLanguageServer` | `WIRECRAFT_KOTLIN_LANGUAGE_SERVER` |
+| Node.js, systemJS | typescript-language-server `--stdio` | `javascriptLanguageServer` | `WIRECRAFT_JAVASCRIPT_LANGUAGE_SERVER` |
+| PHP | intelephense `--stdio` | `phpLanguageServer` | `WIRECRAFT_PHP_LANGUAGE_SERVER` |
+
+JavaScript and PHP library arguments are untyped, so their servers cannot follow `libhttp.f(...)`; Wirecraft resolves those calls, model arguments and modeled types from the model itself, and finds a library function's references in every consumer body. When a body's server is not installed, this model navigation is all that works, and the status bar says the server is missing; locals then need the server. Completion, hover, semantic colors and compiler checks remain C17 and Rust only.
 
 References list the definition and every use, including calls through lent library instances, in a panel; click an authored location to open it. Opening another entity needs the editor draft applied first, as for diagnostics. The backend commands are `editor.definition` / `editor.references` (MCP `wirecraft.workbench` operations `definition` / `references`), with the same nodeId/section/text/offset arguments as hover.
 
@@ -172,6 +185,12 @@ The rust-analyzer editor tests are ignored unless requested; they need `rust-ana
 
 ```sh
 cargo test -p wirecraft-runtime --test rust_editor --locked -- --include-ignored
+```
+
+Go, Kotlin, JavaScript and PHP navigation is checked from the model by default. The language-server tests are ignored unless requested; they use the servers on PATH or `WIRECRAFT_TEST_GOPLS`, `WIRECRAFT_TEST_KOTLIN_LANGUAGE_SERVER`, `WIRECRAFT_TEST_JAVASCRIPT_LANGUAGE_SERVER` and `WIRECRAFT_TEST_PHP_LANGUAGE_SERVER`:
+
+```sh
+cargo test -p wirecraft-runtime --test template_navigation --locked -- --include-ignored
 ```
 
 Inspector commit/recovered-draft checks use `python3 scripts/draft_smoke.py` (owned process and temporary state). Add `--draft` to installed package verification.

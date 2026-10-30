@@ -2,6 +2,16 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Navigation in Go, Kotlin, JavaScript and PHP bodies (0.23.0)
+
+At the user's request, Go to Definition and Find References also serve Go, Kotlin, JavaScript (Node.js, systemJS) and PHP bodies. `editor::body_language` names the language of every body with a context; `compiler_language` stays C17/Rust and still gates completion, hover, semantic colors and compiler checks. The Rust context became the template body context: it locates the body in the single-file program of any template set by the `wirecraft-source` markers, with per-language header, parameter, declaration, function-definition and instance-member rules. The Kotlin context drops the Gradle scripts, so the server does not resolve a classpath with Gradle; the Go context adds a `go.mod` for gopls. Template-language servers are ready when their work-done progress has ended. Each language has a configurable server (`gopls`, `kotlinLanguageServer`, `javascriptLanguageServer`, `phpLanguageServer`, with `WIRECRAFT_*` overrides and Options fields); gopls is also found in `$GOPATH/bin` or `~/go/bin`.
+
+JavaScript and PHP library arguments are untyped, so their servers cannot follow calls through them. Core `BodyContext::model_definitions` / `model_references` resolve a call through a lent library argument (`.`, `->`, `::`, `?.`), a model argument and a modeled type or library instance, and list a library function's definition, its calls inside the library and every call through an argument lent by a dependency link in all consumers. They are merged with the server's locations (for definitions, only when the server found no authored or model location), and answer alone when the server cannot start (`serverError`; the desktop status bar says so).
+
+Verification: `tests/template_navigation.rs` checks the contexts and the model navigation on the five WebServer examples by default, and the backend's answer without a server. With the real servers (opt-in), each language passes a local binding, the library call, the library argument and references across the library and `socket_respond`: gopls (from `~/go/bin`), kotlin-language-server 1.3.3, typescript-language-server 4 for Node.js and systemJS, and intelephense (installed into a temporary directory for the run). C17 clangd and Rust rust-analyzer navigation tests still pass. The desktop only changed its gate and status text; no native smoke was run for these languages. Pending: workspace symbol search, rename, and completion, hover and checks for these languages.
+
+The native smokes no longer take the keyboard focus (0.22.1). They used to re-activate their window before every input, fighting the user's typing in other windows; that is how the unexplained `lib_http_server` draft of the 0.22.0 smoke appeared. They now pause until their window has the focus again and stop after three minutes (`scripts/smoke_focus.py`).
+
 ## Go to Definition and Find References (0.22.0)
 
 At the user's request, C17 and Rust bodies support Go to Definition (F12, Ctrl-click, palette) and Find References (Shift-F12). `GeneratedAnalysis::locations` sends `textDocument/definition` / `references` to clangd or rust-analyzer and maps every reply through the pure `BodyContext::locate` in core:
@@ -20,7 +30,7 @@ Verification: core mapping tests run by default (`tests/rust_editor.rs`). A real
 - the references panel listing the definition, the call in `socket_respond` (12:40) and the generated forwarders;
 - Ctrl-click on `ReqRep` revealing the Type.
 
-The panel capture was inspected. Some other window captures repeated a stale frame, so those steps were checked through the UI session and request traces instead. One earlier smoke run saw an unexplained draft appear in `lib_http_server` around Shift-F12/Escape; it did not recur in later runs, which now assert that no draft exists at those steps. Pending: navigation in languages other than C and Rust, workspace symbol search, and rename.
+The panel capture was inspected. Some other window captures repeated a stale frame, so those steps were checked through the UI session and request traces instead. One earlier smoke run saw an unexplained draft appear in `lib_http_server` around Shift-F12/Escape: the smoke had taken the focus while the user was typing elsewhere (fixed in 0.22.1). Later runs assert that no draft exists at those steps. Navigation in other languages followed in 0.23.0.
 
 ## Rust body editing and rust-analyzer (0.21.0)
 
