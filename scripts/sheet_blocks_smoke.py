@@ -4,6 +4,7 @@ Only owned PID and temporary copies of examples/webserver*.orch.
 Requires X11/XWayland with Vulkan, xdotool and ImageMagick.
 """
 import json,os,pathlib,shutil,subprocess,tempfile,time,urllib.request
+from smoke_focus import await_focus
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 BINARY=os.environ.get('WIRECRAFT_SMOKE_BINARY',str(ROOT/'target/debug/wirecraft-desktop'))
 ARTIFACT=ROOT/'target/sheet-blocks-smoke';ARTIFACT.mkdir(parents=True,exist_ok=True)
@@ -35,8 +36,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-components-') as temporary:
  def xd(*args):
   if args and args[0]=='mousemove' and len(args)>4 and args[1]=='--window':
    dx,dy=content_inset();args=(*args[:3],int(args[3])+dx,int(args[4])+dy,*args[5:])
-  if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
-   subprocess.run(['xdotool','windowactivate','--sync',window],env=env,check=True,capture_output=True)
+  await_focus(window,env)
   if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
   return subprocess.run(['xdotool',*map(str,args)],env=env,check=True,capture_output=True,text=True).stdout.strip()
  def click(x,y):xd('mousemove','--window',window,x,y);time.sleep(.15);xd('mousedown',1);time.sleep(.08);xd('mouseup',1);time.sleep(.5)

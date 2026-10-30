@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Requires X11/XWayland with Vulkan/DRI3. Uses only temporary state and an owned PID."""
 import os, pathlib, subprocess, time, tempfile, json, urllib.request
+from smoke_focus import await_focus
 root=pathlib.Path(__file__).resolve().parent.parent
 binary=os.environ.get('WIRECRAFT_SMOKE_BINARY',str(root/'target/debug/wirecraft-desktop'))
 artifact=root/'target'/'desktop-smoke'
@@ -19,11 +20,9 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
  def xd(*args):
   if args and args[0]=='mousemove' and len(args)>4 and args[1]=='--window':
    dx,dy=content_inset();args=(*args[:3],int(args[3])+dx,int(args[4])+dy,*args[5:])
-  if args and args[0] in ('key','type') and window is not None:
-   if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
-    subprocess.run(['xdotool','windowactivate','--sync',str(window)],env=env,check=True,capture_output=True)
-   assert int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))==int(window)
-   if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
+  if args and args[0] in ('key','type','mousemove','click','mousedown','mouseup') and window is not None:
+   await_focus(window,env)
+  if args and args[0]=='key' and window is not None:args=(args[0],'--clearmodifiers',*args[1:])
   result=subprocess.run(['xdotool',*map(str,args)],env=env,text=True,capture_output=True)
   if result.returncode and args[-1]!='ctrl+q':raise subprocess.CalledProcessError(result.returncode,result.args,result.stdout,result.stderr)
   return result.stdout.strip()
@@ -51,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   window=wait_for(lambda:xd('search','--onlyvisible','--pid',app.pid).splitlines()[0])
   assert int(xd('getwindowpid',window))==app.pid
   time.sleep(.5)
-  xd('windowfocus','--sync',window)
+  await_focus(window,env)
   time.sleep(1)
   subprocess.run(['import','-window',window,str(artifact/'initial.png')],env=env,check=True)
   # Node mode button then two canvas positions; never addresses Threadworks' display.
@@ -94,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-desktop-smoke-') as tmp:
   app=subprocess.Popen([binary,'--state-dir',str(state)],env=env,stdout=log,stderr=log)
   window=wait_for(lambda:xd('search','--onlyvisible','--pid',app.pid).splitlines()[0])
   assert int(xd('getwindowpid',window))==app.pid
-  time.sleep(.7);xd('windowfocus','--sync',window)
+  time.sleep(.7);await_focus(window,env)
   xd('mousemove','--window',window,950,150);xd('click',1)
   wait_for(lambda:any(n['text']['source']=='int main(void) { return missing; }' for n in recovery()['document']['nodes'].values()))
   # Tool output is visually recorded; real LSP result assertions also run in cargo tests.

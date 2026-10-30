@@ -4,6 +4,7 @@ background cargo check of the generated program, Go to definition (F12, Ctrl-cli
 Requires X11/XWayland with Vulkan, xdotool, ImageMagick, rust-analyzer and cargo.
 """
 import json,os,pathlib,shutil,subprocess,tempfile,time,urllib.request
+from smoke_focus import await_focus
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 BINARY=os.environ.get('WIRECRAFT_SMOKE_BINARY',str(ROOT/'target/debug/wirecraft-desktop'))
 ARTIFACT=ROOT/'target/rust-editor-smoke';ARTIFACT.mkdir(parents=True,exist_ok=True)
@@ -26,8 +27,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-rust-editor-') as temporary:
    time.sleep(.12)
   raise TimeoutError('rust editor condition timed out')
  def xd(*args):
-  if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
-   subprocess.run(['xdotool','windowactivate','--sync',window],env=env,check=True,capture_output=True)
+  await_focus(window,env)
   if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
   return subprocess.run(['xdotool',*map(str,args)],env=env,check=True,capture_output=True,text=True).stdout.strip()
  def click(x,y):xd('mousemove','--window',window,x,y,'click',1);time.sleep(.3)
@@ -83,8 +83,10 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-rust-editor-') as temporary:
    text=source(name);index=[i for i in range(len(text)) if text.startswith(needle,i)][occurrence]+1
    # From the nearer end, so that few key events are sent.
    click(600,350)
-   if index<len(text)-index:xd('key','ctrl+Home');xd('key','--delay',30,'--repeat',index,'Right')
-   else:xd('key','ctrl+End');xd('key','--delay',30,'--repeat',len(text)-index,'Left')
+   key,steps=('Right',index) if index<len(text)-index else ('Left',len(text)-index)
+   xd('key','ctrl+Home' if key=='Right' else 'ctrl+End')
+   # Short runs, so that the focus is checked again before each one.
+   for run in range(0,steps,10):xd('key','--delay',30,'--repeat',min(10,steps-run),key)
    time.sleep(.3)
   # F12 on `item` in `push(route, item);` jumps to its `let`; Shift-F12 there lists its uses.
   cursor_on('router','item');xd('key','F12');time.sleep(2)

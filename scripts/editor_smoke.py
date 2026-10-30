@@ -3,6 +3,7 @@
 No physical printing. Requires X11/XWayland with Vulkan, xdotool and ImageMagick.
 """
 import json,os,pathlib,shutil,subprocess,tempfile,time,urllib.request
+from smoke_focus import await_focus
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 BINARY=os.environ.get('WIRECRAFT_SMOKE_BINARY',str(ROOT/'target/debug/wirecraft-desktop'))
 ARTIFACT=ROOT/'target/editor-smoke';ARTIFACT.mkdir(parents=True,exist_ok=True)
@@ -26,9 +27,7 @@ with tempfile.TemporaryDirectory(prefix='wirecraft-walkthrough-') as temporary:
   if '=' not in text:return (0,0)
   values=[int(v.strip()) for v in text.split('=',1)[1].split(',')];return (values[0],values[2])
  def xd(*args):
-  if int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))!=int(window):
-   subprocess.run(['xdotool','windowactivate','--sync',window],env=env,check=True,capture_output=True)
-  assert int(subprocess.check_output(['xdotool','getwindowfocus'],env=env,text=True))==int(window)
+  await_focus(window,env)
   if args[0]=='key':args=(args[0],'--clearmodifiers',*args[1:])
   return subprocess.run(['xdotool',*map(str,args)],env=env,check=True,capture_output=True,text=True).stdout.strip()
  def click(x,y):xd('mousemove','--window',window,x,y,'click',1);time.sleep(.3)
