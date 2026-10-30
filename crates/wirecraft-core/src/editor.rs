@@ -101,7 +101,7 @@ fn c17_body_context(
     section: &str,
     draft: Option<&str>,
 ) -> Result<BodyContext> {
-    let mut candidate = document.clone();
+    let mut candidate = crate::components::stub_exteriors(document).into_owned();
     let node = candidate
         .nodes
         .get_mut(node_id)
@@ -334,7 +334,7 @@ fn template_body_context(
     }
     let rust = language == "rust";
     let dialect = dialect(language);
-    let mut candidate = document.clone();
+    let mut candidate = crate::components::stub_exteriors(document).into_owned();
     let node = candidate
         .nodes
         .get_mut(node_id)
@@ -574,20 +574,33 @@ pub struct Signature {
     /// Language of the generated program: `c`, `rust`, `go`, `kotlin`, `javascript` or
     /// `php`.
     pub language: String,
+    /// The code as the generator emits it; a body's header is its one generated line.
     pub text: String,
+    /// A body header with one parameter per line, for views too narrow for `text`.
+    pub wrapped: Option<String>,
 }
-/// The generated signature of a Declaration or Instantiation body (one parameter per line),
+/// The generated signature of a Declaration or Instantiation body (its function header),
 /// of a Type, or of a link: the port buffers and transport of a data link, or the argument
-/// a capability link gives its consumer.
+/// a capability link gives its consumer. Component designs are generated with their
+/// Exterior placements as plain processors.
 pub fn signature(document: &Document, node_id: &str, section: &str) -> Result<Signature> {
     let node = document.node(node_id)?;
     if let Some(language) = body_language(document, node_id, section) {
         let context = body_context(document, node_id, section, None)?;
+        // As the baseline shows it: the generated line ending with the body's opening brace,
+        // which C17 and PHP emit on the next line.
+        let mut text = context.header.trim_end().to_string();
+        if !text.ends_with('{') && !text.starts_with("//") && !text.starts_with("/*") {
+            text.push_str(" {");
+        }
+        let wrapped = multiline(&text).filter(|w| *w != text);
         return Ok(Signature {
             language: language.into(),
-            text: multiline(&context.header),
+            text,
+            wrapped,
         });
     }
+    let document: &Document = &crate::components::stub_exteriors(document);
     if !node.is_link() && node.kind != crate::NodeKind::Type {
         return Err(Error::new(
             "unsupported",
@@ -630,6 +643,7 @@ pub fn signature(document: &Document, node_id: &str, section: &str) -> Result<Si
     text.map(|text| Signature {
         language: language.into(),
         text,
+        wrapped: None,
     })
     .ok_or_else(|| {
         Error::new(
@@ -641,23 +655,22 @@ pub fn signature(document: &Document, node_id: &str, section: &str) -> Result<Si
         )
     })
 }
-/// A generated function header with one parameter per line, without its opening brace.
-/// The scope comment of a service library is kept as it is.
-fn multiline(header: &str) -> String {
-    let header = header.trim_end().trim_end_matches('{').trim_end();
+/// A generated function header with one parameter per line; a service library's scope
+/// comment has none.
+fn multiline(header: &str) -> Option<String> {
     if header.starts_with("//") || header.starts_with("/*") {
-        return header.into();
+        return None;
     }
     match header_parts(header) {
-        Some((open, parts, close)) if !parts.is_empty() => format!(
+        Some((open, parts, close)) if !parts.is_empty() => Some(format!(
             "{open}\n{}\n{close}",
             parts
                 .iter()
                 .map(|p| format!("    {p}"))
                 .collect::<Vec<_>>()
                 .join(",\n")
-        ),
-        _ => header.into(),
+        )),
+        _ => None,
     }
 }
 /// The generated declaration of a Type: the C17 `typedef struct`, or the block a template

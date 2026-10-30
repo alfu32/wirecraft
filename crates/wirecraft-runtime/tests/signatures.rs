@@ -1,5 +1,6 @@
-//! Read-only generated signatures shown with the editor: full body headers (one parameter
-//! per line), Type declarations and link code, for C17 and every template technology.
+//! Read-only generated signatures shown with the editor: body headers as generated (with a
+//! one-parameter-per-line form), Type declarations and link code, for C17 and every
+//! template technology, component designs included.
 use serde_json::{Value, json};
 use wirecraft_core::{Document, editor::signature, store};
 use wirecraft_runtime::{
@@ -45,18 +46,25 @@ fn template_signatures_show_headers_types_and_links() {
         let d = load(&format!("../../examples/webserver-{technology}.orch"));
         let respond = signature(&d, &named(&d, "socket_respond"), "source").unwrap();
         assert_eq!(respond.language, language);
-        let lines = respond.text.lines().collect::<Vec<_>>();
+        // The one header line the generator emits, brace included.
         assert!(
-            lines[0].starts_with(&format!("{function}run_socket_respond_"))
-                && lines[0].ends_with('('),
+            respond
+                .text
+                .starts_with(&format!("{function}run_socket_respond_"))
+                && !respond.text.contains('\n')
+                && respond.text.contains("libhttp")
+                && respond.text.ends_with('{'),
             "{technology}: {}",
             respond.text
         );
-        // Every argument on its own indented line, the body's brace left out.
-        assert_eq!(lines.len(), 9, "{technology}: {}", respond.text);
+        // Every argument on its own indented line.
+        let wrapped = respond.wrapped.unwrap();
+        let lines = wrapped.lines().collect::<Vec<_>>();
+        assert!(lines[0].ends_with('('), "{technology}: {wrapped}");
+        assert_eq!(lines.len(), 9, "{technology}: {wrapped}");
         assert!(lines[1..8].iter().all(|l| l.starts_with("    ")));
         assert!(lines[7].contains("libhttp") && !lines[7].ends_with(','));
-        assert!(lines[8].starts_with(')') && !lines[8].contains('{'));
+        assert!(lines[8].starts_with(')') && lines[8].ends_with('{'));
         let init = signature(&d, &named(&d, "socket_respond"), "initialization").unwrap();
         assert!(
             init.text
@@ -64,6 +72,7 @@ fn template_signatures_show_headers_types_and_links() {
         );
         let library = signature(&d, &named(&d, "lib_http_server"), "source").unwrap();
         assert!(library.text.contains("service library items (file scope)"));
+        assert!(library.wrapped.is_none());
 
         let request = signature(&d, &named(&d, "Request"), "source").unwrap();
         let id = named(&d, "Request");
@@ -111,10 +120,16 @@ fn c17_signatures_show_prototypes_typedefs_and_transports() {
     let d = load("tests/fixtures/walkthrough.orch");
     let respond = signature(&d, &named(&d, "socket_respond"), "source").unwrap();
     assert_eq!(respond.language, "c");
-    let lines = respond.text.lines().collect::<Vec<_>>();
-    assert!(lines[0].starts_with("static threadwork_error_t tw_run_socket_respond_"));
+    assert!(
+        respond
+            .text
+            .starts_with("static threadwork_error_t tw_run_socket_respond_")
+            && respond.text.ends_with(") {")
+    );
+    let wrapped = respond.wrapped.unwrap();
+    let lines = wrapped.lines().collect::<Vec<_>>();
     assert_eq!(lines[1], "    threadwork_context *context,");
-    assert_eq!(*lines.last().unwrap(), ")");
+    assert_eq!(*lines.last().unwrap(), ") {");
     // C has no trailing comma after the last parameter.
     assert!(!lines[lines.len() - 2].ends_with(','));
 
@@ -137,10 +152,46 @@ fn c17_signatures_show_prototypes_typedefs_and_transports() {
 }
 
 #[test]
-fn components_report_why_they_have_no_signature() {
+fn component_bodies_have_headers_with_their_exterior_ports() {
     let d = load("../../examples/webserver-component.orch");
-    let error = signature(&d, &named(&d, "ListenerConfig"), "source").unwrap_err();
-    assert!(error.message.contains("component"), "{}", error.message);
+    let respond = signature(&d, &named(&d, "socket_respond"), "source").unwrap();
+    assert!(
+        respond
+            .text
+            .starts_with("static threadwork_error_t tw_run_socket_respond_")
+            && respond.text.ends_with(") {"),
+        "{}",
+        respond.text
+    );
+    // A published port is a buffer parameter, as in the program that references it.
+    let exterior = d
+        .nodes
+        .values()
+        .find(|n| wirecraft_core::components::is_exterior(n))
+        .unwrap();
+    let port = d
+        .nodes
+        .values()
+        .find(|l| {
+            l.link
+                .as_ref()
+                .is_some_and(|l| l.source_node_id == exterior.id || l.target_node_id == exterior.id)
+        })
+        .unwrap();
+    let consumer = d
+        .nodes
+        .values()
+        .find(|n| {
+            !n.is_link()
+                && port.link.as_ref().is_some_and(|l| {
+                    (l.source_node_id == n.id || l.target_node_id == n.id) && n.id != exterior.id
+                })
+        })
+        .unwrap();
+    let header = signature(&d, &consumer.id, "source").unwrap();
+    assert!(header.text.contains(port.name.as_str()), "{}", header.text);
+    // The Exterior placement itself has no editable body and no header of its own.
+    assert!(d.nodes[&exterior.id].text.source.trim().is_empty());
 }
 
 #[tokio::test]

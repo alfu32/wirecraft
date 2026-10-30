@@ -557,6 +557,19 @@ pub fn expand(d: &Document) -> Result<Cow<'_, Document>> {
     out.ensure_valid()?;
     Ok(Cow::Owned(out))
 }
+/// A component design with its Exterior placements as plain processors, so editor services
+/// can generate the program around its bodies. A component still never generates on its
+/// own; this only serves headers, signatures and body contexts.
+pub fn stub_exteriors(d: &Document) -> Cow<'_, Document> {
+    if !d.nodes.values().any(is_exterior) {
+        return Cow::Borrowed(d);
+    }
+    let mut out = d.clone();
+    for n in out.nodes.values_mut().filter(|n| is_exterior(n)) {
+        n.extra.remove("stereotype");
+    }
+    Cow::Owned(out)
+}
 fn splice(out: &mut Document, reference_id: &str, c: &Document) -> Result<()> {
     let reference_name = out.nodes[reference_id].name.clone();
     let map = |id: &str| {
