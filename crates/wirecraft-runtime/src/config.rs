@@ -8,11 +8,26 @@ pub struct Tool {
     pub executable: String,
     pub args: Vec<String>,
 }
-fn rust_analyzer() -> Tool {
+fn tool(executable: &str, args: &[&str]) -> Tool {
     Tool {
-        executable: "rust-analyzer".into(),
-        args: vec![],
+        executable: executable.into(),
+        args: args.iter().map(|a| a.to_string()).collect(),
     }
+}
+fn rust_analyzer() -> Tool {
+    tool("rust-analyzer", &[])
+}
+fn gopls() -> Tool {
+    tool("gopls", &[])
+}
+fn kotlin_language_server() -> Tool {
+    tool("kotlin-language-server", &[])
+}
+fn javascript_language_server() -> Tool {
+    tool("typescript-language-server", &["--stdio"])
+}
+fn php_language_server() -> Tool {
+    tool("intelephense", &["--stdio"])
 }
 impl Default for Tool {
     fn default() -> Self {
@@ -168,6 +183,15 @@ pub struct Settings {
     pub clangd: Tool,
     #[serde(default = "rust_analyzer")]
     pub rust_analyzer: Tool,
+    #[serde(default = "gopls")]
+    pub gopls: Tool,
+    #[serde(default = "kotlin_language_server")]
+    pub kotlin_language_server: Tool,
+    /// Serves Node.js and systemJS bodies.
+    #[serde(default = "javascript_language_server")]
+    pub javascript_language_server: Tool,
+    #[serde(default = "php_language_server")]
+    pub php_language_server: Tool,
     pub c_compiler: String,
     pub cpp_compiler: String,
     pub legacy_preferences: BTreeMap<String, String>,
@@ -181,6 +205,10 @@ impl Default for Settings {
             editor_indent_spaces: 4,
             clangd: Tool::default(),
             rust_analyzer: rust_analyzer(),
+            gopls: gopls(),
+            kotlin_language_server: kotlin_language_server(),
+            javascript_language_server: javascript_language_server(),
+            php_language_server: php_language_server(),
             c_compiler: "clang".into(),
             cpp_compiler: "clang++".into(),
             legacy_preferences: BTreeMap::new(),
@@ -200,7 +228,15 @@ impl Settings {
         if self.schema_version != 1
             || !(1..=16).contains(&self.editor_indent_spaces)
             || self.clangd.executable.trim().is_empty()
-            || self.rust_analyzer.executable.trim().is_empty()
+            || [
+                &self.rust_analyzer,
+                &self.gopls,
+                &self.kotlin_language_server,
+                &self.javascript_language_server,
+                &self.php_language_server,
+            ]
+            .iter()
+            .any(|t| t.executable.trim().is_empty())
         {
             return Err(Error::new(
                 "invalid_input",

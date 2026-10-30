@@ -234,18 +234,46 @@ impl Application {
                     old.shutdown().await;
                 }
                 let project = context.project("Editor body");
+                let navigation =
+                    ["editor.definition", "editor.references"].contains(&r.command.as_str());
                 if let Some(session) = editor.as_mut() {
                     session.update(project).await?;
                 } else {
-                    *editor = Some(
-                        crate::generated_analysis::GeneratedAnalysis::start(
-                            project,
-                            &context.language,
-                            &executable,
-                            &args,
-                        )
-                        .await?,
-                    );
+                    match crate::generated_analysis::GeneratedAnalysis::start(
+                        project,
+                        &context.language,
+                        &executable,
+                        &args,
+                    )
+                    .await
+                    {
+                        Ok(session) => *editor = Some(session),
+                        // Without a language server, navigation still follows the model:
+                        // library calls, model arguments and modeled types.
+                        Err(e) if navigation && e.code == "tool_unavailable" => {
+                            drop(editor);
+                            drop(_lifecycle);
+                            let (start, end) = wirecraft_core::editor::identifier_at(&text, offset);
+                            let locations = if r.command == "editor.references" {
+                                context.model_references(&text, offset)
+                            } else {
+                                context.model_definitions(&text, offset)
+                            };
+                            let mut result = json!({"locations":crate::generated_analysis::ordered(locations),"identifier":&text[start..end],"server":null,"serverError":e.message});
+                            if self.revision() != revision {
+                                return Err(Error::new(
+                                    "stale_result",
+                                    "Model changed during editor navigation",
+                                ));
+                            }
+                            result["revision"] = json!(revision);
+                            result["generation"] = a["generation"].clone();
+                            result["nodeId"] = a["nodeId"].clone();
+                            result["section"] = a["section"].clone();
+                            return Ok(result);
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
                 let session = editor.as_ref().unwrap();
                 drop(_lifecycle);
@@ -577,15 +605,36 @@ impl Application {
 /// Executable and arguments of the body/graph language server for an LSP language;
 /// `WIRECRAFT_CLANGD` / `WIRECRAFT_RUST_ANALYZER` override the configured executables.
 fn language_server(settings: &crate::config::Settings, language: &str) -> (String, Vec<String>) {
-    let (variable, tool) = if language == "rust" {
-        ("WIRECRAFT_RUST_ANALYZER", &settings.rust_analyzer)
-    } else {
-        ("WIRECRAFT_CLANGD", &settings.clangd)
+    let (variable, tool) = match language {
+        "rust" => ("WIRECRAFT_RUST_ANALYZER", &settings.rust_analyzer),
+        "go" => ("WIRECRAFT_GOPLS", &settings.gopls),
+        "kotlin" => (
+            "WIRECRAFT_KOTLIN_LANGUAGE_SERVER",
+            &settings.kotlin_language_server,
+        ),
+        "javascript" => (
+            "WIRECRAFT_JAVASCRIPT_LANGUAGE_SERVER",
+            &settings.javascript_language_server,
+        ),
+        "php" => (
+            "WIRECRAFT_PHP_LANGUAGE_SERVER",
+            &settings.php_language_server,
+        ),
+        _ => ("WIRECRAFT_CLANGD", &settings.clangd),
     };
-    (
-        std::env::var(variable).unwrap_or_else(|_| tool.executable.clone()),
-        tool.args.clone(),
-    )
+    let mut executable = std::env::var(variable).unwrap_or_else(|_| tool.executable.clone());
+    // `go install` puts gopls in GOPATH's bin, which is often not on PATH.
+    if executable == "gopls" && !crate::service::executable_exists("gopls") {
+        let installed = std::env::var_os("GOPATH")
+            .and_then(|p| std::env::split_paths(&p).next())
+            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join("go")))
+            .map(|p| p.join("bin/gopls"))
+            .filter(|p| p.is_file());
+        if let Some(path) = installed {
+            executable = path.to_string_lossy().into();
+        }
+    }
+    (executable, tool.args.clone())
 }
 fn required_text(a: &Value) -> Result<&str> {
     a["text"]

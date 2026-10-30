@@ -1,5 +1,6 @@
 //! A generated translation unit and its independent supervised language server workspace:
-//! clangd for C17 units, rust-analyzer for Rust programs (with their `Cargo.toml`).
+//! clangd for C17 units, rust-analyzer for Rust programs (with their `Cargo.toml`), and
+//! the configured Go, Kotlin, JavaScript and PHP servers for template programs.
 use crate::lsp::LanguageSession;
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -9,7 +10,7 @@ use wirecraft_core::{
     generation::{GeneratedProject, VirtualFile},
 };
 pub struct GeneratedAnalysis {
-    /// LSP language of the unit: `c` or `rust`.
+    /// LSP language of the unit: `c`, `rust`, `go`, `kotlin`, `javascript` or `php`.
     pub language: String,
     directory: tempfile::TempDir,
     session: LanguageSession,
@@ -26,11 +27,10 @@ impl GeneratedAnalysis {
         args: &[String],
     ) -> Result<Self> {
         let directory = tempfile::Builder::new()
-            .prefix(if language == "rust" {
-                "wirecraft-rust-analysis-"
-            } else {
-                "wirecraft-c17-analysis-"
-            })
+            .prefix(&format!(
+                "wirecraft-{}-analysis-",
+                if language == "c" { "c17" } else { language }
+            ))
             .tempdir()?;
         let (project, staged) = stage_project(project, directory.path().to_owned(), vec![]).await?;
         let file = project.files.into_iter().next().ok_or_else(|| {
@@ -40,13 +40,18 @@ impl GeneratedAnalysis {
         let uri = url::Url::from_file_path(&path)
             .map_err(|_| Error::new("invalid_input", "Invalid generated URI"))?
             .to_string();
-        let session = if language == "rust" {
+        let capabilities = match language {
+            "c" => json!({}),
             // Readiness, `cargo check` progress and Markdown hovers.
-            let capabilities = json!({"experimental":{"serverStatusNotification":true},"window":{"workDoneProgress":true},"textDocument":{"hover":{"contentFormat":["markdown","plaintext"]}}});
-            LanguageSession::start_with(executable, args, directory.path(), capabilities).await?
-        } else {
-            LanguageSession::start(executable, args, directory.path()).await?
+            "rust" => {
+                json!({"experimental":{"serverStatusNotification":true},"window":{"workDoneProgress":true},"textDocument":{"hover":{"contentFormat":["markdown","plaintext"]}}})
+            }
+            // Workspace loading is reported as progress.
+            _ => json!({"window":{"workDoneProgress":true}}),
         };
+        let session =
+            LanguageSession::start_with(executable, args, directory.path(), capabilities).await?;
+        let mut events = session.subscribe();
         let mut analysis = Self {
             language: language.into(),
             directory,
@@ -57,8 +62,10 @@ impl GeneratedAnalysis {
             staged,
         };
         analysis.synchronize(None).await?;
-        if language == "rust" {
-            analysis.ready().await;
+        match language {
+            "c" => {}
+            "rust" => analysis.ready().await,
+            _ => settle(&analysis.session, &mut events).await,
         }
         Ok(analysis)
     }
@@ -386,6 +393,60 @@ impl GeneratedAnalysis {
     }
 }
 
+/// Template-language servers load the workspace in the background and report it as
+/// work-done progress: wait until none is active, or none has started for two seconds.
+async fn settle(session: &LanguageSession, events: &mut broadcast::Receiver<Value>) {
+    use tokio::time::{Instant, timeout_at};
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let mut active = std::collections::BTreeSet::new();
+    let mut quiet = Instant::now() + Duration::from_secs(2);
+    while session.alive() {
+        match timeout_at(quiet.min(deadline), events.recv()).await {
+            Err(_) if active.is_empty() || Instant::now() >= deadline => return,
+            Err(_) => quiet = deadline,
+            Ok(Ok(event)) if event["method"] == "$/progress" => {
+                let token = event["data"]["token"].to_string();
+                match event["data"]["value"]["kind"].as_str() {
+                    Some("begin") => {
+                        active.insert(token);
+                    }
+                    Some("end") => {
+                        active.remove(&token);
+                    }
+                    _ => {}
+                }
+                quiet = if active.is_empty() {
+                    Instant::now() + Duration::from_millis(500)
+                } else {
+                    deadline
+                };
+            }
+            Ok(Ok(_)) | Ok(Err(broadcast::error::RecvError::Lagged(_))) => {}
+            Ok(Err(broadcast::error::RecvError::Closed)) => return,
+        }
+    }
+}
+/// Locations without duplicates: authored bodies first, then entities, then generated
+/// and external code.
+pub fn ordered(mut locations: Vec<Value>) -> Vec<Value> {
+    let key = |l: &Value| {
+        (
+            ["body", "entity", "generated", "external"]
+                .iter()
+                .position(|k| l["kind"] == *k),
+            l["source"]["nodeId"]
+                .as_str()
+                .or(l["path"].as_str())
+                .map(str::to_string),
+            l["source"]["section"].as_str().map(str::to_string),
+            l["source"]["line"].as_u64().or(l["line"].as_u64()),
+            l["source"]["column"].as_u64().or(l["column"].as_u64()),
+        )
+    };
+    locations.sort_by_key(key);
+    locations.dedup_by(|a, b| key(a) == key(b));
+    locations
+}
 fn stage_files(project: &GeneratedProject, directory: &std::path::Path) -> Result<Vec<String>> {
     use base64::Engine;
     let mut paths = std::collections::BTreeSet::new();
@@ -454,16 +515,7 @@ impl GeneratedAnalysis {
             params["context"] = json!({"includeDeclaration":true});
         }
         let response = self.session.request(method, params.clone()).await?;
-        let start = text[..offset]
-            .char_indices()
-            .rev()
-            .take_while(|(_, c)| c.is_alphanumeric() || *c == '_')
-            .last()
-            .map_or(offset, |(i, _)| i);
-        let end = offset
-            + text[offset..]
-                .find(|c: char| !c.is_alphanumeric() && c != '_')
-                .unwrap_or(text.len() - offset);
+        let (start, end) = wirecraft_core::editor::identifier_at(text, offset);
         let identifier = &text[start..end];
         // Location, Location[] or LocationLink[]; a link's selection range is the name.
         let flatten = |response: Value| match response {
@@ -527,23 +579,20 @@ impl GeneratedAnalysis {
                     }
                 }
             };
-            if !locations.contains(&location) {
-                locations.push(location);
-            }
+            locations.push(location);
         }
-        // Authored bodies first, then entities, then generated and external code.
-        locations.sort_by_key(|l| {
-            (
-                ["body", "entity", "generated", "external"]
-                    .iter()
-                    .position(|k| l["kind"] == *k),
-                l["source"]["nodeId"].as_str().map(str::to_string),
-                l["source"]["line"].as_u64().or(l["line"].as_u64()),
-                l["source"]["column"].as_u64().or(l["column"].as_u64()),
-            )
-        });
+        // Untyped servers (JavaScript, PHP) cannot follow calls through library
+        // arguments; the model can. A server's own model answer wins for definitions.
+        if method == "textDocument/references" {
+            locations.extend(context.model_references(text, offset));
+        } else if !locations
+            .iter()
+            .any(|l| l["kind"] == "body" || l["kind"] == "entity")
+        {
+            locations.splice(0..0, context.model_definitions(text, offset));
+        }
         Ok(
-            json!({"locations":locations,"identifier":identifier,"version":self.version,"pid":self.session.pid()}),
+            json!({"locations":ordered(locations),"identifier":identifier,"version":self.version,"pid":self.session.pid()}),
         )
     }
     pub async fn hover(
