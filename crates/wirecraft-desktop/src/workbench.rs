@@ -1390,18 +1390,30 @@ impl Wirecraft {
                         }),
                     )),
             )
-            .when(!self.function_header.is_empty(), |b| {
+            // Generated, so read-only: the body's full header, a Type's declaration or
+            // a link's code. Long signatures scroll inside a bounded height.
+            .when(self.signature_lines > 0, |b| {
                 b.child(
                     div()
-                        .id("generated-function-header")
-                        .whitespace_nowrap()
-                        .overflow_x_scroll()
-                        .h(px(25.))
+                        .id("generated-signature")
+                        .flex_none()
                         .px_3()
-                        .font_family(self.options.saved.appearance.editor_font.clone())
-                        .text_xs()
-                        .text_color(crate::chrome::color(0x70d5c6))
-                        .child(self.function_header.clone()),
+                        .pb_2()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(crate::chrome::color(0x8fa6b5))
+                                .child("Generated (read-only)"),
+                        )
+                        .child(
+                            div()
+                                .h(px(self.signature_lines.min(14) as f32 * 20. + 14.))
+                                .font_family(self.options.saved.appearance.editor_font.clone())
+                                .child(Input::new(&self.signature).disabled(true).h_full()),
+                        ),
                 )
             })
             .child(

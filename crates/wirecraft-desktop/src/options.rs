@@ -205,6 +205,7 @@ impl Wirecraft {
                         .effective_text_language(id, &self.section)
                 })
                 .unwrap_or_default();
+            self.editor_language = language.clone();
             self.editor = cx.new(|cx| {
                 let mut s = InputState::new(w, cx)
                     .code_editor(language)

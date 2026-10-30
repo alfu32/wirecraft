@@ -173,7 +173,15 @@ struct Wirecraft {
     navigation: Option<navigation::Ticket>,
     navigation_generation: u64,
     references: Option<navigation::References>,
-    function_header: String,
+    /// Read-only generated code of the selected entity: its body's function header, its
+    /// Type declaration or its link code; `signature_key` is the entity and section shown.
+    signature: Entity<InputState>,
+    signature_key: Option<(String, String)>,
+    signature_lines: usize,
+    signature_language: SharedString,
+    /// Highlighter language of `editor`.
+    editor_language: String,
+    window_title: String,
     token_timer: Option<Task<()>>,
     token_ticket: Option<editor_tokens::Ticket>,
     token_dirty: bool,
@@ -229,6 +237,12 @@ impl Wirecraft {
                 })
         });
         let properties = cx.new(|cx| InputState::new(window, cx).code_editor("json"));
+        let signature = cx.new(|cx| {
+            InputState::new(window, cx)
+                .code_editor("plain")
+                .line_number(false)
+                .searchable(false)
+        });
         let snapshot = Arc::new(Snapshot {
             document: Document::new("Connecting…"),
             revision: 0,
@@ -348,7 +362,12 @@ impl Wirecraft {
             navigation: None,
             navigation_generation: 0,
             references: None,
-            function_header: String::new(),
+            signature,
+            signature_key: None,
+            signature_lines: 0,
+            signature_language: "plain".into(),
+            editor_language: "plain".into(),
+            window_title: String::new(),
             token_timer: None,
             token_ticket: None,
             token_dirty: false,
@@ -480,17 +499,18 @@ impl Wirecraft {
                     self.tokens_failed(message, cx);
                     return;
                 }
-                // A component's bodies only compile through a design that references it;
-                // the background header query failing there is expected, not news.
-                if command.as_deref() == Some("editor.context")
-                    && self
-                        .snapshot
-                        .document
-                        .nodes
-                        .values()
-                        .any(wirecraft_core::components::is_exterior)
-                {
-                    self.function_header.clear();
+                // The signature is background information: its failure is shown in place
+                // (a component, for instance, only generates through a design using it).
+                if command.as_deref() == Some("editor.signature") {
+                    if !message.starts_with("conflict:") && !message.starts_with("stale_result:") {
+                        let text = format!(
+                            "// No generated code: {}",
+                            message
+                                .split_once(": ")
+                                .map_or(message.as_str(), |(_, m)| m)
+                        );
+                        self.show_signature("plain", text, window, cx);
+                    }
                     return;
                 }
                 self.completion = None;
@@ -518,6 +538,8 @@ impl Wirecraft {
                 commit,
             } => {
                 self.status = match command.as_str() {
+                    // Background information, not the outcome of a user action.
+                    "editor.signature" => std::mem::take(&mut self.status),
                     "file.save" | "file.commit_and_save" => "Project saved".into(),
                     "threadwork.update_entity" | "entities.patch" => "Changes applied".into(),
                     _ => format!("{command} completed"),
@@ -602,12 +624,17 @@ impl Wirecraft {
                 if command == "editor.tokens" {
                     self.accept_tokens(value.clone(), cx);
                 }
-                if command == "editor.context"
+                if command == "editor.signature"
                     && value["revision"].as_u64() == Some(self.snapshot.revision)
                     && value["nodeId"].as_str() == self.editor_entity.as_deref()
                     && value["section"] == self.section
                 {
-                    self.function_header = value["header"].as_str().unwrap_or("").into();
+                    self.show_signature(
+                        value["language"].as_str().unwrap_or("plain").to_string(),
+                        value["text"].as_str().unwrap_or("").to_string(),
+                        window,
+                        cx,
+                    );
                 }
                 if command == "export.preview"
                     && value["generation"].as_u64() == Some(self.export_generation)
@@ -900,12 +927,56 @@ impl Wirecraft {
             .sender
             .send(Message::SaveUi(serde_json::to_value(state).unwrap()));
     }
+    /// Shows generated code above the editor for the selected entity and section; empty
+    /// text hides the view.
+    fn show_signature(
+        &mut self,
+        language: impl Into<SharedString>,
+        text: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.signature_key = self
+            .selected
+            .first()
+            .map(|id| (id.clone(), self.section.clone()));
+        self.signature_lines = if text.is_empty() {
+            0
+        } else {
+            text.lines().count()
+        };
+        // A new highlighter only colors text set after it, so the text is set again.
+        let language = language.into();
+        let relanguage = language != self.signature_language;
+        if relanguage {
+            self.signature_language = language.clone();
+        }
+        self.signature.update(cx, |state, cx| {
+            if relanguage {
+                state.set_highlighter(language, cx);
+            }
+            if relanguage || state.value().as_ref() != text {
+                state.set_value(text, window, cx);
+            }
+        });
+        cx.notify();
+    }
     fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.token_inflight {
             self.token_ticket = None;
         }
         self.completion = None;
-        self.function_header.clear();
+        let key = self
+            .selected
+            .first()
+            .map(|id| (id.clone(), self.section.clone()));
+        // Snapshots of the same entity keep the shown signature until the new one arrives.
+        if key != self.signature_key {
+            self.signature_key = None;
+            self.signature_lines = 0;
+            self.signature
+                .update(cx, |state, cx| state.set_value("", window, cx));
+        }
         if let Some(n) = self
             .selected
             .first()
@@ -955,17 +1026,25 @@ impl Wirecraft {
                 .snapshot
                 .document
                 .effective_text_language(&n.id, &self.section);
-            self.editor
-                .update(cx, |state, cx| state.set_highlighter(language.clone(), cx));
-            if wirecraft_core::editor::compiler_language(
-                &self.snapshot.document,
-                &n.id,
-                &self.section,
-            )
-            .is_some()
+            // A new highlighter only colors text set after it: snapshots of the same
+            // entity keep the highlighter, and a language change sets the text again.
+            let relanguage = language != self.editor_language;
+            if relanguage {
+                self.editor
+                    .update(cx, |state, cx| state.set_highlighter(language.clone(), cx));
+                self.editor_language = language;
+            }
+            if n.is_link()
+                || n.kind == wirecraft_core::NodeKind::Type
+                || wirecraft_core::editor::body_language(
+                    &self.snapshot.document,
+                    &n.id,
+                    &self.section,
+                )
+                .is_some()
             {
                 self.client.send(
-                    "editor.context",
+                    "editor.signature",
                     json!({"nodeId":n.id,"section":self.section}),
                 );
             }
@@ -976,7 +1055,7 @@ impl Wirecraft {
             // Snapshots reload a clean editor; setting identical text would move the
             // cursor to the start, losing a revealed or navigated position.
             self.editor.update(cx, |state, cx| {
-                if state.value().as_ref() != self.base_text {
+                if relanguage || state.value().as_ref() != self.base_text {
                     state.set_value(self.base_text.clone(), window, cx)
                 }
             });
@@ -1553,6 +1632,19 @@ impl Render for Wirecraft {
             self.snapshot.document.project_name(),
             if self.snapshot.dirty { " •" } else { "" }
         );
+        let file = self
+            .snapshot
+            .path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map_or("Unsaved".into(), |f| f.to_string_lossy().into_owned());
+        let version = env!("CARGO_PKG_VERSION");
+        let window_title = format!("{title} — {file} — Wirecraft {version}");
+        if window_title != self.window_title {
+            window.set_window_title(&window_title);
+            self.window_title = window_title;
+        }
+        let muted = crate::chrome::color(0x8fa6b5);
         let toolbar = div()
             .flex()
             .items_center()
@@ -1562,11 +1654,29 @@ impl Render for Wirecraft {
             .bg(crate::chrome::color(0x171d25))
             .child(
                 div()
-                    .text_lg()
-                    .text_color(crate::chrome::color(0x75d4d6))
-                    .child("Wirecraft"),
+                    .flex()
+                    .items_baseline()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_lg()
+                            .text_color(crate::chrome::color(0x75d4d6))
+                            .child("Wirecraft"),
+                    )
+                    .child(div().text_xs().text_color(muted).child(version)),
             )
-            .child(div().flex_1().child(title))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .items_baseline()
+                    .gap_2()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .child(title)
+                    .child(div().text_sm().text_color(muted).child(file)),
+            )
             .child(
                 button("new", "New")
                     .on_click(cx.listener(|this, _, w, cx| this.new_project(&New, w, cx))),

@@ -307,8 +307,13 @@ fn worker(
                     intelligence.started = false;
                     intelligence.versions.clear();
                 }
-                let editor_query = ["editor.context", "editor.complete", "editor.tokens"]
-                    .contains(&command.as_str());
+                let editor_query = [
+                    "editor.context",
+                    "editor.complete",
+                    "editor.tokens",
+                    "editor.signature",
+                ]
+                .contains(&command.as_str());
                 match backend.call_with_revision(&request) {
                     Ok((value, response_revision)) => {
                         if command == "settings.replace" {
