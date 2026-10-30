@@ -287,22 +287,7 @@ impl C17 {
             if reserved(&argument) {
                 return Err(unsupported(n, "Link argument is a reserved C identifier"));
             }
-            let source = document.node(&link.source_node_id)?;
-            let position = source
-                .outgoing_links
-                .iter()
-                .filter(|id| {
-                    document.nodes.get(*id).is_some_and(|n| {
-                        matches!(
-                            relation(document, n),
-                            Some(Relation::Principal | Relation::Error)
-                        )
-                    })
-                })
-                .position(|id| id == &n.id)
-                .unwrap_or(0)
-                + 1;
-            let mut allocation = format!("{argument}{position}");
+            let mut allocation = wire_allocation(document, n)?;
             if !allocated.insert(allocation.clone()) {
                 allocation = format!("{allocation}_{}", identifier(&n.id));
                 allocated.insert(allocation.clone());
@@ -784,6 +769,30 @@ fn type_name(d: &Document, id: &str) -> Result<String> {
 }
 fn unsupported(n: &Node, message: &str) -> Error {
     Error::new("unsupported", format!("{} [{}]: {message}", n.name, n.id))
+}
+/// The buffer allocation name of a data link: its argument and its position among the data
+/// links leaving its source. A name already taken gets the link id appended.
+pub(crate) fn wire_allocation(document: &Document, n: &Node) -> Result<String> {
+    let link = n
+        .link
+        .as_ref()
+        .ok_or_else(|| Error::new("invalid_input", "Expected a link"))?;
+    let source = document.node(&link.source_node_id)?;
+    let position = source
+        .outgoing_links
+        .iter()
+        .filter(|id| {
+            document.nodes.get(*id).is_some_and(|n| {
+                matches!(
+                    relation(document, n),
+                    Some(Relation::Principal | Relation::Error)
+                )
+            })
+        })
+        .position(|id| id == &n.id)
+        .unwrap_or(0)
+        + 1;
+    Ok(format!("{}{position}", identifier(&n.name)))
 }
 fn comment(s: &str) -> String {
     s.replace("*/", "* /").replace(['\n', '\r'], " ")

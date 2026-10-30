@@ -518,35 +518,11 @@ fn template_body_context(
 /// `(name, type)` pairs of a one-line generated function header: `name: type` (Rust,
 /// Kotlin), `name type` (Go), `name = default` (JavaScript) or `type &$name` (PHP).
 fn parameters(language: &str, header: &str) -> Vec<(String, String)> {
-    let Some(open) = header.find('(') else {
+    let Some((_, parts, _)) = header_parts(header) else {
         return vec![];
     };
-    // Generated parameter types contain no commas outside brackets.
-    let mut parts = vec![];
-    let (mut depth, mut start) = (0i32, open + 1);
-    for (i, c) in header[open + 1..]
-        .char_indices()
-        .map(|(i, c)| (i + open + 1, c))
-    {
-        match c {
-            '>' if header[..i].ends_with('-') => {}
-            '<' | '(' | '[' | '{' => depth += 1,
-            ')' if depth == 0 => {
-                parts.push(&header[start..i]);
-                break;
-            }
-            '>' | ')' | ']' | '}' => depth -= 1,
-            ',' if depth == 0 => {
-                parts.push(&header[start..i]);
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
     parts
         .into_iter()
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
         .filter_map(|part| {
             let (name, ty) = match language {
                 "go" => part.split_once(char::is_whitespace)?,
@@ -561,6 +537,241 @@ fn parameters(language: &str, header: &str) -> Vec<(String, String)> {
             Some((name.trim().to_string(), ty.trim().to_string()))
         })
         .collect()
+}
+/// A one-line function header split into the text up to its opening parenthesis, its
+/// trimmed parameters, and the text from the closing parenthesis on.
+fn header_parts(header: &str) -> Option<(&str, Vec<&str>, &str)> {
+    let open = header.find('(')?;
+    // Generated parameter types contain no commas outside brackets.
+    let mut parts = vec![];
+    let (mut depth, mut start) = (0i32, open + 1);
+    for (i, c) in header[open + 1..]
+        .char_indices()
+        .map(|(i, c)| (i + open + 1, c))
+    {
+        match c {
+            '>' if header[..i].ends_with('-') => {}
+            '<' | '(' | '[' | '{' => depth += 1,
+            ')' if depth == 0 => {
+                parts.push(header[start..i].trim());
+                parts.retain(|p| !p.is_empty());
+                return Some((&header[..=open], parts, &header[i..]));
+            }
+            '>' | ')' | ']' | '}' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(header[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+/// Generated code shown read-only with an entity's editor: the complete function header
+/// around a processor body, a Type's generated declaration, or what a link generates.
+#[derive(Debug)]
+pub struct Signature {
+    /// Language of the generated program: `c`, `rust`, `go`, `kotlin`, `javascript` or
+    /// `php`.
+    pub language: String,
+    pub text: String,
+}
+/// The generated signature of a Declaration or Instantiation body (one parameter per line),
+/// of a Type, or of a link: the port buffers and transport of a data link, or the argument
+/// a capability link gives its consumer.
+pub fn signature(document: &Document, node_id: &str, section: &str) -> Result<Signature> {
+    let node = document.node(node_id)?;
+    if let Some(language) = body_language(document, node_id, section) {
+        let context = body_context(document, node_id, section, None)?;
+        return Ok(Signature {
+            language: language.into(),
+            text: multiline(&context.header),
+        });
+    }
+    if !node.is_link() && node.kind != crate::NodeKind::Type {
+        return Err(Error::new(
+            "unsupported",
+            "Generated signatures exist for Declaration and Instantiation bodies, Types and links",
+        ));
+    }
+    let root = &document.root_node_id;
+    let language = match document.effective(root, "technologyId").as_str() {
+        "c-native" => "c",
+        "rust" => "rust",
+        "go" => "go",
+        "kotlin-jvm" => "kotlin",
+        "nodejs" | "systemjs" | "quickjs" => "javascript",
+        "php" => "php",
+        other => {
+            return Err(Error::new(
+                "unsupported",
+                format!("The {other} technology generates no program with signatures"),
+            ));
+        }
+    };
+    let files = if language == "c" {
+        C17::generate(document, root)?.files
+    } else {
+        let extension = format!(".{}", dialect(language).extension);
+        crate::compiler::generate(document, root, Default::default())?
+            .files
+            .into_iter()
+            .filter(|f| f.path.ends_with(&extension))
+            .collect()
+    };
+    let text = files.iter().find_map(|file| {
+        let lines = file.content.lines().collect::<Vec<_>>();
+        if node.is_link() {
+            link_code(document, node, language, file, &lines)
+        } else {
+            type_code(node, language, &lines)
+        }
+    });
+    text.map(|text| Signature {
+        language: language.into(),
+        text,
+    })
+    .ok_or_else(|| {
+        Error::new(
+            "not_found",
+            format!(
+                "{} has no generated code in the {language} program",
+                node.name
+            ),
+        )
+    })
+}
+/// A generated function header with one parameter per line, without its opening brace.
+/// The scope comment of a service library is kept as it is.
+fn multiline(header: &str) -> String {
+    let header = header.trim_end().trim_end_matches('{').trim_end();
+    if header.starts_with("//") || header.starts_with("/*") {
+        return header.into();
+    }
+    match header_parts(header) {
+        Some((open, parts, close)) if !parts.is_empty() => format!(
+            "{open}\n{}\n{close}",
+            parts
+                .iter()
+                .map(|p| format!("    {p}"))
+                .collect::<Vec<_>>()
+                .join(",\n")
+        ),
+        _ => header.into(),
+    }
+}
+/// The generated declaration of a Type: the C17 `typedef struct`, or the block a template
+/// compiler emits after its `// Name [id]` comment.
+fn type_code(node: &crate::Node, language: &str, lines: &[&str]) -> Option<String> {
+    if language == "c" {
+        let start = format!("typedef struct {} {{", node.name);
+        let end = format!("}} {};", node.name);
+        let a = lines.iter().position(|l| *l == start)?;
+        let b = a + lines[a..].iter().position(|l| *l == end)?;
+        return Some(lines[a..=b].join("\n"));
+    }
+    let marker = format!(" [{}]", node.id);
+    let a = lines
+        .iter()
+        .position(|l| l.starts_with("// ") && l.ends_with(&marker))?;
+    Some(block(&lines[a..]))
+}
+/// Lines up to the first blank one.
+fn block(lines: &[&str]) -> String {
+    lines
+        .iter()
+        .take_while(|l| !l.trim().is_empty())
+        .copied()
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+/// What a link generates. A data link has two port buffers and a transport function; a
+/// library, source or runnable link becomes an argument of its consumer's functions.
+fn link_code(
+    document: &Document,
+    node: &crate::Node,
+    language: &str,
+    file: &VirtualFile,
+    lines: &[&str],
+) -> Option<String> {
+    let link = node.link.as_ref()?;
+    let relation = relation(document, node);
+    if matches!(relation, Some(Relation::Principal | Relation::Error)) {
+        if language == "c" {
+            let allocation = crate::c17::wire_allocation(document, node).ok()?;
+            // A taken allocation name has the link id appended.
+            let ports = [
+                format!("{allocation}_{}_a_port ", crate::c17::identifier(&node.id)),
+                format!("{allocation}_a_port "),
+            ];
+            let a = ports.iter().find_map(|port| {
+                lines.windows(2).position(|w| {
+                    w[0].starts_with("/* Transport ")
+                        && w[1].starts_with(&format!("static threadwork_buffer {port}"))
+                })
+            })?;
+            return Some(lines[a..(a + 4).min(lines.len())].join("\n"));
+        }
+        let allocation = crate::compiler::link_allocation(document, node);
+        let transport = format!("{}transport_{allocation}(", dialect(language).function);
+        // The declaration block (not the scheduler's call) defines the transport. Its
+        // buffers and transport are separated by single blank lines.
+        for (a, _) in lines
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| l.starts_with("// Link "))
+        {
+            let mut end = a + 1;
+            while end < lines.len()
+                && !lines[end].starts_with("// Link ")
+                && !(lines[end].trim().is_empty()
+                    && lines.get(end + 1).is_none_or(|l| l.trim().is_empty()))
+            {
+                end += 1;
+            }
+            if lines[a..end].iter().any(|l| l.starts_with(&transport)) {
+                return Some(lines[a..end].join("\n"));
+            }
+        }
+        return None;
+    }
+    // The consumer's run function receives the capability under the link's name.
+    let argument = crate::c17::identifier(&node.name);
+    let consumer = document.nodes.get(&link.target_node_id)?;
+    let provider = document
+        .nodes
+        .get(&link.source_node_id)
+        .map_or(link.source_node_id.as_str(), |n| n.name.as_str());
+    let what = match relation {
+        Some(Relation::Dependency) => format!("lends library {provider}"),
+        Some(Relation::Source) => format!("materializes the declaration of {provider}"),
+        Some(Relation::Runnable) => format!("lets it run {provider}"),
+        _ => format!("connects {provider}"),
+    };
+    let summary = format!("// {} {what} to {}", node.name, consumer.name);
+    if crate::analysis::stereotype(document, consumer) == "ServiceLibrary" {
+        return Some(format!(
+            "{summary}\n// Service library items share the file scope; no argument is passed."
+        ));
+    }
+    let prefix = if language == "c" {
+        "static threadwork_error_t tw_"
+    } else {
+        dialect(language).function
+    };
+    let start = file
+        .source_map
+        .iter()
+        .find(|m| m.node_id == consumer.id && m.section == "source")?
+        .generated_start_line;
+    let header = lines
+        .iter()
+        .take(start.saturating_sub(1))
+        .rfind(|l| l.starts_with(prefix))?;
+    let word = regex(&format!(r"(?:^|\W)\$?{}\b", regex::escape(&argument)));
+    let (_, parts, _) = header_parts(header)?;
+    let parameter = parts.into_iter().find(|p| word.is_match(p))?;
+    Some(format!("{summary} as the argument\n{parameter}"))
 }
 fn libraries(document: &Document) -> impl Iterator<Item = &crate::Node> {
     document

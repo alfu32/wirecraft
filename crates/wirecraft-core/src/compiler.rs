@@ -575,16 +575,8 @@ impl Plan<'_> {
         let source = self.d.node(&l.source_node_id)?;
         let target = self.d.node(&l.target_node_id)?;
         let cap = capability(self.d, n);
-        let ordinal = source
-            .outgoing_links
-            .iter()
-            .filter_map(|id| self.d.nodes.get(id))
-            .filter(|link| capability(self.d, link) == cap)
-            .position(|link| link.id == n.id)
-            .unwrap_or(0)
-            + 1;
         let symbol = identifier(&n.name);
-        let allocation = format!("{symbol}{ordinal}");
+        let allocation = link_allocation(self.d, n);
         let argument = self.member(&symbol);
         let source_product = self
             .artifacts
@@ -991,6 +983,26 @@ fn marked(n: &Node, section: &str, text: &str) -> String {
             n.id, n.id
         )
     }
+}
+/// The symbol templates name a link's ports and transport after: its identifier and its
+/// position among the links of the same kind (data or capability) leaving its source.
+pub(crate) fn link_allocation(d: &Document, n: &Node) -> String {
+    let cap = capability(d, n);
+    let ordinal = n
+        .link
+        .as_ref()
+        .and_then(|l| d.nodes.get(&l.source_node_id))
+        .and_then(|source| {
+            source
+                .outgoing_links
+                .iter()
+                .filter_map(|id| d.nodes.get(id))
+                .filter(|link| capability(d, link) == cap)
+                .position(|link| link.id == n.id)
+        })
+        .unwrap_or(0)
+        + 1;
+    format!("{}{ordinal}", identifier(&n.name))
 }
 fn capability(d: &Document, n: &Node) -> bool {
     matches!(
