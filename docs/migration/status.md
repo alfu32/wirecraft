@@ -13,7 +13,7 @@ Adaptations from Meshcraft:
 - **Executables:** each payload carries both `wirecraft-desktop` and the `wirecraft` command line, and both gained `--version` for the install checks.
 - **Tags and toolchain:** tags keep the `v` prefix. The toolchain is pinned in the workflow, because a `rust-toolchain.toml` would also switch local rust-analyzer.
 - **Validation runner:** validation runs on the current runner, since the tests need clang, clangd, Go and Node.js.
-- **MSIX signing:** the MSIX is signed with a self-signed `CN=Wirecraft` certificate created per run. There are no repository secrets.
+- **MSIX signing:** the MSIX carries the reserved Store identity (since 0.27.3) and is signed with a self-signed certificate for that publisher, created per run. There are no repository secrets.
 - **Snap:** strictly confined; it cannot reach host compilers or language servers.
 
 The workspace license is now `MIT OR Apache-2.0`, with `LICENSE-MIT` and `LICENSE-APACHE`. The icon PNG and ICO are drawn from `assets/wirecraft.svg`.
@@ -32,11 +32,13 @@ Verification:
 Pending:
 - The Release workflow has not run on GitHub. AppImage, Snap, Windows and macOS packaging, and the ARM builds, are unverified.
 - The Windows application itself has never been run.
-- The Store needs the reserved MSIX identity in `packaging/windows/msix-identity.json`, confirmation of the product name and publisher, and a privacy policy page.
+- The Store needs confirmation of the product name and a privacy policy page.
 
 0.27.1: the first Release run (v0.27.0) passed on Linux x86_64/aarch64, including the AppImage startup smoke, and on macOS Apple Silicon. On Windows ARM64, the installed MSIX refused to start `wirecraft.exe` (`Access is denied`), because only `wirecraft-desktop.exe` was declared in its manifest. The command line is now a second, unlisted console application with a `wirecraft.exe` alias.
 
 0.27.2: the v0.27.1 run passed on Linux and both macOS targets. On both Windows targets MakeAppx rejected the manifest, because a console-subsystem application must also declare `desktop4:SupportsMultipleInstances="true"`; the command-line application now declares it.
+
+0.27.3: Partner Center refused the 0.27.2 MSIX: the unlisted command-line application (`AppListEntry="none"`) is a headless app, which needs a waiver, and its PublisherDisplayName `Wirecraft contributors` was not the account's `K3D0`. The manifest now has one application, `wirecraft-desktop.exe`; `wirecraft.exe` is declared through its own execution alias on that application. The package carries Partner Center's Product identity: `K3D0.wirecraft`, publisher `CN=7F0CBC95-8035-4AF2-9B17-C38D58351CE5` and display name `K3D0` (family `K3D0.wirecraft_tfmtd4yrk952g`). Release CI now also runs both commands through their aliases.
 
 0.26.1 fixed the committed WebServer example, which broke CI: the component's `socket_accept` body lacked a semicolon after `http_resolve`, and `examples/webserver.orch` still pinned the component before its `listenerConfig` port.
 

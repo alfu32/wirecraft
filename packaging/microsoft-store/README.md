@@ -123,8 +123,10 @@ certification notes. Still to do in Partner Center:
 - **Privacy policy.** Wirecraft has no privacy policy page yet; one is needed
   before submission (the listing answers Yes to personal information, since
   project files can carry people's names and MCP clients can read them).
-- **Package.** The release workflow's MSIX uses a self-signed `CN=Wirecraft`
-  identity. The Store requires the reserved identity (Package/Identity/Name and
-  Publisher from **Product identity**) in `packaging/windows/msix-identity.json`.
+- **Package.** Upload the release workflow's `wirecraft-X.Y.Z-windows-x64.msix`
+  and `-arm64.msix` (0.27.3 or later). They carry the identity in
+  `packaging/windows/msix-identity.json`, copied from Partner Center's
+  **Product identity**: `K3D0.wirecraft`, publisher `CN=7F0CBC95-…` and publisher
+  display name `K3D0` (family name `K3D0.wirecraft_tfmtd4yrk952g`).
 - Age rating questionnaire, markets, publisher declarations and the final
   submission are account-only steps; nothing here performs them.

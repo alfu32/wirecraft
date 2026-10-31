@@ -55,13 +55,17 @@ are pinned to commits/digests (`packaging/appimage-inputs.json`, notices under
 - **Snap** (strict confinement): `wirecraft` is the command line and
   `wirecraft.desktop` starts the application. Host clang, clangd, rust-analyzer,
   Go and Node.js are not reachable from the Snap.
-- **Windows** builds link the static CRT. The MSIX is signed with a self-signed
-  certificate created for that run (publisher `CN=Wirecraft`, identity in
-  `packaging/windows/msix-identity.json`); its public CER ships for Trusted
-  People installation. The manifest declares both executables (the command line
-  as an unlisted console application with a `wirecraft.exe` alias): Windows
-  refuses to start an undeclared packaged executable. Release CI installs the
-  MSIX, runs both executables' `--version` and removes it. The MSI is unsigned.
+- **Windows** builds link the static CRT. The MSIX carries the reserved Microsoft
+  Store identity (`K3D0.wirecraft`, publisher display name `K3D0`, in
+  `packaging/windows/msix-identity.json`) and is signed with a self-signed
+  certificate for that publisher created per run; its public CER ships for
+  Trusted People installation, and the Store re-signs packages it accepts. The
+  manifest has one application, `wirecraft-desktop.exe`, with the
+  `wirecraft-desktop.exe` and `wirecraft.exe` execution aliases: Windows refuses
+  to start an undeclared packaged executable, and the Store refuses an unlisted
+  (headless) second application without a waiver. Release CI installs the MSIX,
+  runs `--version` from the install location and through both aliases, and
+  removes it. The MSI is unsigned.
 - **macOS** bundles are ad-hoc signed, without Developer ID signing or
   notarization.
 
