@@ -78,6 +78,7 @@ class MsixTests(unittest.TestCase):
             aliases = root.findall(".//{" + msix.NS["desktop"] + "}ExecutionAlias")
             self.assertEqual([a.get("Alias") for a in aliases], ["wirecraft-desktop.exe", "wirecraft.exe"])
             self.assertEqual(applications[1].get("{" + msix.NS["desktop4"] + "}Subsystem"), "console")
+            self.assertEqual(applications[1].get("{" + msix.NS["desktop4"] + "}SupportsMultipleInstances"), "true")
             self.assertIn(b".orch", data)
             self.assertIn(b"windows.appExecutionAlias", data)
             msix.check_manifest(data, "0.41.1", arch)

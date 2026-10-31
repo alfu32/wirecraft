@@ -103,9 +103,11 @@ def manifest(version, arch, config=None):
     add(add(alias, "uap3:AppExecutionAlias"), "desktop:ExecutionAlias", Alias="wirecraft-desktop.exe")
     # Windows refuses to start a packaged executable the manifest does not declare, so
     # the command line is a second, unlisted application with its own console alias.
+    # MakeAppx only accepts a console subsystem on a multiple-instance application.
     command_line = add(applications, "Application", Id="WirecraftCommandLine",
                        Executable="wirecraft.exe", EntryPoint="Windows.FullTrustApplication",
-                       **{"{" + NS["desktop4"] + "}Subsystem": "console"})
+                       **{"{" + NS["desktop4"] + "}Subsystem": "console",
+                          "{" + NS["desktop4"] + "}SupportsMultipleInstances": "true"})
     add(command_line, "uap:VisualElements", DisplayName=config["displayName"] + " command line",
         Description="Wirecraft command line: MCP, validation and code generation",
         BackgroundColor="transparent", AppListEntry="none",
