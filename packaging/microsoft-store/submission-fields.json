@@ -28,7 +28,7 @@
     "ageRating": "Complete the Partner Center/IARC questionnaire. No official rating has been assigned by this bundle. The app is a user-operated software design tool; the examples are web-server designs.",
     "marketsAndPublicationDate": "Use the publisher's chosen markets and schedule; no account settings were changed.",
     "publisherContactAndTraderDeclarations": "Use the verified publisher details already held in Partner Center. No address, phone number or private email is included here.",
-    "packageUpload": "Upload the release workflow's x64 and arm64 MSIX packages (0.27.3 or later). They carry the Product identity from Partner Center: Name K3D0.wirecraft, Publisher CN=7F0CBC95-8035-4AF2-9B17-C38D58351CE5, PublisherDisplayName K3D0 (packaging/windows/msix-identity.json).",
+    "packageUpload": "Upload the release workflow's x64 and arm64 MSIX packages (0.27.4 or later; 0.27.3 produced no MSIX). They carry the Product identity from Partner Center: Name K3D0.wirecraft, Publisher CN=7F0CBC95-8035-4AF2-9B17-C38D58351CE5, PublisherDisplayName K3D0 (packaging/windows/msix-identity.json).",
     "finalSubmission": "Import and review the listing, complete account-only declarations, then submit in Partner Center. The local build does not publish or certify the app."
   }
 }

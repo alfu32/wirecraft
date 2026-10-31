@@ -124,7 +124,7 @@ certification notes. Still to do in Partner Center:
   before submission (the listing answers Yes to personal information, since
   project files can carry people's names and MCP clients can read them).
 - **Package.** Upload the release workflow's `wirecraft-X.Y.Z-windows-x64.msix`
-  and `-arm64.msix` (0.27.3 or later). They carry the identity in
+  and `-arm64.msix` (0.27.4 or later; 0.27.3 produced no MSIX). They carry the identity in
   `packaging/windows/msix-identity.json`, copied from Partner Center's
   **Product identity**: `K3D0.wirecraft`, publisher `CN=7F0CBC95-…` and publisher
   display name `K3D0` (family name `K3D0.wirecraft_tfmtd4yrk952g`).
