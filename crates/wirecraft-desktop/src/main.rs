@@ -2237,7 +2237,12 @@ fn main() -> anyhow::Result<()> {
                 );
             }
             "--help" => {
-                println!("wirecraft-desktop [PROJECT.orch] [--state-dir DIRECTORY]");
+                println!("wirecraft-desktop [PROJECT.orch] [--state-dir DIRECTORY] [--version]");
+                return Ok(());
+            }
+            // Release packaging checks installed commands with this line.
+            "--version" | "-V" => {
+                println!("Wirecraft {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
             s if s.starts_with('-') => anyhow::bail!("Unknown option {s}"),

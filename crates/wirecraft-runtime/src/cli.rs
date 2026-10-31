@@ -8,6 +8,10 @@ use std::path::{Path, PathBuf};
 use wirecraft_core::{Document, store};
 pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let mode = args.next().unwrap_or_else(|| "help".into());
+    if mode == "--version" || mode == "-V" {
+        println!("Wirecraft {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     if mode == "help" || mode == "--help" {
         println!(
             "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft update-references FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY [--template-set ID] [--layout ID] [--compiler BUNDLE.json]\nwirecraft templates [ID]\nwirecraft export-compiler PROJECT.orch OUTPUT_DIRECTORY [TEMPLATE_SET]\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
