@@ -34,6 +34,8 @@ Pending:
 - The Windows application itself has never been run.
 - The Store needs confirmation of the product name. The privacy policy is [docs/PRIVACY_POLICY.md](../PRIVACY_POLICY.md) (0.27.6).
 
+0.27.7: the user-facing description follows the user's definition of Wirecraft: a framework for scaffolding software visually, where explicit links declare the data channels that conventional code leaves implicit in its call graph; the workflow is design, then each component's algorithm, then generation; and without links, composites are folders and entities files that keep code, specification and tests together. The Store listing (all 32 locales; rewritten description, short description, features, search terms and three captions, machine-translated without native review), the README introduction, and the Linux metainfo, Snap, DEB, RPM, desktop-entry and MSIX descriptions were rewritten.
+
 0.27.1: the first Release run (v0.27.0) passed on Linux x86_64/aarch64, including the AppImage startup smoke, and on macOS Apple Silicon. On Windows ARM64, the installed MSIX refused to start `wirecraft.exe` (`Access is denied`), because only `wirecraft-desktop.exe` was declared in its manifest. The command line is now a second, unlisted console application with a `wirecraft.exe` alias.
 
 0.27.2: the v0.27.1 run passed on Linux and both macOS targets. On both Windows targets MakeAppx rejected the manifest, because a console-subsystem application must also declare `desktop4:SupportsMultipleInstances="true"`; the command-line application now declares it.

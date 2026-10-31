@@ -1,6 +1,29 @@
 # Wirecraft
 
-Rust + GPUI migration of [Threadworks](https://github.com/alfu32/threadworks), based on revision `7d392d3a0e30b86445e00e7c03032a5188b26593` (2.6.7). This is an early working migration, **not feature-complete**. See [parity](docs/migration/parity.md), [architecture](docs/migration/architecture.md), and [current status](docs/migration/status.md). Planned Wirecraft extensions: [pluggable components](docs/design/components.md) (specification).
+Wirecraft is a development framework for scaffolding a software solution visually.
+It adds one design element that conventional programming leaves implicit: the
+**link**. In ordinary code, data moves between components through function and
+method calls, sometimes hidden in object construction, and the resulting call graph
+is hard to sketch without tools. In Wirecraft you declare explicitly the data
+channels through which components communicate, so the architecture reads like a
+production or assembly line.
+
+The workflow has three steps:
+
+1. **Design.** Break the solution into processing nodes, which are functional
+   components, and connect them with typed links. Composites group nodes.
+   Object orientation remains: types form explicit hierarchies and dependencies,
+   and libraries lend suites of methods to the components that use them.
+2. **Program.** Write the algorithm of each component in its own editor, under the
+   function header the generator will produce, with language-server help.
+3. **Generate.** Wirecraft assembles the components and their links into a
+   program in C17, Rust, Go, Kotlin, JavaScript (Node.js) or PHP.
+
+Links are optional. Without them, composites act as folders and leaf nodes as
+files, and each entity keeps its code together with its specification and test
+data, so the association between them is explicit instead of implicit.
+
+Wirecraft is a Rust + GPUI migration of [Threadworks](https://github.com/alfu32/threadworks), based on revision `7d392d3a0e30b86445e00e7c03032a5188b26593` (2.6.7). This is an early working migration, **not feature-complete**. See [parity](docs/migration/parity.md), [architecture](docs/migration/architecture.md), and [current status](docs/migration/status.md). Planned Wirecraft extensions: [pluggable components](docs/design/components.md) (specification).
 
 The framework-independent graph/storage crate is shared by a headless backend and a desktop client. The desktop owns an authenticated loopback backend process. MCP and the desktop invoke the same services. TCC and its native integration are absent.
 

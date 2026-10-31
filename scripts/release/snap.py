@@ -54,10 +54,12 @@ def main():
         (root / "meta/snap.yaml").write_text(
             """name: wirecraft
 version: '{version}'
-summary: Dataflow topology designer that generates programs
+summary: Visual development framework with explicit data links
 description: |
-  Wirecraft GPUI desktop and command line for Threadworks-compatible .orch
-  projects. Strict confinement: host compilers and language servers (clang,
+  Wirecraft scaffolds software visually: break a solution into processing
+  components joined by explicit, typed data links, write each component's
+  algorithm, and generate C17, Rust, Go, Kotlin, JavaScript or PHP programs.
+  Desktop and command line for .orch projects. Strict confinement: host compilers and language servers (clang,
   clangd, rust-analyzer, Go, Node.js) are not reachable from the Snap.
 base: core24
 architectures: [{arch}]

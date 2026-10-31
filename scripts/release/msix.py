@@ -78,7 +78,7 @@ def manifest(version, arch, config=None):
         element.text = text
         return element
 
-    description = "Wirecraft dataflow topology designer"
+    description = "Visual development framework with explicit data links"
     root = ET.Element("{" + NS[""] + "}Package", IgnorableNamespaces="uap uap3 desktop rescap")
     add(root, "Identity", Name=config["name"], Publisher=config["publisher"],
         Version=package_version(version, config), ProcessorArchitecture=arch)

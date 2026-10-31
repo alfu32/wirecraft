@@ -4,11 +4,17 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT OR Apache-2.0</project_license>
   <name>Wirecraft</name>
-  <summary>Dataflow topology designer that generates programs</summary>
+  <summary>Visual development framework with explicit data links</summary>
   <description>
-    <p>Design processors, types and links as a dataflow graph, edit their bodies
-    with language-server support, and generate C17, Rust, Go, Kotlin, JavaScript or
-    PHP programs from Threadworks-compatible .orch projects.</p>
+    <p>Wirecraft is a development framework for scaffolding software visually. Break a
+    solution into processing components and declare the typed links through which
+    they exchange data, so the architecture reads like an assembly line instead of a
+    hidden call graph. Write each component's algorithm under its generated function
+    header, with language-server support, and generate C17, Rust, Go, Kotlin,
+    JavaScript or PHP programs.</p>
+    <p>Links are optional: without them, composites act as folders and entities as
+    files that keep code, specification and test data together. Wirecraft opens
+    Threadworks-compatible .orch projects.</p>
   </description>
   <launchable type="desktop-id">wirecraft.desktop</launchable>
   <provides>

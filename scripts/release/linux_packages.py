@@ -80,10 +80,12 @@ def build_deb(root, manifest, output):
         "Installed-Size: {size}\n"
         "Depends: libc6 (>= 2.27), libgcc-s1 | libgcc1, libvulkan1\n"
         "Recommends: mesa-vulkan-drivers, clang, clangd\n"
-        "Description: Dataflow topology designer that generates programs\n"
-        " Wirecraft designs processors, types and links as a dataflow graph,\n"
-        " edits their bodies and generates C17, Rust, Go, Kotlin, JavaScript\n"
-        " or PHP programs from Threadworks-compatible .orch projects.\n"
+        "Description: Visual development framework with explicit data links\n"
+        " Wirecraft scaffolds software visually: break a solution into processing\n"
+        " components joined by explicit, typed data links, write each component's\n"
+        " algorithm, and generate C17, Rust, Go, Kotlin, JavaScript or PHP programs.\n"
+        " Without links, composites act as folders and entities as files that keep\n"
+        " code, specification and tests together.\n"
         .format(version=manifest["version"], arch=arch, size=(size + 1023) // 1024)
     )
     artifact = output / ("wirecraft_" + manifest["version"] + "-1_" + arch + ".deb")
@@ -99,7 +101,7 @@ def build_rpm(root, manifest, output, work):
     spec = top / "SPECS/wirecraft.spec"
     spec.write_text(
         "Name: wirecraft\nVersion: {version}\nRelease: 1\n"
-        "Summary: Dataflow topology designer that generates programs\n"
+        "Summary: Visual development framework with explicit data links\n"
         "License: MIT OR Apache-2.0\nURL: https://github.com/alfu32/wirecraft\n"
         "ExclusiveArch: x86_64 aarch64\n"
         # The payload contains private libraries whose providers must not leak
@@ -115,8 +117,10 @@ def build_rpm(root, manifest, output, work):
         "%global _binary_payload w7.xzdio\n"
         "%global use_source_date_epoch_as_buildtime 1\n"
         "%global clamp_mtime_to_source_date_epoch 1\n"
-        "%description\nWirecraft designs processors, types and links as a dataflow\n"
-        "graph and generates C17, Rust, Go, Kotlin, JavaScript or PHP programs.\n"
+        "%description\nWirecraft scaffolds software visually: break a solution into\n"
+        "processing components joined by explicit, typed data links, write each\n"
+        "component's algorithm, and generate C17, Rust, Go, Kotlin, JavaScript or\n"
+        "PHP programs.\n"
         "%prep\n%build\n%install\n"
         "mkdir -p %{{buildroot}}\ncp -a {root}/. %{{buildroot}}/\n"
         "%files\n%defattr(-,root,root,-)\n"

@@ -51,11 +51,14 @@ builder checks Microsoft's field limits (UTF-16 lengths, 21 search-term words) a
 image sizes. Release notes, trailers and non-desktop images are intentionally
 empty for this first listing.
 
-The features lead with the software design capabilities (the dataflow designer,
-routing, code generation in six languages, the body editor with its pinned
-generated header, language-server help, navigation, components), followed by the
-auxiliary ones (archetypes and analysis, project management, plan export for
-printing, the local MCP server).
+The description follows the workflow: scaffold the solution as processing
+components joined by explicit data links (the design element that conventional
+code leaves implicit in its call graph), write each component's algorithm under
+its generated header, then generate the program. It states that types and
+libraries keep object orientation, and that without links composites are folders
+and entities are files holding code, specification and tests. The features follow
+the same order, then the auxiliary ones (components and analysis, project
+management, plan export for printing, the local MCP server).
 
 ## Screenshots
 
