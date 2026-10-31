@@ -6,7 +6,7 @@ exclude = ["vendor/gpui-component"]
 [workspace.package]
 version = "0.26.1"
 edition = "2024"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 rust-version = "1.89"
 
 [workspace.dependencies]
