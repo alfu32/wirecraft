@@ -61,11 +61,13 @@ are pinned to commits/digests (`packaging/appimage-inputs.json`, notices under
   certificate for that publisher created per run; its public CER ships for
   Trusted People installation, and the Store re-signs packages it accepts. The
   manifest has one application, `wirecraft-desktop.exe`, with the
-  `wirecraft-desktop.exe` and `wirecraft.exe` execution aliases: Windows refuses
-  to start an undeclared packaged executable, and the Store refuses an unlisted
-  (headless) second application without a waiver. Release CI installs the MSIX,
-  runs `--version` from the install location and through both aliases, and
-  removes it. The MSI is unsigned.
+  `wirecraft-desktop.exe` and `wirecraft.exe` execution aliases. Windows refuses
+  to start an undeclared packaged executable, the Store refuses an unlisted
+  (headless) second application without a waiver, and all of an application's
+  aliases start its own executable; so `wirecraft-desktop` runs the command line
+  when started as `wirecraft`. Release CI installs the MSIX, runs `--version`
+  from the install location and through both aliases, checks that `wirecraft
+  help` prints the command-line usage, and removes it. The MSI is unsigned.
 - **macOS** bundles are ad-hoc signed, without Developer ID signing or
   notarization.
 
