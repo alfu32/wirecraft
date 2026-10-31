@@ -1,0 +1,34 @@
+{
+  "productName": "Wirecraft",
+  "storeId": "9NDMQVXLGBQJ",
+  "publisherDisplayName": "K3D0",
+  "toConfirm": "productName must equal the name reserved for 9NDMQVXLGBQJ, and publisherDisplayName the account's publisher; both are assumed (Meshcraft's listing uses publisher K3D0).",
+  "submissionType": "MSIX desktop app",
+  "minimumApplicationVersionForThisListing": "0.27.0",
+  "preparedFields": {
+    "primaryCategory": "Developer tools",
+    "subcategory": "Other",
+    "secondaryCategory": "Productivity",
+    "price": "Free",
+    "freeTrial": "None",
+    "inAppPurchases": "None",
+    "website": "https://github.com/alfu32/wirecraft",
+    "supportContact": "https://github.com/alfu32/wirecraft/issues",
+    "privacyPolicy": "To be published; Wirecraft has no privacy policy page yet (Meshcraft's is docs/PRIVACY_POLICY.md in its repository).",
+    "accessesPersonalInformation": "Yes — user-selected project files may contain personal information (responsible, assignee and revision fields); optional local MCP clients can read the design. No automatic developer analytics or project upload.",
+    "deviceFamily": "Windows.Desktop",
+    "packageArchitectures": ["x64", "arm64"],
+    "minimumWindowsVersion": "10.0.17763.0 (Windows 10, version 1809)",
+    "applicationInterfaceLanguages": ["en-US"],
+    "accountRequired": false,
+    "coreDesignRequiresInternet": false,
+    "certificationNotes": "Desktop dataflow designer and code generator. No login, subscription or external server is needed; the app starts its own backend bound to 127.0.0.1. Test with keyboard and mouse: open an example .orch from the portable release (examples/webserver-rust.orch), use the Designer tab, select an entity and open the Editor tab. Code checks, completion and hover need clang/clangd or rust-analyzer installed separately; without them the editor still works with syntax colors. The optional MCP server binds only to 127.0.0.1 with a bearer token; external agent clients are separate. The interface is English; Store descriptions and captions are localized. Needs graphics drivers supporting DirectX 11."
+  },
+  "accountOnlyStepsNotRepresentableInListingCsv": {
+    "ageRating": "Complete the Partner Center/IARC questionnaire. No official rating has been assigned by this bundle. The app is a user-operated software design tool; the examples are web-server designs.",
+    "marketsAndPublicationDate": "Use the publisher's chosen markets and schedule; no account settings were changed.",
+    "publisherContactAndTraderDeclarations": "Use the verified publisher details already held in Partner Center. No address, phone number or private email is included here.",
+    "packageUpload": "Upload signed MSIX packages built with the reserved Store identity (Package/Identity/Name and Publisher from Partner Center > Product identity). The release workflow currently signs a self-signed CN=Wirecraft identity, which the Store will not accept until packaging/windows/msix-identity.json carries the reserved values.",
+    "finalSubmission": "Import and review the listing, complete account-only declarations, then submit in Partner Center. The local build does not publish or certify the app."
+  }
+}

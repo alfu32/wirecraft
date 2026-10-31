@@ -1,0 +1,46 @@
+{
+  "language": "Afrikaans",
+  "description": "Ontwerp sagteware as 'n datavloeigrafiek en genereer die program daaruit.\n\nWirecraft is 'n gratis oopbron-ontwerper vir gebeurtenisgedrewe en datavloeisagteware. Plaas verwerkers, datatipes en getipeerde skakels op 'n doek, groepeer hulle in samestellings en laat 45-grade-roetering groot topologieë leesbaar hou. Elke skakel is 'n getipeerde buffer, elke verwerker 'n funksie, en diensbiblioteke word uitgeleen aan die verwerkers wat hulle gebruik.\n\nUit dieselfde ontwerp genereer Wirecraft volledige programme in C17, Rust, Go, Kotlin, JavaScript (Node.js) en PHP. Skryf elke verwerker se liggaam in 'n redigeerder wat die gegenereerde funksieopskrif bo jou kode vaspen, sodat jy altyd die parameters sien wat die generator sal deurgee. Met clang, clangd of rust-analyzer geïnstalleer kry jy kodevoltooiing, dokumentasie wanneer jy daaroor beweeg, semantiese kleure, gaan na definisie, soek verwysings en samestellerdiagnose wat teruggekoppel word na die entiteit en reël wat jy geskryf het.\n\nPubliseer dele van 'n ontwerp as herbruikbare komponente met getipeerde poorte en verwys daarna vanuit ander ontwerpe, vasgepen met 'n inhoudshash sodat bywerkings doelbewus is. Begin nuwe werk uit 'n biblioteek van argetipes en ondersoek 'n ontwerp met netwerkontleding van sy data-, fout- en afhanklikheidsvloei.\n\nRondom die ontwerp kry jy ook projekbestuur ('n Kanban-bord en agterstandslys met status, verantwoordelikheid en hersieningsgeskiedenis), uitvoer van planne en dokumentasie na PDF, SVG, PNG en Mermaid om te druk en te deel, en 'n opsionele plaaslike MCP-bediener waardeur versoenbare KI-agente die ontwerp met gedokumenteerde gereedskap kan lees en wysig.\n\nWirecraft maak Threadworks .orch-projekte oop en bewaar hul data. Geen rekening is nodig nie en ontwerpwerk werk vanlyn. Die toepassing se koppelvlak is in Engels. Wirecraft word aktief ontwikkel.",
+  "shortDescription": "Ontwerp datavloeisagteware visueel en genereer programme in C17, Rust, Go, Kotlin, JavaScript of PHP daaruit. Wysig verwerkerliggame met hulp van taalbedieners, hergebruik komponente, voer planne uit en koppel KI-agente deur 'n plaaslike MCP-bediener.",
+  "features": [
+    "Visuele datavloei-ontwerper met verwerkers, tipes, getipeerde skakels en samestellings",
+    "Leesbare 45-grade-roetering van skakels vir groot topologieë",
+    "Genereer C17-, Rust-, Go-, Kotlin-, JavaScript- en PHP-programme uit een ontwerp",
+    "Liggaamredigeerder met die gegenereerde funksieopskrif bo jou kode vasgepen",
+    "Voltooiing, inligting by beweging, semantiese kleure en diagnose met clangd of rust-analyzer",
+    "Gaan na definisie en soek verwysings oor verwerkerliggame heen",
+    "Herbruikbare komponente met getipeerde poorte, vasgepen met 'n inhoudshash",
+    "Argetipebiblioteek en netwerkontleding van data-, fout- en afhanklikheidsvloei",
+    "Kanban-bord, agterstandslys, verantwoordelikheid en hersieningsgeskiedenis",
+    "Planuitvoer na PDF, SVG, PNG en Mermaid en 'n plaaslike MCP-bediener vir KI-agente"
+  ],
+  "searchTerms": [
+    "datavloei",
+    "sagteware-ontwerp",
+    "kodegenerering",
+    "C17",
+    "Rust",
+    "MCP-bediener",
+    "argitektuur"
+  ],
+  "captions": [
+    "Ontwerp 'n webbediener as 'n datavloeigrafiek van verwerkers, tipes en skakels.",
+    "Groepeer verwerkers in samestellings; geroeteerde skakels wys elke getipeerde buffer.",
+    "Publiseer 'n ontwerp as 'n herbruikbare komponent met getipeerde in- en uitvoerpoorte.",
+    "Verwys na 'n komponent vanuit 'n ander ontwerp; sy poorte sluit by jou skakels aan.",
+    "Wysig 'n verwerkerliggaam onder sy vasgepende, gegenereerde C17-funksieopskrif.",
+    "Voltooi die lede van 'n uitgeleende biblioteek terwyl jy tik, met clangd.",
+    "Lees dokumentasie wanneer jy oor Rust-liggame beweeg, met rust-analyzer geïnstalleer.",
+    "Voorskou planne met 'n titelblok en voer hulle uit na PDF, SVG, PNG of Mermaid.",
+    "Volg entiteite op 'n Kanban-bord met status, verantwoordelikheid en toegewysdes.",
+    "Laat KI-agente deur die plaaslike MCP-bediener en sy toegangslog werk."
+  ],
+  "minimumHardware": [
+    "Grafiese drywers wat DirectX 11 ondersteun",
+    "Sleutelbord en muis"
+  ],
+  "recommendedHardware": [
+    "clang, clangd of rust-analyzer geïnstalleer vir kodekontroles",
+    "'n Muis met drie knoppies om die doek te skuif"
+  ]
+}

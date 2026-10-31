@@ -1,0 +1,46 @@
+{
+  "language": "Română",
+  "description": "Proiectați software ca graf de flux de date, apoi generați programul din el.\n\nWirecraft este un proiectant gratuit și open source pentru software bazat pe evenimente și pe flux de date. Așezați procesoare, tipuri de date și legături tipizate pe o planșă, grupați-le în compozite și lăsați rutarea la 45 de grade să păstreze lizibile chiar și topologiile mari. Fiecare legătură este un buffer tipizat, fiecare procesor o funcție, iar bibliotecile de servicii sunt împrumutate procesoarelor care le folosesc.\n\nDin același proiect, Wirecraft generează programe complete în C17, Rust, Go, Kotlin, JavaScript (Node.js) și PHP. Scrieți corpul fiecărui procesor într-un editor care fixează antetul de funcție generat deasupra codului, astfel încât vedeți mereu parametrii pe care îi va transmite generatorul. Cu clang, clangd sau rust-analyzer instalate, beneficiați de completare automată, documentație la trecerea cursorului, culori semantice, salt la definiție, căutarea referințelor și diagnostice de compilare legate de entitatea și linia pe care le-ați scris.\n\nPublicați părți ale unui proiect ca componente reutilizabile cu porturi tipizate și referiți-le din alte proiecte, fixate prin hash de conținut, pentru ca actualizările să fie deliberate. Porniți lucrări noi dintr-o bibliotecă de arhetipuri și examinați un proiect prin analiza de rețea a fluxurilor de date, erori și dependențe.\n\nÎn jurul proiectului aveți și management de proiect (tablă Kanban și backlog cu stare, responsabilitate și istoric de revizii), exportul planurilor și al documentației în PDF, SVG, PNG și Mermaid pentru tipărire și partajare, precum și un server MCP local opțional prin care agenții AI compatibili pot citi și modifica proiectul cu instrumente documentate.\n\nWirecraft deschide proiecte .orch din Threadworks și le păstrează datele. Nu este necesar un cont, iar proiectarea funcționează offline. Interfața aplicației este în limba engleză. Wirecraft este în dezvoltare activă.",
+  "shortDescription": "Proiectați vizual software pe flux de date și generați programe în C17, Rust, Go, Kotlin, JavaScript sau PHP. Editați corpurile procesoarelor cu ajutorul serverelor de limbaj, reutilizați componente, exportați planuri și conectați agenți AI printr-un server MCP local.",
+  "features": [
+    "Proiectant vizual de flux de date cu procesoare, tipuri, legături tipizate și compozite",
+    "Rutare lizibilă a legăturilor la 45 de grade pentru topologii mari",
+    "Generați programe C17, Rust, Go, Kotlin, JavaScript și PHP dintr-un singur proiect",
+    "Editor de corpuri cu antetul de funcție generat fixat deasupra codului",
+    "Completare, informații la trecerea cursorului, culori semantice și diagnostice cu clangd sau rust-analyzer",
+    "Salt la definiție și căutarea referințelor în corpurile procesoarelor",
+    "Componente reutilizabile cu porturi tipizate, fixate prin hash de conținut",
+    "Bibliotecă de arhetipuri și analiză de rețea a fluxurilor de date, erori și dependențe",
+    "Tablă Kanban, backlog, responsabilitate și istoric de revizii",
+    "Export de planuri în PDF, SVG, PNG și Mermaid și server MCP local pentru agenți AI"
+  ],
+  "searchTerms": [
+    "flux de date",
+    "proiectare software",
+    "generare de cod",
+    "C17",
+    "Rust",
+    "server MCP",
+    "arhitectură"
+  ],
+  "captions": [
+    "Proiectați un server web ca graf de procesoare, tipuri și legături tipizate.",
+    "Grupați procesoarele în compozite; legăturile rutate arată fiecare buffer tipizat.",
+    "Publicați un proiect ca o componentă cu porturi tipizate de intrare și ieșire.",
+    "Referiți o componentă din alt proiect; porturile ei se unesc cu legăturile dvs.",
+    "Editați corpul unui procesor sub antetul de funcție C17 generat și fixat.",
+    "Completați membrii unei biblioteci împrumutate în timp ce scrieți, cu clangd.",
+    "Citiți documentația la trecerea cursorului în corpuri Rust, cu rust-analyzer instalat.",
+    "Previzualizați planuri cu cartuș și exportați-le în PDF, SVG, PNG sau Mermaid.",
+    "Urmăriți entitățile pe o tablă Kanban cu stare, responsabilitate și persoane alocate.",
+    "Lăsați agenții AI să lucreze prin serverul MCP local și jurnalul său de acces."
+  ],
+  "minimumHardware": [
+    "Drivere grafice compatibile cu DirectX 11",
+    "Tastatură și mouse"
+  ],
+  "recommendedHardware": [
+    "clang, clangd sau rust-analyzer instalat pentru verificarea codului",
+    "Un mouse cu trei butoane pentru deplasarea planșei"
+  ]
+}

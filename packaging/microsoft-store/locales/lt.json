@@ -1,0 +1,46 @@
+{
+  "language": "Lietuvių",
+  "description": "Kurkite programinę įrangą kaip duomenų srauto grafą ir generuokite iš jo programą.\n\nWirecraft – nemokamas atvirojo kodo kūrimo įrankis įvykiais ir duomenų srautu grindžiamai programinei įrangai. Dėkite procesorius, duomenų tipus ir tipizuotas jungtis ant drobės, grupuokite juos į sudėtinius elementus, o 45 laipsnių maršrutizavimas išlaikys net didelių topologijų aiškumą. Kiekviena jungtis yra tipizuotas buferis, kiekvienas procesorius – funkcija, o paslaugų bibliotekos skolinamos jas naudojantiems procesoriams.\n\nIš to paties projekto Wirecraft generuoja išbaigtas programas C17, Rust, Go, Kotlin, JavaScript (Node.js) ir PHP kalbomis. Kiekvieno procesoriaus kūną rašykite redaktoriuje, kuris virš jūsų kodo prisega sugeneruotą funkcijos antraštę, todėl visada matote parametrus, kuriuos perduos generatorius. Įdiegę clang, clangd arba rust-analyzer gausite kodo užbaigimą, dokumentaciją užvedus žymeklį, semantines spalvas, perėjimą prie apibrėžimo, nuorodų paiešką ir kompiliatoriaus diagnostiką, susietą su jūsų parašytu objektu ir eilute.\n\nSkelbkite projekto dalis kaip pakartotinai naudojamus komponentus su tipizuotais prievadais ir nurodykite juos kituose projektuose, prisegtus turinio maiša, kad atnaujinimai būtų sąmoningi. Pradėkite naują darbą iš archetipų bibliotekos ir tirkite projektą atlikdami jo duomenų, klaidų ir priklausomybių srautų tinklo analizę.\n\nAplink projektą taip pat gaunate projektų valdymą (Kanban lentą ir darbų sąrašą su būsena, atsakomybe ir peržiūrų istorija), planų ir dokumentacijos eksportą į PDF, SVG, PNG ir Mermaid spausdinti bei dalytis, ir pasirinktinį vietinį MCP serverį, per kurį suderinami DI agentai gali skaityti ir redaguoti projektą dokumentuotais įrankiais.\n\nWirecraft atidaro Threadworks .orch projektus ir išsaugo jų duomenis. Paskyros nereikia, o projektavimas veikia be ryšio. Programos sąsaja yra anglų kalba. Wirecraft aktyviai kuriamas.",
+  "shortDescription": "Vizualiai kurkite duomenų srauto programinę įrangą ir generuokite programas C17, Rust, Go, Kotlin, JavaScript arba PHP kalbomis. Redaguokite procesorių kūnus padedant kalbų serveriams, pakartotinai naudokite komponentus, eksportuokite planus ir junkite DI agentus per vietinį MCP serverį.",
+  "features": [
+    "Vizualus duomenų srauto kūrimo įrankis su procesoriais, tipais, tipizuotomis jungtimis ir sudėtiniais elementais",
+    "Aiškus 45 laipsnių jungčių maršrutizavimas didelėse topologijose",
+    "Generuokite C17, Rust, Go, Kotlin, JavaScript ir PHP programas iš vieno projekto",
+    "Kūnų redaktorius su virš kodo prisegta sugeneruota funkcijos antrašte",
+    "Užbaigimas, užuominos, semantinės spalvos ir diagnostika su clangd arba rust-analyzer",
+    "Perėjimas prie apibrėžimo ir nuorodų paieška procesorių kūnuose",
+    "Pakartotinai naudojami komponentai su tipizuotais prievadais, prisegti turinio maiša",
+    "Archetipų biblioteka ir duomenų, klaidų bei priklausomybių srautų tinklo analizė",
+    "Kanban lenta, darbų sąrašas, atsakomybė ir peržiūrų istorija",
+    "Planų eksportas į PDF, SVG, PNG ir Mermaid bei vietinis MCP serveris DI agentams"
+  ],
+  "searchTerms": [
+    "duomenų srautas",
+    "programų kūrimas",
+    "kodo generavimas",
+    "C17",
+    "Rust",
+    "MCP serveris",
+    "architektūra"
+  ],
+  "captions": [
+    "Sukurkite žiniatinklio serverį kaip procesorių, tipų ir jungčių duomenų srauto grafą.",
+    "Grupuokite procesorius į sudėtinius; maršrutizuotos jungtys rodo kiekvieną buferį.",
+    "Paskelbkite projektą kaip komponentą su tipizuotais įvesties ir išvesties prievadais.",
+    "Nurodykite komponentą kitame projekte; jo prievadai prisijungia prie jūsų jungčių.",
+    "Redaguokite procesoriaus kūną po prisegta sugeneruota C17 funkcijos antrašte.",
+    "Užbaikite paskolintos bibliotekos narius rašydami, padedant clangd.",
+    "Skaitykite dokumentaciją užvedę žymeklį Rust kūnuose, kai įdiegtas rust-analyzer.",
+    "Peržiūrėkite planus su antraštiniu bloku ir eksportuokite į PDF, SVG, PNG ar Mermaid.",
+    "Sekite objektus Kanban lentoje su būsena, atsakomybe ir vykdytojais.",
+    "Leiskite DI agentams dirbti per vietinį MCP serverį ir jo prieigos žurnalą."
+  ],
+  "minimumHardware": [
+    "DirectX 11 palaikančios grafikos tvarkyklės",
+    "Klaviatūra ir pelė"
+  ],
+  "recommendedHardware": [
+    "Kodo tikrinimui įdiegtas clang, clangd arba rust-analyzer",
+    "Trijų mygtukų pelė drobei slinkti"
+  ]
+}

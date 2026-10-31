@@ -1,0 +1,46 @@
+{
+  "language": "Français",
+  "description": "Concevez un logiciel sous forme de graphe de flux de données, puis générez le programme à partir de celui-ci.\n\nWirecraft est un concepteur gratuit et open source pour les logiciels événementiels et à flux de données. Placez des processeurs, des types de données et des liens typés sur un canevas, regroupez-les en composites et laissez le routage à 45 degrés garder lisibles les grandes topologies. Chaque lien est un tampon typé, chaque processeur une fonction, et les bibliothèques de services sont prêtées aux processeurs qui les utilisent.\n\nÀ partir de la même conception, Wirecraft génère des programmes complets en C17, Rust, Go, Kotlin, JavaScript (Node.js) et PHP. Écrivez le corps de chaque processeur dans un éditeur qui épingle l'en-tête de fonction généré au-dessus de votre code, pour toujours voir les paramètres que le générateur transmettra. Avec clang, clangd ou rust-analyzer installés, vous obtenez la complétion, la documentation au survol, les couleurs sémantiques, l'accès à la définition, la recherche de références et des diagnostics du compilateur rattachés à l'entité et à la ligne que vous avez écrites.\n\nPubliez des parties d'une conception comme composants réutilisables aux ports typés et référencez-les depuis d'autres conceptions, épinglés par empreinte de contenu pour que les mises à jour soient délibérées. Démarrez un nouveau travail à partir d'une bibliothèque d'archétypes et examinez une conception grâce à l'analyse réseau de ses flux de données, d'erreurs et de dépendances.\n\nAutour de la conception, vous disposez aussi de la gestion de projet (tableau Kanban et backlog avec statut, responsabilité et historique des révisions), de l'export des plans et de la documentation en PDF, SVG, PNG et Mermaid pour imprimer et partager, et d'un serveur MCP local optionnel permettant aux agents d'IA compatibles de lire et modifier la conception au moyen d'outils documentés.\n\nWirecraft ouvre les projets Threadworks .orch et préserve leurs données. Aucun compte n'est requis et la conception fonctionne hors ligne. L'interface de l'application est en anglais. Wirecraft est en développement actif.",
+  "shortDescription": "Concevez visuellement un logiciel à flux de données et générez-en des programmes en C17, Rust, Go, Kotlin, JavaScript ou PHP. Modifiez les corps des processeurs avec l'aide de serveurs de langage, réutilisez des composants, exportez des plans et connectez des agents d'IA via un serveur MCP local.",
+  "features": [
+    "Concepteur visuel de flux de données avec processeurs, types, liens typés et composites",
+    "Routage lisible des liens à 45 degrés pour les grandes topologies",
+    "Générer des programmes C17, Rust, Go, Kotlin, JavaScript et PHP à partir d'une conception",
+    "Éditeur de corps avec l'en-tête de fonction généré épinglé au-dessus du code",
+    "Complétion, survol, couleurs sémantiques et diagnostics avec clangd ou rust-analyzer",
+    "Atteindre la définition et rechercher les références dans les corps des processeurs",
+    "Composants réutilisables aux ports typés, épinglés par empreinte de contenu",
+    "Bibliothèque d'archétypes et analyse réseau des flux de données, d'erreurs et de dépendances",
+    "Tableau Kanban, backlog, responsabilité et historique des révisions",
+    "Export des plans en PDF, SVG, PNG et Mermaid, et serveur MCP local pour agents d'IA"
+  ],
+  "searchTerms": [
+    "flux de données",
+    "conception logicielle",
+    "génération de code",
+    "C17",
+    "Rust",
+    "serveur MCP",
+    "architecture"
+  ],
+  "captions": [
+    "Concevez un serveur web comme graphe de processeurs, de types et de liens typés.",
+    "Regroupez les processeurs en composites ; les liens routés montrent chaque tampon typé.",
+    "Publiez une conception comme composant réutilisable avec ports d'entrée et de sortie typés.",
+    "Référencez un composant depuis une autre conception ; ses ports rejoignent vos liens.",
+    "Modifiez le corps d'un processeur sous son en-tête de fonction C17 généré et épinglé.",
+    "Complétez les membres d'une bibliothèque prêtée pendant la saisie, grâce à clangd.",
+    "Lisez la documentation au survol dans les corps Rust, avec rust-analyzer installé.",
+    "Prévisualisez des plans avec cartouche et exportez-les en PDF, SVG, PNG ou Mermaid.",
+    "Suivez les entités sur un tableau Kanban avec statut, responsabilité et assignés.",
+    "Laissez des agents d'IA travailler via le serveur MCP local et son journal d'accès."
+  ],
+  "minimumHardware": [
+    "Pilotes graphiques compatibles DirectX 11",
+    "Clavier et souris"
+  ],
+  "recommendedHardware": [
+    "clang, clangd ou rust-analyzer installé pour les vérifications de code",
+    "Une souris à trois boutons pour déplacer le canevas"
+  ]
+}

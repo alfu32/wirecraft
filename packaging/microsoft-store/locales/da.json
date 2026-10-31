@@ -1,0 +1,46 @@
+{
+  "language": "Dansk",
+  "description": "Design software som en dataflowgraf, og generér programmet ud fra den.\n\nWirecraft er en gratis open source-designer til hændelsesdrevet software og dataflowsoftware. Placér processorer, datatyper og typede forbindelser på et lærred, saml dem i kompositter, og lad 45-graders ruteføring holde store topologier læsbare. Hver forbindelse er en typet buffer, hver processor en funktion, og servicebiblioteker udlånes til de processorer, der bruger dem.\n\nUd fra det samme design genererer Wirecraft komplette programmer i C17, Rust, Go, Kotlin, JavaScript (Node.js) og PHP. Skriv hver processors krop i en editor, der fastgør den genererede funktionsheader over din kode, så du altid ser de parametre, generatoren sender med. Med clang, clangd eller rust-analyzer installeret får du autofuldførelse, dokumentation ved hover, semantiske farver, gå til definition, find referencer og compilerdiagnoser knyttet til den enhed og linje, du skrev.\n\nUdgiv dele af et design som genbrugelige komponenter med typede porte, og henvis til dem fra andre designs, fastlåst med en indholdshash, så opdateringer sker bevidst. Start nyt arbejde fra et bibliotek af arketyper, og undersøg et design med netværksanalyse af dets data-, fejl- og afhængighedsstrømme.\n\nOmkring designet får du også projektstyring (Kanban-tavle og backlog med status, ansvar og revisionshistorik), eksport af tegninger og dokumentation til PDF, SVG, PNG og Mermaid til udskrivning og deling samt en valgfri lokal MCP-server, så kompatible AI-agenter kan læse og redigere designet via dokumenterede værktøjer.\n\nWirecraft åbner Threadworks .orch-projekter og bevarer deres data. Der kræves ingen konto, og design fungerer offline. Programmets brugerflade er på engelsk. Wirecraft er under aktiv udvikling.",
+  "shortDescription": "Design dataflowsoftware visuelt, og generér programmer i C17, Rust, Go, Kotlin, JavaScript eller PHP ud fra det. Redigér processorkroppe med hjælp fra sprogservere, genbrug komponenter, eksportér tegninger og forbind AI-agenter via en lokal MCP-server.",
+  "features": [
+    "Visuel dataflowdesigner med processorer, typer, typede forbindelser og kompositter",
+    "Læsbar 45-graders ruteføring af forbindelser i store topologier",
+    "Generér C17-, Rust-, Go-, Kotlin-, JavaScript- og PHP-programmer ud fra ét design",
+    "Kropseditor med den genererede funktionsheader fastgjort over koden",
+    "Autofuldførelse, hover, semantiske farver og diagnoser med clangd eller rust-analyzer",
+    "Gå til definition og find referencer på tværs af processorkroppe",
+    "Genbrugelige komponenter med typede porte, fastlåst med indholdshash",
+    "Arketypebibliotek og netværksanalyse af data-, fejl- og afhængighedsstrømme",
+    "Kanban-tavle, backlog, ansvar og revisionshistorik",
+    "Eksport af tegninger til PDF, SVG, PNG og Mermaid samt lokal MCP-server til AI-agenter"
+  ],
+  "searchTerms": [
+    "dataflow",
+    "softwaredesign",
+    "kodegenerering",
+    "C17",
+    "Rust",
+    "MCP-server",
+    "arkitektur"
+  ],
+  "captions": [
+    "Design en webserver som en dataflowgraf af processorer, typer og typede forbindelser.",
+    "Saml processorer i kompositter; rutede forbindelser viser hver typet buffer.",
+    "Udgiv et design som en genbrugelig komponent med typede ind- og udgangsporte.",
+    "Henvis til en komponent fra et andet design; dens porte forbindes med dine forbindelser.",
+    "Redigér en processorkrop under dens fastgjorte, genererede C17-funktionsheader.",
+    "Fuldfør medlemmerne af et udlånt bibliotek, mens du skriver, med clangd.",
+    "Læs hover-dokumentation i Rust-kroppe, når rust-analyzer er installeret.",
+    "Se tegninger med titelfelt, og eksportér dem til PDF, SVG, PNG eller Mermaid.",
+    "Følg enheder på en Kanban-tavle med status, ansvar og tildelte.",
+    "Lad AI-agenter arbejde via den lokale MCP-server og dens adgangslog."
+  ],
+  "minimumHardware": [
+    "Grafikdrivere med understøttelse af DirectX 11",
+    "Tastatur og mus"
+  ],
+  "recommendedHardware": [
+    "clang, clangd eller rust-analyzer installeret til kodekontrol",
+    "En mus med tre knapper til at panorere lærredet"
+  ]
+}

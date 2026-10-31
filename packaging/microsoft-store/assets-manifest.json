@@ -1,0 +1,85 @@
+{
+  "minimumApplicationVersion": "0.27.0",
+  "screenshots": [
+    {
+      "file": "01-designer-topology.png",
+      "scene": "01-designer-topology",
+      "source": "packaging/microsoft-store/captures/01-designer-topology/webserver-rust.orch",
+      "sha256": "94d3a0344dbb9c2225837eeae43985510b63446daf96b5a48aee0f69bee5e0fe",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "02-designer-routing.png",
+      "scene": "02-designer-routing",
+      "source": "packaging/microsoft-store/captures/02-designer-routing/webserver-rust.orch",
+      "sha256": "b3a040a30b7c560d03ca399f591d609168187dc523faf14f3f5e77aa1be67df2",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "03-component-ports.png",
+      "scene": "03-component-ports",
+      "source": "packaging/microsoft-store/captures/03-component-ports/webserver-component.orch",
+      "sha256": "99ef08262f56b1e358f783eb5cd909f5bff8f1b292e00ebaf20574e6ba1a7b46",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "04-component-reference.png",
+      "scene": "04-component-reference",
+      "source": "packaging/microsoft-store/captures/04-component-reference/webserver.orch",
+      "sha256": "34e4b7acc2571d621bd597700610b7e4397eaf5372d82ab435f64bc1ae4084de",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "05-editor-generated-header.png",
+      "scene": "05-editor-generated-header",
+      "source": "packaging/microsoft-store/captures/05-editor-generated-header/webserver-component.orch",
+      "sha256": "1c9e6810c20946e56fb9695ce0d1516ee54c4d55afa57cabed2896efd86a6a03",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "06-editor-completion.png",
+      "scene": "06-editor-completion",
+      "source": "packaging/microsoft-store/captures/06-editor-completion/webserver-component.orch",
+      "sha256": "fc9b176c77f41f32a58b1e833793d20ebe7ff0167414530a5effd6be8d6b1b35",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "07-editor-hover.png",
+      "scene": "07-editor-hover",
+      "source": "packaging/microsoft-store/captures/07-editor-hover/webserver-rust.orch",
+      "sha256": "d2c549427a7f75f59849e227b43b0f1b1d139ac7966fc2e75649aae79a8000bc",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "08-export-plan.png",
+      "scene": "08-export-plan",
+      "source": "packaging/microsoft-store/captures/08-export-plan/webserver-rust.orch",
+      "sha256": "4e4335025279b9860138339b9a61d3e98b365647628e6c8b8e9e9e8f37de5c94",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "09-project-management.png",
+      "scene": "09-project-management",
+      "source": "packaging/microsoft-store/captures/09-project-management/webserver-rust.orch",
+      "sha256": "cf35c02be1c027a8814a1e2a3bdc62f9d9d70f4b5f4ff8a03fe0557d6cbe59be",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    },
+    {
+      "file": "10-mcp-server.png",
+      "scene": "10-mcp-server",
+      "source": "packaging/microsoft-store/captures/10-mcp-server/webserver-rust.orch",
+      "sha256": "4ee60b2bb70225e7e2ec0dc0c8fe55d7f9d5e1f1f79b199ac7fbfd3df4a2c11a",
+      "application": "Wirecraft 0.27.0",
+      "capture": "private Xvfb 1920x1080, Mesa lavapipe"
+    }
+  ]
+}

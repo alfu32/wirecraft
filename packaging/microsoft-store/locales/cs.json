@@ -1,0 +1,46 @@
+{
+  "language": "Čeština",
+  "description": "Navrhujte software jako graf datového toku a generujte z něj program.\n\nWirecraft je bezplatný návrhář s otevřeným zdrojovým kódem pro software řízený událostmi a datovým tokem. Umísťujte procesory, datové typy a typovaná propojení na plátno, seskupujte je do kompozitů a nechte směrování pod úhlem 45 stupňů udržet čitelnost i velkých topologií. Každé propojení je typovaná vyrovnávací paměť, každý procesor funkce a knihovny služeb se půjčují procesorům, které je používají.\n\nZe stejného návrhu Wirecraft generuje úplné programy v jazycích C17, Rust, Go, Kotlin, JavaScript (Node.js) a PHP. Tělo každého procesoru pište v editoru, který nad váš kód připíná vygenerovanou hlavičku funkce, takže vždy vidíte parametry, které generátor předá. S nainstalovaným clang, clangd nebo rust-analyzer získáte doplňování kódu, dokumentaci při najetí myší, sémantické barvy, přechod na definici, hledání odkazů a diagnostiku kompilátoru přiřazenou k entitě a řádku, který jste napsali.\n\nPublikujte části návrhu jako opakovaně použitelné komponenty s typovanými porty a odkazujte na ně z jiných návrhů, připnuté hashem obsahu, aby aktualizace probíhaly vědomě. Začněte novou práci z knihovny archetypů a zkoumejte návrh síťovou analýzou jeho datových, chybových a závislostních toků.\n\nKolem návrhu máte také řízení projektu (tabule Kanban a backlog se stavem, odpovědností a historií revizí), export plánů a dokumentace do PDF, SVG, PNG a Mermaid pro tisk a sdílení a volitelný místní server MCP, přes který mohou kompatibilní agenti AI číst a upravovat návrh pomocí zdokumentovaných nástrojů.\n\nWirecraft otevírá projekty .orch z Threadworks a zachovává jejich data. Účet není potřeba a navrhování funguje offline. Rozhraní aplikace je v angličtině. Wirecraft se aktivně vyvíjí.",
+  "shortDescription": "Navrhujte vizuálně software s datovým tokem a generujte z něj programy v C17, Rust, Go, Kotlin, JavaScript nebo PHP. Upravujte těla procesorů s pomocí jazykových serverů, používejte komponenty opakovaně, exportujte plány a připojte agenty AI přes místní server MCP.",
+  "features": [
+    "Vizuální návrhář datového toku s procesory, typy, typovanými propojeními a kompozity",
+    "Čitelné směrování propojení pod úhlem 45 stupňů pro velké topologie",
+    "Generování programů C17, Rust, Go, Kotlin, JavaScript a PHP z jednoho návrhu",
+    "Editor těl s vygenerovanou hlavičkou funkce připnutou nad kódem",
+    "Doplňování, nápověda při najetí, sémantické barvy a diagnostika s clangd nebo rust-analyzer",
+    "Přechod na definici a hledání odkazů napříč těly procesorů",
+    "Opakovaně použitelné komponenty s typovanými porty, připnuté hashem obsahu",
+    "Knihovna archetypů a síťová analýza datových, chybových a závislostních toků",
+    "Tabule Kanban, backlog, odpovědnost a historie revizí",
+    "Export plánů do PDF, SVG, PNG a Mermaid a místní server MCP pro agenty AI"
+  ],
+  "searchTerms": [
+    "datový tok",
+    "návrh softwaru",
+    "generování kódu",
+    "C17",
+    "Rust",
+    "server MCP",
+    "architektura"
+  ],
+  "captions": [
+    "Navrhněte webový server jako graf procesorů, typů a typovaných propojení.",
+    "Seskupte procesory do kompozitů; směrovaná propojení ukazují každou vyrovnávací paměť.",
+    "Publikujte návrh jako komponentu s typovanými vstupními a výstupními porty.",
+    "Odkažte na komponentu z jiného návrhu; její porty se napojí na vaše propojení.",
+    "Upravujte tělo procesoru pod jeho připnutou, vygenerovanou hlavičkou funkce C17.",
+    "Doplňujte členy zapůjčené knihovny při psaní díky clangd.",
+    "Čtěte dokumentaci při najetí myší v tělech Rust s nainstalovaným rust-analyzer.",
+    "Prohlížejte plány s rohovým razítkem a exportujte je do PDF, SVG, PNG nebo Mermaid.",
+    "Sledujte entity na tabuli Kanban se stavem, odpovědností a řešiteli.",
+    "Nechte agenty AI pracovat přes místní server MCP a jeho protokol přístupů."
+  ],
+  "minimumHardware": [
+    "Grafické ovladače s podporou DirectX 11",
+    "Klávesnice a myš"
+  ],
+  "recommendedHardware": [
+    "Nainstalovaný clang, clangd nebo rust-analyzer pro kontrolu kódu",
+    "Myš se třemi tlačítky pro posouvání plátna"
+  ]
+}

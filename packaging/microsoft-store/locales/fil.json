@@ -1,0 +1,46 @@
+{
+  "language": "Filipino",
+  "description": "Idisenyo ang software bilang isang dataflow graph, at saka buuin ang programa mula rito.\n\nAng Wirecraft ay isang libre at open-source na designer para sa event-driven at dataflow na software. Maglagay ng mga processor, uri ng data at typed na link sa isang canvas, ipangkat ang mga ito sa mga composite, at hayaang panatilihing nababasa ng 45-degree na routing kahit ang malalaking topology. Ang bawat link ay isang typed na buffer, ang bawat processor ay isang function, at ipinahihiram ang mga service library sa mga processor na gumagamit nito.\n\nMula sa iisang disenyo, bumubuo ang Wirecraft ng kumpletong mga programa sa C17, Rust, Go, Kotlin, JavaScript (Node.js) at PHP. Isulat ang body ng bawat processor sa isang editor na nag-pi-pin ng nabuong function header sa itaas ng iyong code, kaya lagi mong nakikita ang mga parameter na ipapasa ng generator. Kapag naka-install ang clang, clangd o rust-analyzer, makakakuha ka ng code completion, dokumentasyon sa pag-hover, semantic na kulay, go-to-definition, paghahanap ng reference at mga diagnostic ng compiler na nakaugnay sa entity at linyang isinulat mo.\n\nI-publish ang mga bahagi ng disenyo bilang mga reusable na component na may typed na port at i-reference ang mga ito mula sa ibang disenyo, naka-pin sa pamamagitan ng content hash para sinasadya ang mga update. Magsimula ng bagong gawain mula sa isang library ng mga archetype, at suriin ang disenyo gamit ang network analysis ng daloy ng data, error at dependency nito.\n\nBukod sa disenyo, mayroon ka ring project management (Kanban board at backlog na may status, responsibilidad at kasaysayan ng rebisyon), pag-export ng mga plano at dokumentasyon sa PDF, SVG, PNG at Mermaid para sa pag-print at pagbabahagi, at isang opsyonal na lokal na MCP server para mabasa at ma-edit ng mga compatible na AI agent ang disenyo gamit ang mga dokumentadong tool.\n\nBinubuksan ng Wirecraft ang mga .orch project ng Threadworks at pinapanatili ang kanilang data. Hindi kailangan ng account at gumagana offline ang pagdidisenyo. Nasa English ang interface ng app. Aktibong dinedebelop ang Wirecraft.",
+  "shortDescription": "Idisenyo nang biswal ang dataflow na software at bumuo ng mga programa sa C17, Rust, Go, Kotlin, JavaScript o PHP. I-edit ang mga processor body sa tulong ng mga language server, gamitin muli ang mga component, mag-export ng mga plano at ikonekta ang mga AI agent sa lokal na MCP server.",
+  "features": [
+    "Biswal na dataflow designer na may mga processor, uri, typed na link at composite",
+    "Nababasang 45-degree na routing ng link para sa malalaking topology",
+    "Bumuo ng mga programang C17, Rust, Go, Kotlin, JavaScript at PHP mula sa isang disenyo",
+    "Body editor na may nabuong function header na naka-pin sa itaas ng code",
+    "Completion, hover, semantic na kulay at diagnostic gamit ang clangd o rust-analyzer",
+    "Go-to-definition at paghahanap ng reference sa mga processor body",
+    "Reusable na component na may typed na port, naka-pin sa content hash",
+    "Library ng archetype at network analysis ng daloy ng data, error at dependency",
+    "Kanban board, backlog, responsibilidad at kasaysayan ng rebisyon",
+    "Pag-export ng plano sa PDF, SVG, PNG at Mermaid at lokal na MCP server para sa AI agent"
+  ],
+  "searchTerms": [
+    "dataflow",
+    "disenyo ng software",
+    "code generation",
+    "C17",
+    "Rust",
+    "MCP server",
+    "arkitektura"
+  ],
+  "captions": [
+    "Idisenyo ang isang web server bilang dataflow graph ng mga processor, uri at link.",
+    "Ipangkat ang mga processor sa composite; ipinapakita ng mga link ang bawat buffer.",
+    "I-publish ang disenyo bilang reusable na component na may typed na input at output port.",
+    "I-reference ang component mula sa ibang disenyo; kumokonekta ang mga port nito sa iyong link.",
+    "I-edit ang processor body sa ilalim ng naka-pin na nabuong C17 function header.",
+    "Kumpletuhin ang mga member ng hiniram na library habang nagta-type, gamit ang clangd.",
+    "Basahin ang dokumentasyon sa pag-hover sa mga Rust body kapag may rust-analyzer.",
+    "I-preview ang mga plano na may title block at i-export sa PDF, SVG, PNG o Mermaid.",
+    "Subaybayan ang mga entity sa Kanban board na may status, responsibilidad at assignee.",
+    "Hayaang gumana ang mga AI agent sa lokal na MCP server at sa access log nito."
+  ],
+  "minimumHardware": [
+    "Mga graphics driver na sumusuporta sa DirectX 11",
+    "Keyboard at mouse"
+  ],
+  "recommendedHardware": [
+    "Naka-install na clang, clangd o rust-analyzer para sa code check",
+    "Mouse na may tatlong button para igalaw ang canvas"
+  ]
+}

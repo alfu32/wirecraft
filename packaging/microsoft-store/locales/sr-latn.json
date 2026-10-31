@@ -1,0 +1,46 @@
+{
+  "language": "Srpski (latinica)",
+  "description": "Dizajnirajte softver kao graf toka podataka, a zatim iz njega generišite program.\n\nWirecraft je besplatan dizajner otvorenog koda za softver zasnovan na događajima i toku podataka. Postavite procesore, tipove podataka i tipizovane veze na platno, grupišite ih u kompozite i prepustite usmeravanju pod uglom od 45 stepeni da održi čitljivost i velikih topologija. Svaka veza je tipizovani bafer, svaki procesor funkcija, a biblioteke usluga se pozajmljuju procesorima koji ih koriste.\n\nIz istog dizajna Wirecraft generiše kompletne programe u jezicima C17, Rust, Go, Kotlin, JavaScript (Node.js) i PHP. Telo svakog procesora pišete u uređivaču koji iznad vašeg koda kači generisano zaglavlje funkcije, pa uvek vidite parametre koje će generator proslediti. Uz instalirani clang, clangd ili rust-analyzer dobijate dovršavanje koda, dokumentaciju pri prelasku mišem, semantičke boje, odlazak na definiciju, pretragu referenci i dijagnostiku kompajlera povezanu sa entitetom i redom koji ste napisali.\n\nObjavite delove dizajna kao komponente za višekratnu upotrebu sa tipizovanim portovima i referencirajte ih iz drugih dizajna, zakačene hešom sadržaja kako bi ažuriranja bila namerna. Započnite novi rad iz biblioteke arhetipova i ispitajte dizajn mrežnom analizom njegovih tokova podataka, grešaka i zavisnosti.\n\nOko dizajna dobijate i upravljanje projektom (Kanban tabla i backlog sa statusom, odgovornošću i istorijom revizija), izvoz planova i dokumentacije u PDF, SVG, PNG i Mermaid za štampu i deljenje, kao i opcioni lokalni MCP server preko kog kompatibilni AI agenti mogu da čitaju i uređuju dizajn dokumentovanim alatima.\n\nWirecraft otvara Threadworks .orch projekte i čuva njihove podatke. Nalog nije potreban, a dizajniranje radi bez mreže. Interfejs aplikacije je na engleskom jeziku. Wirecraft se aktivno razvija.",
+  "shortDescription": "Vizuelno dizajnirajte softver sa tokom podataka i generišite programe u C17, Rust, Go, Kotlin, JavaScript ili PHP. Uređujte tela procesora uz pomoć jezičkih servera, ponovo koristite komponente, izvozite planove i povežite AI agente preko lokalnog MCP servera.",
+  "features": [
+    "Vizuelni dizajner toka podataka sa procesorima, tipovima, tipizovanim vezama i kompozitima",
+    "Čitljivo usmeravanje veza pod uglom od 45 stepeni za velike topologije",
+    "Generišite C17, Rust, Go, Kotlin, JavaScript i PHP programe iz jednog dizajna",
+    "Uređivač tela sa generisanim zaglavljem funkcije zakačenim iznad koda",
+    "Dovršavanje, saveti, semantičke boje i dijagnostika uz clangd ili rust-analyzer",
+    "Odlazak na definiciju i pretraga referenci kroz tela procesora",
+    "Komponente za višekratnu upotrebu sa tipizovanim portovima, zakačene hešom sadržaja",
+    "Biblioteka arhetipova i mrežna analiza tokova podataka, grešaka i zavisnosti",
+    "Kanban tabla, backlog, odgovornost i istorija revizija",
+    "Izvoz planova u PDF, SVG, PNG i Mermaid i lokalni MCP server za AI agente"
+  ],
+  "searchTerms": [
+    "tok podataka",
+    "dizajn softvera",
+    "generisanje koda",
+    "C17",
+    "Rust",
+    "MCP server",
+    "arhitektura"
+  ],
+  "captions": [
+    "Dizajnirajte veb server kao graf procesora, tipova i tipizovanih veza.",
+    "Grupišite procesore u kompozite; usmerene veze prikazuju svaki tipizovani bafer.",
+    "Objavite dizajn kao komponentu sa tipizovanim ulaznim i izlaznim portovima.",
+    "Referencirajte komponentu iz drugog dizajna; njeni portovi se spajaju sa vašim vezama.",
+    "Uređujte telo procesora ispod zakačenog, generisanog zaglavlja C17 funkcije.",
+    "Dovršavajte članove pozajmljene biblioteke dok kucate, uz clangd.",
+    "Čitajte dokumentaciju pri prelasku mišem u Rust telima uz instalirani rust-analyzer.",
+    "Pregledajte planove sa zaglavljem crteža i izvezite ih u PDF, SVG, PNG ili Mermaid.",
+    "Pratite entitete na Kanban tabli sa statusom, odgovornošću i izvršiocima.",
+    "Pustite AI agente da rade preko lokalnog MCP servera i njegovog dnevnika pristupa."
+  ],
+  "minimumHardware": [
+    "Grafički drajveri sa podrškom za DirectX 11",
+    "Tastatura i miš"
+  ],
+  "recommendedHardware": [
+    "Instaliran clang, clangd ili rust-analyzer za proveru koda",
+    "Miš sa tri tastera za pomeranje platna"
+  ]
+}

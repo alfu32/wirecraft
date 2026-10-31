@@ -1,0 +1,46 @@
+{
+  "language": "Eesti",
+  "description": "Kujundage tarkvara andmevoo graafina ja looge sellest programm.\n\nWirecraft on tasuta avatud lähtekoodiga kujundaja sündmuspõhise ja andmevoopõhise tarkvara jaoks. Paigutage lõuendile protsessorid, andmetüübid ja tüübitud ühendused, rühmitage need liitüksusteks ning laske 45-kraadisel marsruutimisel hoida ka suured topoloogiad loetavana. Iga ühendus on tüübitud puhver, iga protsessor funktsioon ning teenusteekid laenatakse neid kasutavatele protsessoritele.\n\nSamast kujundusest loob Wirecraft terviklikud programmid keeltes C17, Rust, Go, Kotlin, JavaScript (Node.js) ja PHP. Kirjutage iga protsessori keha redaktoris, mis kinnitab loodud funktsiooni päise teie koodi kohale, nii et näete alati parameetreid, mille generaator edastab. Kui clang, clangd või rust-analyzer on paigaldatud, saate koodi lõpetamise, dokumentatsiooni kursori all, semantilised värvid, definitsioonile liikumise, viidete otsingu ja kompilaatori diagnostika, mis seotakse teie kirjutatud olemi ja reaga.\n\nAvaldage kujunduse osi korduvkasutatavate tüübitud portidega komponentidena ja viidake neile teistest kujundustest, sisuräsiga lukustatult, et uuendused oleksid teadlikud. Alustage uut tööd arhetüüpide teegist ja uurige kujundust selle andme-, vea- ja sõltuvusvoogude võrguanalüüsiga.\n\nKujunduse ümber saate ka projektijuhtimise (Kanbani tahvel ja ootejärjekord oleku, vastutuse ja redaktsiooniajalooga), plaanide ja dokumentatsiooni ekspordi PDF-, SVG-, PNG- ja Mermaid-vormingusse printimiseks ja jagamiseks ning valikulise kohaliku MCP-serveri, mille kaudu ühilduvad tehisintellekti agendid saavad dokumenteeritud tööriistadega kujundust lugeda ja muuta.\n\nWirecraft avab Threadworksi .orch-projekte ja säilitab nende andmed. Kontot pole vaja ning kujundamine töötab võrguühenduseta. Rakenduse liides on inglise keeles. Wirecrafti arendatakse aktiivselt.",
+  "shortDescription": "Kujundage andmevootarkvara visuaalselt ja looge sellest programme keeltes C17, Rust, Go, Kotlin, JavaScript või PHP. Muutke protsessorite kehasid keeleserverite abiga, taaskasutage komponente, eksportige plaane ja ühendage tehisintellekti agente kohaliku MCP-serveri kaudu.",
+  "features": [
+    "Visuaalne andmevoo kujundaja protsessorite, tüüpide, tüübitud ühenduste ja liitüksustega",
+    "Loetav 45-kraadine ühenduste marsruutimine suurtes topoloogiates",
+    "Looge ühest kujundusest C17-, Rust-, Go-, Kotlin-, JavaScript- ja PHP-programme",
+    "Keharedaktor, kus loodud funktsiooni päis on koodi kohale kinnitatud",
+    "Lõpetamine, kursorivihjed, semantilised värvid ja diagnostika clangdi või rust-analyzeriga",
+    "Definitsioonile liikumine ja viidete otsing protsessorite kehades",
+    "Korduvkasutatavad komponendid tüübitud portidega, sisuräsiga lukustatud",
+    "Arhetüüpide teek ning andme-, vea- ja sõltuvusvoogude võrguanalüüs",
+    "Kanbani tahvel, ootejärjekord, vastutus ja redaktsiooniajalugu",
+    "Plaanide eksport PDF-, SVG-, PNG- ja Mermaid-vormingusse ning kohalik MCP-server"
+  ],
+  "searchTerms": [
+    "andmevoog",
+    "tarkvara disain",
+    "koodi genereerimine",
+    "C17",
+    "Rust",
+    "MCP-server",
+    "arhitektuur"
+  ],
+  "captions": [
+    "Kujundage veebiserver andmevoo graafina protsessoritest, tüüpidest ja ühendustest.",
+    "Rühmitage protsessorid liitüksusteks; marsruuditud ühendused näitavad iga puhvrit.",
+    "Avaldage kujundus korduvkasutatava komponendina tüübitud sisend- ja väljundportidega.",
+    "Viidake komponendile teisest kujundusest; selle pordid liituvad teie ühendustega.",
+    "Muutke protsessori keha selle kinnitatud, loodud C17-funktsioonipäise all.",
+    "Lõpetage laenatud teegi liikmed trükkimise ajal clangdi abil.",
+    "Lugege Rusti kehades kursori all dokumentatsiooni, kui rust-analyzer on paigaldatud.",
+    "Vaadake plaane koos nurgatempliga ja eksportige need PDF-, SVG-, PNG- või Mermaid-vormingusse.",
+    "Jälgige olemeid Kanbani tahvlil oleku, vastutuse ja täitjatega.",
+    "Laske tehisintellekti agentidel töötada kohaliku MCP-serveri ja selle pääsulogi kaudu."
+  ],
+  "minimumHardware": [
+    "DirectX 11 toega graafikadraiverid",
+    "Klaviatuur ja hiir"
+  ],
+  "recommendedHardware": [
+    "Koodikontrolliks paigaldatud clang, clangd või rust-analyzer",
+    "Kolme nupuga hiir lõuendi liigutamiseks"
+  ]
+}

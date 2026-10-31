@@ -1,0 +1,46 @@
+{
+  "language": "Polski",
+  "description": "Projektuj oprogramowanie jako graf przepływu danych, a potem generuj z niego program.\n\nWirecraft to bezpłatny projektant open source dla oprogramowania sterowanego zdarzeniami i opartego na przepływie danych. Umieszczaj procesory, typy danych i typowane połączenia na kanwie, grupuj je w kompozyty i pozwól, by trasowanie pod kątem 45 stopni utrzymywało czytelność dużych topologii. Każde połączenie to typowany bufor, każdy procesor to funkcja, a biblioteki usług są udostępniane procesorom, które z nich korzystają.\n\nZ tego samego projektu Wirecraft generuje kompletne programy w językach C17, Rust, Go, Kotlin, JavaScript (Node.js) i PHP. Pisz treść każdego procesora w edytorze, który przypina wygenerowany nagłówek funkcji nad Twoim kodem, więc zawsze widzisz parametry przekazywane przez generator. Po zainstalowaniu clang, clangd lub rust-analyzer otrzymujesz uzupełnianie kodu, dokumentację po najechaniu, kolory semantyczne, przejście do definicji, wyszukiwanie odwołań i diagnostykę kompilatora powiązaną z encją i wierszem, które napisałeś.\n\nPublikuj części projektu jako komponenty wielokrotnego użytku z typowanymi portami i odwołuj się do nich z innych projektów, z przypięciem przez skrót zawartości, aby aktualizacje były świadome. Rozpoczynaj nową pracę od biblioteki archetypów i badaj projekt dzięki analizie sieciowej przepływów danych, błędów i zależności.\n\nWokół projektu masz też zarządzanie projektem (tablica Kanban i backlog ze statusem, odpowiedzialnością i historią rewizji), eksport planów i dokumentacji do PDF, SVG, PNG i Mermaid do drukowania i udostępniania oraz opcjonalny lokalny serwer MCP, przez który zgodni agenci AI mogą czytać i edytować projekt za pomocą udokumentowanych narzędzi.\n\nWirecraft otwiera projekty .orch z Threadworks i zachowuje ich dane. Konto nie jest wymagane, a projektowanie działa offline. Interfejs aplikacji jest w języku angielskim. Wirecraft jest aktywnie rozwijany.",
+  "shortDescription": "Projektuj wizualnie oprogramowanie oparte na przepływie danych i generuj programy w C17, Rust, Go, Kotlin, JavaScript lub PHP. Edytuj treść procesorów z pomocą serwerów językowych, używaj ponownie komponentów, eksportuj plany i łącz agentów AI przez lokalny serwer MCP.",
+  "features": [
+    "Wizualny projektant przepływu danych z procesorami, typami, typowanymi połączeniami i kompozytami",
+    "Czytelne trasowanie połączeń pod kątem 45 stopni w dużych topologiach",
+    "Generowanie programów C17, Rust, Go, Kotlin, JavaScript i PHP z jednego projektu",
+    "Edytor treści z wygenerowanym nagłówkiem funkcji przypiętym nad kodem",
+    "Uzupełnianie, podpowiedzi, kolory semantyczne i diagnostyka z clangd lub rust-analyzer",
+    "Przejście do definicji i wyszukiwanie odwołań w treściach procesorów",
+    "Komponenty wielokrotnego użytku z typowanymi portami, przypięte skrótem zawartości",
+    "Biblioteka archetypów i analiza sieciowa przepływów danych, błędów i zależności",
+    "Tablica Kanban, backlog, odpowiedzialność i historia rewizji",
+    "Eksport planów do PDF, SVG, PNG i Mermaid oraz lokalny serwer MCP dla agentów AI"
+  ],
+  "searchTerms": [
+    "przepływ danych",
+    "projektowanie",
+    "generowanie kodu",
+    "C17",
+    "Rust",
+    "serwer MCP",
+    "architektura"
+  ],
+  "captions": [
+    "Zaprojektuj serwer WWW jako graf procesorów, typów i typowanych połączeń.",
+    "Grupuj procesory w kompozyty; trasowane połączenia pokazują każdy typowany bufor.",
+    "Opublikuj projekt jako komponent z typowanymi portami wejściowymi i wyjściowymi.",
+    "Odwołaj się do komponentu z innego projektu; jego porty łączą się z Twoimi połączeniami.",
+    "Edytuj treść procesora pod przypiętym, wygenerowanym nagłówkiem funkcji C17.",
+    "Uzupełniaj członków udostępnionej biblioteki podczas pisania dzięki clangd.",
+    "Czytaj dokumentację po najechaniu w treściach Rust z zainstalowanym rust-analyzer.",
+    "Podglądaj plany z tabliczką rysunkową i eksportuj je do PDF, SVG, PNG lub Mermaid.",
+    "Śledź encje na tablicy Kanban ze statusem, odpowiedzialnością i przypisanymi osobami.",
+    "Pozwól agentom AI pracować przez lokalny serwer MCP i jego dziennik dostępu."
+  ],
+  "minimumHardware": [
+    "Sterowniki graficzne obsługujące DirectX 11",
+    "Klawiatura i mysz"
+  ],
+  "recommendedHardware": [
+    "Zainstalowany clang, clangd lub rust-analyzer do sprawdzania kodu",
+    "Mysz z trzema przyciskami do przesuwania kanwy"
+  ]
+}

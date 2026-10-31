@@ -1,0 +1,46 @@
+{
+  "language": "Português",
+  "description": "Projete software como um grafo de fluxo de dados e gere o programa a partir dele.\n\nO Wirecraft é um projetista gratuito e de código aberto para software orientado a eventos e a fluxo de dados. Coloque processadores, tipos de dados e ligações tipadas numa tela, agrupe-os em compostos e deixe o encaminhamento a 45 graus manter legíveis as topologias grandes. Cada ligação é um buffer tipado, cada processador uma função, e as bibliotecas de serviço são emprestadas aos processadores que as usam.\n\nA partir do mesmo projeto, o Wirecraft gera programas completos em C17, Rust, Go, Kotlin, JavaScript (Node.js) e PHP. Escreva o corpo de cada processador num editor que fixa o cabeçalho de função gerado acima do seu código, para ver sempre os parâmetros que o gerador vai passar. Com clang, clangd ou rust-analyzer instalados, obtém preenchimento automático, documentação ao passar o ponteiro, cores semânticas, ir para a definição, localizar referências e diagnósticos do compilador associados à entidade e à linha que escreveu.\n\nPublique partes de um projeto como componentes reutilizáveis com portas tipadas e referencie-os a partir de outros projetos, fixados por hash de conteúdo para que as atualizações sejam deliberadas. Comece novos trabalhos a partir de uma biblioteca de arquétipos e examine um projeto com a análise de rede dos seus fluxos de dados, erros e dependências.\n\nEm torno do projeto tem também gestão de projetos (quadro Kanban e backlog com estado, responsabilidade e histórico de revisões), exportação de plantas e documentação para PDF, SVG, PNG e Mermaid para imprimir e partilhar, e um servidor MCP local opcional para que agentes de IA compatíveis leiam e editem o projeto através de ferramentas documentadas.\n\nO Wirecraft abre projetos .orch do Threadworks e preserva os seus dados. Não é necessária conta e o projeto funciona offline. A interface da aplicação está em inglês. O Wirecraft está em desenvolvimento ativo.",
+  "shortDescription": "Projete visualmente software de fluxo de dados e gere programas em C17, Rust, Go, Kotlin, JavaScript ou PHP. Edite corpos de processadores com ajuda de servidores de linguagem, reutilize componentes, exporte plantas e ligue agentes de IA através de um servidor MCP local.",
+  "features": [
+    "Projetista visual de fluxo de dados com processadores, tipos, ligações tipadas e compostos",
+    "Encaminhamento legível de ligações a 45 graus para grandes topologias",
+    "Gere programas C17, Rust, Go, Kotlin, JavaScript e PHP a partir de um projeto",
+    "Editor de corpos com o cabeçalho de função gerado fixado acima do código",
+    "Preenchimento, informação ao passar, cores semânticas e diagnósticos com clangd ou rust-analyzer",
+    "Ir para a definição e localizar referências entre corpos de processadores",
+    "Componentes reutilizáveis com portas tipadas, fixados por hash de conteúdo",
+    "Biblioteca de arquétipos e análise de rede de fluxos de dados, erros e dependências",
+    "Quadro Kanban, backlog, responsabilidade e histórico de revisões",
+    "Exportação de plantas para PDF, SVG, PNG e Mermaid e servidor MCP local para agentes de IA"
+  ],
+  "searchTerms": [
+    "fluxo de dados",
+    "projeto de software",
+    "geração de código",
+    "C17",
+    "Rust",
+    "servidor MCP",
+    "arquitetura"
+  ],
+  "captions": [
+    "Projete um servidor web como grafo de processadores, tipos e ligações tipadas.",
+    "Agrupe processadores em compostos; as ligações encaminhadas mostram cada buffer tipado.",
+    "Publique um projeto como componente reutilizável com portas tipadas de entrada e saída.",
+    "Referencie um componente a partir de outro projeto; as suas portas juntam-se às ligações.",
+    "Edite o corpo de um processador sob o seu cabeçalho de função C17 gerado e fixado.",
+    "Complete os membros de uma biblioteca emprestada enquanto escreve, com o clangd.",
+    "Leia documentação ao passar o ponteiro em corpos Rust, com o rust-analyzer instalado.",
+    "Pré-visualize plantas com legenda e exporte-as para PDF, SVG, PNG ou Mermaid.",
+    "Acompanhe entidades num quadro Kanban com estado, responsabilidade e responsáveis.",
+    "Deixe agentes de IA trabalhar através do servidor MCP local e do seu registo de acessos."
+  ],
+  "minimumHardware": [
+    "Controladores gráficos compatíveis com DirectX 11",
+    "Teclado e rato"
+  ],
+  "recommendedHardware": [
+    "clang, clangd ou rust-analyzer instalados para verificações de código",
+    "Um rato de três botões para deslocar a tela"
+  ]
+}

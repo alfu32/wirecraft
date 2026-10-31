@@ -1,0 +1,46 @@
+{
+  "language": "Nederlands",
+  "description": "Ontwerp software als een dataflowgraaf en genereer het programma daaruit.\n\nWirecraft is een gratis opensource-ontwerper voor gebeurtenisgestuurde en dataflowsoftware. Plaats processors, datatypen en getypeerde koppelingen op een canvas, groepeer ze in composieten en laat routering onder 45 graden grote topologieën leesbaar houden. Elke koppeling is een getypeerde buffer, elke processor een functie, en servicebibliotheken worden uitgeleend aan de processors die ze gebruiken.\n\nUit hetzelfde ontwerp genereert Wirecraft complete programma's in C17, Rust, Go, Kotlin, JavaScript (Node.js) en PHP. Schrijf de body van elke processor in een editor die de gegenereerde functiekop boven je code vastzet, zodat je altijd de parameters ziet die de generator doorgeeft. Met clang, clangd of rust-analyzer geïnstalleerd krijg je aanvulling, documentatie bij aanwijzen, semantische kleuren, ga naar definitie, verwijzingen zoeken en compilerdiagnoses die verwijzen naar de entiteit en regel die je schreef.\n\nPubliceer delen van een ontwerp als herbruikbare componenten met getypeerde poorten en verwijs ernaar vanuit andere ontwerpen, vastgezet met een inhoudshash zodat updates bewust gebeuren. Begin nieuw werk vanuit een bibliotheek met archetypen en onderzoek een ontwerp met netwerkanalyse van zijn data-, fout- en afhankelijkheidsstromen.\n\nRond het ontwerp krijg je ook projectbeheer (Kanban-bord en backlog met status, verantwoordelijkheid en revisiegeschiedenis), export van plannen en documentatie naar PDF, SVG, PNG en Mermaid om af te drukken en te delen, en een optionele lokale MCP-server waarmee compatibele AI-agents het ontwerp kunnen lezen en bewerken via gedocumenteerde tools.\n\nWirecraft opent Threadworks .orch-projecten en bewaart hun gegevens. Er is geen account nodig en ontwerpen werkt offline. De interface van de app is in het Engels. Wirecraft wordt actief ontwikkeld.",
+  "shortDescription": "Ontwerp dataflowsoftware visueel en genereer er programma's in C17, Rust, Go, Kotlin, JavaScript of PHP uit. Bewerk processorbodies met hulp van taalservers, hergebruik componenten, exporteer plannen en verbind AI-agents via een lokale MCP-server.",
+  "features": [
+    "Visuele dataflowontwerper met processors, typen, getypeerde koppelingen en composieten",
+    "Leesbare koppelingsroutering onder 45 graden voor grote topologieën",
+    "Genereer C17-, Rust-, Go-, Kotlin-, JavaScript- en PHP-programma's uit één ontwerp",
+    "Body-editor met de gegenereerde functiekop vastgezet boven je code",
+    "Aanvulling, hover, semantische kleuren en diagnoses met clangd of rust-analyzer",
+    "Ga naar definitie en zoek verwijzingen over processorbodies heen",
+    "Herbruikbare componenten met getypeerde poorten, vastgezet met een inhoudshash",
+    "Archetypenbibliotheek en netwerkanalyse van data-, fout- en afhankelijkheidsstromen",
+    "Kanban-bord, backlog, verantwoordelijkheid en revisiegeschiedenis",
+    "Planexport naar PDF, SVG, PNG en Mermaid en een lokale MCP-server voor AI-agents"
+  ],
+  "searchTerms": [
+    "dataflow",
+    "softwareontwerp",
+    "codegeneratie",
+    "C17",
+    "Rust",
+    "MCP-server",
+    "architectuur"
+  ],
+  "captions": [
+    "Ontwerp een webserver als dataflowgraaf van processors, typen en getypeerde koppelingen.",
+    "Groepeer processors in composieten; gerouteerde koppelingen tonen elke getypeerde buffer.",
+    "Publiceer een ontwerp als herbruikbare component met getypeerde in- en uitvoerpoorten.",
+    "Verwijs naar een component vanuit een ander ontwerp; de poorten sluiten aan op je koppelingen.",
+    "Bewerk een processorbody onder de vastgezette, gegenereerde C17-functiekop.",
+    "Vul tijdens het typen de leden van een uitgeleende bibliotheek aan met clangd.",
+    "Lees hoverdocumentatie in Rust-bodies wanneer rust-analyzer is geïnstalleerd.",
+    "Bekijk plannen met titelblok en exporteer ze naar PDF, SVG, PNG of Mermaid.",
+    "Volg entiteiten op een Kanban-bord met status, verantwoordelijkheid en toegewezenen.",
+    "Laat AI-agents werken via de lokale MCP-server en zijn toegangslogboek."
+  ],
+  "minimumHardware": [
+    "Grafische stuurprogramma's met DirectX 11-ondersteuning",
+    "Toetsenbord en muis"
+  ],
+  "recommendedHardware": [
+    "clang, clangd of rust-analyzer geïnstalleerd voor codecontroles",
+    "Een muis met drie knoppen om het canvas te verschuiven"
+  ]
+}

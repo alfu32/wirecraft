@@ -1,0 +1,46 @@
+{
+  "language": "Tiếng Việt",
+  "description": "Thiết kế phần mềm dưới dạng đồ thị luồng dữ liệu, rồi tạo chương trình từ đó.\n\nWirecraft là công cụ thiết kế miễn phí, mã nguồn mở dành cho phần mềm hướng sự kiện và luồng dữ liệu. Đặt bộ xử lý, kiểu dữ liệu và liên kết có kiểu lên khung vẽ, gom chúng thành các khối tổng hợp, và để định tuyến 45 độ giữ cho cả những cấu trúc lớn vẫn dễ đọc. Mỗi liên kết là một bộ đệm có kiểu, mỗi bộ xử lý là một hàm, và các thư viện dịch vụ được cho các bộ xử lý sử dụng chúng mượn.\n\nTừ cùng một bản thiết kế, Wirecraft tạo ra chương trình hoàn chỉnh bằng C17, Rust, Go, Kotlin, JavaScript (Node.js) và PHP. Viết thân của từng bộ xử lý trong trình soạn thảo ghim tiêu đề hàm được tạo phía trên mã của bạn, để bạn luôn thấy các tham số mà trình tạo sẽ truyền vào. Khi cài clang, clangd hoặc rust-analyzer, bạn có tự động hoàn thành, tài liệu khi di chuột, tô màu ngữ nghĩa, đi tới định nghĩa, tìm tham chiếu và chẩn đoán trình biên dịch gắn với thực thể và dòng bạn đã viết.\n\nXuất bản các phần của bản thiết kế thành thành phần tái sử dụng với cổng có kiểu và tham chiếu chúng từ các bản thiết kế khác, được ghim bằng mã băm nội dung để việc cập nhật là có chủ đích. Bắt đầu công việc mới từ thư viện nguyên mẫu và kiểm tra bản thiết kế bằng phân tích mạng các luồng dữ liệu, lỗi và phụ thuộc.\n\nXung quanh bản thiết kế, bạn còn có quản lý dự án (bảng Kanban và danh sách tồn đọng với trạng thái, người phụ trách và lịch sử sửa đổi), xuất bản vẽ và tài liệu sang PDF, SVG, PNG và Mermaid để in và chia sẻ, cùng máy chủ MCP cục bộ tùy chọn để các tác tử AI tương thích đọc và chỉnh sửa bản thiết kế bằng các công cụ có tài liệu.\n\nWirecraft mở các dự án .orch của Threadworks và giữ nguyên dữ liệu của chúng. Không cần tài khoản và công việc thiết kế hoạt động ngoại tuyến. Giao diện ứng dụng bằng tiếng Anh. Wirecraft đang được phát triển tích cực.",
+  "shortDescription": "Thiết kế trực quan phần mềm luồng dữ liệu và tạo chương trình C17, Rust, Go, Kotlin, JavaScript hoặc PHP từ đó. Chỉnh sửa thân bộ xử lý với sự trợ giúp của máy chủ ngôn ngữ, tái sử dụng thành phần, xuất bản vẽ và kết nối tác tử AI qua máy chủ MCP cục bộ.",
+  "features": [
+    "Trình thiết kế luồng dữ liệu trực quan với bộ xử lý, kiểu, liên kết có kiểu và khối tổng hợp",
+    "Định tuyến liên kết 45 độ dễ đọc cho các cấu trúc lớn",
+    "Tạo chương trình C17, Rust, Go, Kotlin, JavaScript và PHP từ một bản thiết kế",
+    "Trình soạn thân với tiêu đề hàm được tạo ghim phía trên mã",
+    "Hoàn thành, di chuột, tô màu ngữ nghĩa và chẩn đoán với clangd hoặc rust-analyzer",
+    "Đi tới định nghĩa và tìm tham chiếu giữa các thân bộ xử lý",
+    "Thành phần tái sử dụng với cổng có kiểu, ghim bằng mã băm nội dung",
+    "Thư viện nguyên mẫu và phân tích mạng các luồng dữ liệu, lỗi và phụ thuộc",
+    "Bảng Kanban, danh sách tồn đọng, người phụ trách và lịch sử sửa đổi",
+    "Xuất bản vẽ sang PDF, SVG, PNG và Mermaid, và máy chủ MCP cục bộ cho tác tử AI"
+  ],
+  "searchTerms": [
+    "luồng dữ liệu",
+    "thiết kế phần mềm",
+    "sinh mã",
+    "C17",
+    "Rust",
+    "máy chủ MCP",
+    "kiến trúc"
+  ],
+  "captions": [
+    "Thiết kế máy chủ web như đồ thị luồng dữ liệu gồm bộ xử lý, kiểu và liên kết.",
+    "Gom bộ xử lý thành khối tổng hợp; liên kết được định tuyến hiện từng bộ đệm.",
+    "Xuất bản bản thiết kế thành thành phần có cổng vào và ra có kiểu.",
+    "Tham chiếu một thành phần từ bản thiết kế khác; các cổng của nó nối vào liên kết.",
+    "Chỉnh sửa thân bộ xử lý dưới tiêu đề hàm C17 được tạo và ghim.",
+    "Hoàn thành thành viên của thư viện được mượn khi gõ, nhờ clangd.",
+    "Đọc tài liệu khi di chuột trong thân Rust khi đã cài rust-analyzer.",
+    "Xem trước bản vẽ có khung tên và xuất sang PDF, SVG, PNG hoặc Mermaid.",
+    "Theo dõi thực thể trên bảng Kanban với trạng thái, người phụ trách và người thực hiện.",
+    "Để tác tử AI làm việc qua máy chủ MCP cục bộ và nhật ký truy cập của nó."
+  ],
+  "minimumHardware": [
+    "Trình điều khiển đồ họa hỗ trợ DirectX 11",
+    "Bàn phím và chuột"
+  ],
+  "recommendedHardware": [
+    "Cài clang, clangd hoặc rust-analyzer để kiểm tra mã",
+    "Chuột ba nút để di chuyển khung vẽ"
+  ]
+}

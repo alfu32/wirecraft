@@ -1,0 +1,372 @@
+{
+  "01-designer-topology": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/01-designer-topology.png",
+    "project": "webserver-rust.orch",
+    "scene": "01-designer-topology",
+    "sha256": "94d3a0344dbb9c2225837eeae43985510b63446daf96b5a48aee0f69bee5e0fe",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        745,
+        148
+      ],
+      [
+        "wait",
+        3
+      ]
+    ],
+    "ui": {
+      "selected_ids": [
+        "node_afca91af-9db7-4648-894e-948214e6b2d8"
+      ],
+      "tab": "Designer"
+    }
+  },
+  "02-designer-routing": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/02-designer-routing.png",
+    "project": "webserver-rust.orch",
+    "scene": "02-designer-routing",
+    "sha256": "b3a040a30b7c560d03ca399f591d609168187dc523faf14f3f5e77aa1be67df2",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        745,
+        148
+      ],
+      [
+        "wait",
+        3
+      ],
+      [
+        "wheel",
+        640,
+        330,
+        2
+      ],
+      [
+        "wait",
+        3
+      ]
+    ],
+    "ui": {
+      "selected_ids": [
+        "node_10886e3b-8eac-4654-92e5-8461794ca831"
+      ],
+      "tab": "Designer"
+    }
+  },
+  "03-component-ports": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/03-component-ports.png",
+    "project": "webserver-component.orch",
+    "scene": "03-component-ports",
+    "sha256": "99ef08262f56b1e358f783eb5cd909f5bff8f1b292e00ebaf20574e6ba1a7b46",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        745,
+        148
+      ],
+      [
+        "wait",
+        3
+      ]
+    ],
+    "ui": {
+      "tab": "Designer"
+    }
+  },
+  "04-component-reference": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/04-component-reference.png",
+    "project": "webserver.orch",
+    "scene": "04-component-reference",
+    "sha256": "34e4b7acc2571d621bd597700610b7e4397eaf5372d82ab435f64bc1ae4084de",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        745,
+        148
+      ],
+      [
+        "wait",
+        3
+      ]
+    ],
+    "ui": {
+      "tab": "Designer"
+    }
+  },
+  "05-editor-generated-header": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/05-editor-generated-header.png",
+    "project": "webserver-component.orch",
+    "scene": "05-editor-generated-header",
+    "sha256": "1c9e6810c20946e56fb9695ce0d1516ee54c4d55afa57cabed2896efd86a6a03",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "wait",
+        6
+      ]
+    ],
+    "ui": {
+      "section": "source",
+      "selected_ids": [
+        "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3"
+      ],
+      "tab": "Editor"
+    }
+  },
+  "06-editor-completion": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/06-editor-completion.png",
+    "project": "webserver-component.orch",
+    "scene": "06-editor-completion",
+    "sha256": "fc9b176c77f41f32a58b1e833793d20ebe7ff0167414530a5effd6be8d6b1b35",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "wait",
+        6
+      ],
+      [
+        "click",
+        700,
+        500
+      ],
+      [
+        "key",
+        "End"
+      ],
+      [
+        "key",
+        "Return"
+      ],
+      [
+        "type",
+        "item.response.body = libhttp->"
+      ],
+      [
+        "wait",
+        1
+      ],
+      [
+        "key",
+        "ctrl+space"
+      ],
+      [
+        "wait",
+        8
+      ]
+    ],
+    "ui": {
+      "section": "source",
+      "selected_ids": [
+        "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3"
+      ],
+      "tab": "Editor"
+    }
+  },
+  "07-editor-hover": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/07-editor-hover.png",
+    "project": "webserver-rust.orch",
+    "scene": "07-editor-hover",
+    "sha256": "d2c549427a7f75f59849e227b43b0f1b1d139ac7966fc2e75649aae79a8000bc",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "wait",
+        25
+      ],
+      [
+        "hover",
+        "HOVER"
+      ]
+    ],
+    "ui": {
+      "section": "source",
+      "selected_ids": [
+        "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3"
+      ],
+      "tab": "Editor"
+    }
+  },
+  "08-export-plan": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/08-export-plan.png",
+    "project": "webserver-rust.orch",
+    "scene": "08-export-plan",
+    "sha256": "4e4335025279b9860138339b9a61d3e98b365647628e6c8b8e9e9e8f37de5c94",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        1842,
+        152
+      ],
+      [
+        "wait",
+        30
+      ]
+    ],
+    "ui": {
+      "tab": "Export"
+    }
+  },
+  "09-project-management": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/09-project-management.png",
+    "project": "webserver-rust.orch",
+    "scene": "09-project-management",
+    "sha256": "cf35c02be1c027a8814a1e2a3bdc62f9d9d70f4b5f4ff8a03fe0557d6cbe59be",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "wait",
+        2
+      ]
+    ],
+    "ui": {
+      "tab": "Project Management"
+    }
+  },
+  "10-mcp-server": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/screenshots/10-mcp-server.png",
+    "mcp": [
+      {
+        "method": "initialize",
+        "status": 200,
+        "tool": null
+      },
+      {
+        "method": "tools/list",
+        "status": 200,
+        "tool": null
+      },
+      {
+        "method": "tools/call",
+        "status": 200,
+        "tool": "threadwork.get_design"
+      },
+      {
+        "method": "tools/call",
+        "status": 200,
+        "tool": "threadwork.list_entities"
+      },
+      {
+        "method": "tools/call",
+        "status": 200,
+        "tool": "threadwork.validate_design"
+      },
+      {
+        "method": "tools/call",
+        "status": 200,
+        "tool": "wirecraft.analyze_network"
+      },
+      {
+        "method": "tools/call",
+        "status": 200,
+        "tool": "wirecraft.component_fiches"
+      }
+    ],
+    "project": "webserver-rust.orch",
+    "scene": "10-mcp-server",
+    "sha256": "4ee60b2bb70225e7e2ec0dc0c8fe55d7f9d5e1f1f79b199ac7fbfd3df4a2c11a",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "mcp"
+      ],
+      [
+        "wait",
+        2
+      ],
+      [
+        "click",
+        344,
+        266
+      ],
+      [
+        "wait",
+        3
+      ]
+    ],
+    "ui": {
+      "tab": "MCP"
+    }
+  },
+  "extra-analysis": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/extra/extra-analysis.png",
+    "project": "webserver-rust.orch",
+    "scene": "extra-analysis",
+    "sha256": "41beba96f880f9a30f0e6979aec54d9fe446a2ba10e879186f17361e10b6b02c",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        1745,
+        153
+      ],
+      [
+        "wait",
+        5
+      ]
+    ],
+    "ui": {
+      "tab": "Analysis"
+    }
+  },
+  "extra-archetypes": {
+    "application": "Wirecraft 0.27.0",
+    "display": "private Xvfb 1920x1080, Mesa lavapipe",
+    "file": "assets/extra/extra-archetypes.png",
+    "project": "webserver-rust.orch",
+    "scene": "extra-archetypes",
+    "sha256": "f639d6c69cb54b0661496a7fe379ecd635e6e75d91b9011f64bfb66abd2c9303",
+    "source": "examples at git HEAD 577d1e0",
+    "steps": [
+      [
+        "click",
+        50,
+        152
+      ],
+      [
+        "wait",
+        3
+      ],
+      [
+        "click",
+        90,
+        250
+      ],
+      [
+        "wait",
+        4
+      ]
+    ],
+    "ui": {
+      "tab": "Archetypes"
+    }
+  }
+}

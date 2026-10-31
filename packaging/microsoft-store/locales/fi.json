@@ -1,0 +1,46 @@
+{
+  "language": "Suomi",
+  "description": "Suunnittele ohjelmisto tietovuograafina ja luo ohjelma sen pohjalta.\n\nWirecraft on maksuton avoimen lähdekoodin suunnittelutyökalu tapahtumaohjatulle ja tietovuopohjaiselle ohjelmistolle. Sijoita prosessorit, tietotyypit ja tyypitetyt linkit piirtoalueelle, ryhmittele ne kokonaisuuksiksi ja anna 45 asteen reitityksen pitää suuretkin topologiat luettavina. Jokainen linkki on tyypitetty puskuri, jokainen prosessori funktio, ja palvelukirjastot lainataan niitä käyttäville prosessoreille.\n\nSamasta suunnitelmasta Wirecraft luo valmiit ohjelmat kielillä C17, Rust, Go, Kotlin, JavaScript (Node.js) ja PHP. Kirjoita kunkin prosessorin runko editorissa, joka kiinnittää luodun funktion otsikon koodisi yläpuolelle, joten näet aina parametrit, jotka generaattori välittää. Kun clang, clangd tai rust-analyzer on asennettu, saat koodin täydennyksen, ohjeet osoitettaessa, semanttiset värit, siirtymisen määrittelyyn, viittausten haun ja kääntäjän diagnostiikan, joka kohdistetaan kirjoittamaasi kohteeseen ja riviin.\n\nJulkaise suunnitelman osia uudelleenkäytettävinä komponentteina, joilla on tyypitetyt portit, ja viittaa niihin muista suunnitelmista sisältötiivisteellä lukittuina, jotta päivitykset tehdään tietoisesti. Aloita uusi työ arkkityyppien kirjastosta ja tutki suunnitelmaa sen tieto-, virhe- ja riippuvuusvirtojen verkkoanalyysillä.\n\nSuunnitelman ympärillä saat myös projektinhallinnan (Kanban-taulu ja backlog tilan, vastuun ja versiohistorian kanssa), piirustusten ja dokumentaation viennin PDF-, SVG-, PNG- ja Mermaid-muotoon tulostamista ja jakamista varten sekä valinnaisen paikallisen MCP-palvelimen, jonka kautta yhteensopivat tekoälyagentit voivat lukea ja muokata suunnitelmaa dokumentoiduilla työkaluilla.\n\nWirecraft avaa Threadworksin .orch-projektit ja säilyttää niiden tiedot. Tiliä ei tarvita, ja suunnittelu toimii ilman verkkoyhteyttä. Sovelluksen käyttöliittymä on englanninkielinen. Wirecraftia kehitetään aktiivisesti.",
+  "shortDescription": "Suunnittele tietovuo-ohjelmistoja visuaalisesti ja luo niistä ohjelmia kielillä C17, Rust, Go, Kotlin, JavaScript tai PHP. Muokkaa prosessorien runkoja kielipalvelinten avulla, käytä komponentteja uudelleen, vie piirustuksia ja yhdistä tekoälyagentteja paikallisen MCP-palvelimen kautta.",
+  "features": [
+    "Visuaalinen tietovuosuunnittelija: prosessorit, tyypit, tyypitetyt linkit ja kokonaisuudet",
+    "Luettava 45 asteen linkkien reititys suurissa topologioissa",
+    "Luo C17-, Rust-, Go-, Kotlin-, JavaScript- ja PHP-ohjelmia yhdestä suunnitelmasta",
+    "Runkoeditori, jossa luotu funktion otsikko on kiinnitetty koodin yläpuolelle",
+    "Täydennys, osoitusohjeet, semanttiset värit ja diagnostiikka clangdilla tai rust-analyzerilla",
+    "Siirry määrittelyyn ja hae viittauksia prosessorien rungoista",
+    "Uudelleenkäytettävät komponentit tyypitetyillä porteilla, sisältötiivisteellä lukittuina",
+    "Arkkityyppikirjasto sekä tieto-, virhe- ja riippuvuusvirtojen verkkoanalyysi",
+    "Kanban-taulu, backlog, vastuut ja versiohistoria",
+    "Piirustusten vienti PDF-, SVG-, PNG- ja Mermaid-muotoon sekä paikallinen MCP-palvelin"
+  ],
+  "searchTerms": [
+    "tietovuo",
+    "ohjelmistosuunnittelu",
+    "koodin generointi",
+    "C17",
+    "Rust",
+    "MCP-palvelin",
+    "arkkitehtuuri"
+  ],
+  "captions": [
+    "Suunnittele verkkopalvelin tietovuograafina prosessoreista, tyypeistä ja linkeistä.",
+    "Ryhmittele prosessorit kokonaisuuksiksi; reititetyt linkit näyttävät jokaisen puskurin.",
+    "Julkaise suunnitelma uudelleenkäytettävänä komponenttina tyypitetyin tulo- ja lähtöportein.",
+    "Viittaa komponenttiin toisesta suunnitelmasta; sen portit liittyvät linkkeihisi.",
+    "Muokkaa prosessorin runkoa sen kiinnitetyn, luodun C17-funktio-otsikon alla.",
+    "Täydennä lainatun kirjaston jäsenet kirjoittaessasi clangdin avulla.",
+    "Lue osoitusohjeet Rust-rungoissa, kun rust-analyzer on asennettu.",
+    "Esikatsele piirustuksia nimiöineen ja vie ne PDF-, SVG-, PNG- tai Mermaid-muotoon.",
+    "Seuraa kohteita Kanban-taululla tilan, vastuiden ja tekijöiden kanssa.",
+    "Anna tekoälyagenttien työskennellä paikallisen MCP-palvelimen ja sen lokin kautta."
+  ],
+  "minimumHardware": [
+    "DirectX 11:tä tukevat näytönohjaimen ajurit",
+    "Näppäimistö ja hiiri"
+  ],
+  "recommendedHardware": [
+    "clang, clangd tai rust-analyzer asennettuna koodin tarkistuksiin",
+    "Kolmipainikkeinen hiiri piirtoalueen panorointiin"
+  ]
+}

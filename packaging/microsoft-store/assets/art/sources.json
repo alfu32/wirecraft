@@ -1,0 +1,77 @@
+{
+  "crops": {
+    "analysis": [
+      0,
+      110,
+      960,
+      900
+    ],
+    "completion": [
+      290,
+      250,
+      1400,
+      840
+    ],
+    "component": [
+      262,
+      172,
+      1920,
+      1030
+    ],
+    "export": [
+      585,
+      285,
+      1570,
+      975
+    ],
+    "header": [
+      290,
+      250,
+      1100,
+      860
+    ],
+    "hover": [
+      262,
+      230,
+      1100,
+      760
+    ],
+    "kanban": [
+      0,
+      90,
+      1290,
+      900
+    ],
+    "mcp": [
+      0,
+      90,
+      960,
+      600
+    ],
+    "routing": [
+      262,
+      172,
+      1920,
+      1030
+    ],
+    "topology": [
+      262,
+      170,
+      1560,
+      700
+    ]
+  },
+  "method": "Pillow composition of unretouched screenshot crops; only the product name is added",
+  "screenshots": {
+    "extra/extra-analysis.png": "41beba96f880f9a30f0e6979aec54d9fe446a2ba10e879186f17361e10b6b02c",
+    "screenshots/01-designer-topology.png": "94d3a0344dbb9c2225837eeae43985510b63446daf96b5a48aee0f69bee5e0fe",
+    "screenshots/02-designer-routing.png": "b3a040a30b7c560d03ca399f591d609168187dc523faf14f3f5e77aa1be67df2",
+    "screenshots/03-component-ports.png": "99ef08262f56b1e358f783eb5cd909f5bff8f1b292e00ebaf20574e6ba1a7b46",
+    "screenshots/05-editor-generated-header.png": "1c9e6810c20946e56fb9695ce0d1516ee54c4d55afa57cabed2896efd86a6a03",
+    "screenshots/06-editor-completion.png": "fc9b176c77f41f32a58b1e833793d20ebe7ff0167414530a5effd6be8d6b1b35",
+    "screenshots/07-editor-hover.png": "d2c549427a7f75f59849e227b43b0f1b1d139ac7966fc2e75649aae79a8000bc",
+    "screenshots/08-export-plan.png": "4e4335025279b9860138339b9a61d3e98b365647628e6c8b8e9e9e8f37de5c94",
+    "screenshots/09-project-management.png": "cf35c02be1c027a8814a1e2a3bdc62f9d9d70f4b5f4ff8a03fe0557d6cbe59be",
+    "screenshots/10-mcp-server.png": "4ee60b2bb70225e7e2ec0dc0c8fe55d7f9d5e1f1f79b199ac7fbfd3df4a2c11a"
+  }
+}

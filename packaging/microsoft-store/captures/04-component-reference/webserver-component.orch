@@ -1,0 +1,1749 @@
+{
+  "id": "e198ed8c-cd93-406f-8a53-318338efcf7f",
+  "name": "WebServer",
+  "rootNodeId": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "WebServer",
+      "kind": "Processor",
+      "parentId": null,
+      "children": [
+        "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+        "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+        "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+        "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+        "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+        "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+        "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "992f1269-5aa2-4929-91a3-5745c23f6cb9",
+        "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+        "95f28f57-d01a-4781-bc3c-ecca3987459d",
+        "node_a75bf178-d2b9-40a9-9e5f-c1c4ea6b78bf",
+        "node_f41ab97c-dbae-4950-8574-a772f2beb25b",
+        "c59f3e73-47cc-4cfd-b212-d0b2ce2f7a85",
+        "6ba831b4-0e75-4dbc-bcc0-bad8f3e2db23",
+        "ca25dee6-8e63-400c-a2a5-6a0cc6627435",
+        "1c48b73b-828b-4838-bb5c-ccd588d63519",
+        "e0231627-e715-465b-9054-dcb4241e0f80"
+      ],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "single-file",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "WebServer — the HTTP/1.1 transport of a Wirecraft C17 dataflow server, as a pluggable component.\n\nPORTS (published through Exteriors; see docs/design/components.md)\n- request  (output, ReqRep): every accepted, fully read request. Exactly one consumer link.\n- response (input,  ReqRep): completed responses; set response.status, content_type and body.\n  Any number of consumer links. The packet must keep the id, connection and request strings\n  of the request it answers.\nThe component owns accepting, reading, rendering, writing, logging and freeing; the consumer\nowns routing and response bodies.\n\nCONFIGURATION (environment, read once at startup)\nWEBSERVER_PORT (default 8080), WEBSERVER_BIND_ANY=1 (listen on 0.0.0.0, default 127.0.0.1),\nWEBSERVER_MAX_REQUESTS (exit after N resolved requests; default unlimited).\n\nFLOW\nsocket_accept --request--> [consumer] --response--> socket_respond --rendered--> socket_accept.\nWhile a request is in flight its pending copy circulates on awaitResponseLoop; socket_accept\nmatches each rendered response to it by id, writes the reply and closes the connection.\n\nOWNERSHIP OF ReqRep STRINGS (packets are copied by value)\n- The pending copy on awaitResponseLoop owns id, request.header and request.body.\n- Consumer copies only borrow them. The consumer allocates response.body (or leaves it NULL);\n  socket_respond allocates response.header. content_type must point to a string literal.\n- socket_accept frees all of them exactly once when it resolves the request.\n\nLIMITS AND ERRORS\nHeader ≤ 8 KiB (else 431), body ≤ 64 KiB by Content-Length (else 413), 2 s receive timeout\n(408 when nothing arrives, 400 on a truncated request). These connections are answered by the\nlibrary and never reach the request port. Allocation or socket failures end the run with\nTHREADWORK_ERROR; the process exits non-zero.\n\nEXECUTION MODEL, SHUTDOWN AND LOG\nOne connection is accepted per tick; reading blocks up to 2 s per connection. After shutdown\nsocket_accept stops accepting, resolves every pending request, then closes the listener. It\nprints one access-log line per resolved request: \"<id> <method> <path> <status> <body bytes>\".\nStatic state (sequence, limit, the listener) allows one instance per program.\n",
+        "specificationLanguageId": "markdown",
+        "tests": "Compile and run through a consumer such as examples/webserver.orch; see its Tests section.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "c",
+        "technologyId": "c-native",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T17:25:24Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+      "name": "socket_accept",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "1c48b73b-828b-4838-bb5c-ccd588d63519",
+        "992f1269-5aa2-4929-91a3-5745c23f6cb9",
+        "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+        "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+        "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd"
+      ],
+      "outgoingLinks": [
+        "c59f3e73-47cc-4cfd-b212-d0b2ce2f7a85",
+        "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd"
+      ],
+      "layout": {
+        "x": -11.340810148480273,
+        "y": 1005.3911603231808,
+        "width": 200.0,
+        "height": 138.0,
+        "closedWidth": 200.0,
+        "closedHeight": 138.0,
+        "openWidth": 200.0,
+        "openHeight": 138.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "static unsigned long sequence = 0UL;\nstatic unsigned long resolved_total = 0UL;\nstatic long limit = -1;\n/* Both buffers of the awaitResponseLoop self-link hold the pending copies. */\nthreadwork_buffer *const pending[2] = { awaitResponseLoop_in, awaitResponseLoop_out };\nint running = 1;\nReqRep item;\n\nif (limit < 0) {\n    const char *text = getenv(\"WEBSERVER_MAX_REQUESTS\");\n    limit = text != NULL ? atol(text) : 0;\n}\n/* 1. Resolve every response against its pending copy, rotating each loop buffer once. */\nwhile (threadwork_buffer_count(rendered) > 0U) {\n    int found = 0;\n\n    if (pop(rendered, &item) != THREADWORK_OK) {\n        return THREADWORK_ERROR;\n    }\n    for (size_t side = 0U; side < 2U; side++) {\n        size_t remaining = threadwork_buffer_count(pending[side]);\n\n        while (remaining-- > 0U) {\n            ReqRep waiting;\n\n            if (pop(pending[side], &waiting) != THREADWORK_OK) {\n                return THREADWORK_ERROR;\n            }\n            if (found || strcmp(waiting.id, item.id) != 0) {\n                if (push(pending[side], &waiting) != THREADWORK_OK) {\n                    return THREADWORK_ERROR;\n                }\n                continue;\n            }\n            found = 1;\n            int response_error = libhttp->http_resolve(&waiting, &item);\n            if ( response_error != 0) {\n                fprintf(stderr, \"webserver: client closed the connection early\\n\");\n            }\n        }\n    }\n    if (!found) {\n        fprintf(stderr, \"webserver: response %s has no pending request\\n\", item.id);\n        return THREADWORK_ERROR;\n    }\n    resolved_total++;\n    if (limit > 0 && resolved_total >= (unsigned long)limit) {\n        (void)threadwork_runner__shutdown_request(&threadwork_runner);\n    }\n}\n/* 2. Accept at most one connection; wait briefly only when nothing is in flight. */\n(void)threadwork_runner__is_running(&threadwork_runner, &running);\nif (running) {\n    int idle = threadwork_buffer_count(awaitResponseLoop_in) == 0U\n        && threadwork_buffer_count(awaitResponseLoop_out) == 0U;\n\n    if (libhttp->http_wait(idle ? 25 : 0)) {\n        int accepted = libhttp->http_accept(++sequence, &item);\n\n        if (accepted < 0) {\n            return THREADWORK_ERROR;\n        }\n        if (accepted > 0\n            && (push(request, &item) != THREADWORK_OK\n                || push(awaitResponseLoop_out, &item) != THREADWORK_OK)) {\n            return THREADWORK_ERROR;\n        }\n    }\n} else if (threadwork_buffer_count(awaitResponseLoop_in) == 0U\n           && threadwork_buffer_count(awaitResponseLoop_out) == 0U) {\n    libhttp->http_close();\n}",
+        "sourceLanguageId": "",
+        "initialization": "const char *port_text = getenv(\"WEBSERVER_PORT\");\nconst char *any_text = getenv(\"WEBSERVER_BIND_ANY\");\nint port = port_text != NULL ? atoi(port_text) : 8080;\nint any_address = any_text != NULL && strcmp(any_text, \"1\") == 0;\n\nif (libhttp->http_listen(port, any_address) != 0) {\n    fprintf(stderr, \"webserver: cannot listen on port %d\\n\", port);\n    return THREADWORK_ERROR;\n}\nprintf(\"webserver: listening on http://%s:%d\\n\", any_address ? \"0.0.0.0\" : \"127.0.0.1\", port);\n(void)fflush(stdout);",
+        "initializationLanguageId": "",
+        "specification": "Entry and exit point of every request.\n\nInitialization: read WEBSERVER_PORT and WEBSERVER_BIND_ANY, open the listener with\nlibhttp.http_listen and print \"webserver: listening on http://<address>:<port>\".\nFailure to listen is an error (the process exits non-zero).\n\nEach tick:\n1. Pop every resolved ReqRep from `response` and find its pending copy by id in the\n   awaitResponseLoop self-link. Both of its buffers (awaitResponseLoop_in and\n   awaitResponseLoop_out) are searched by rotating each once, so the copies that do not\n   match keep their order. Resolve the match with libhttp.http_resolve (write the reply,\n   log it, close, free). A response without a pending copy is an error.\n2. While running, accept at most one connection with libhttp.http_accept and push the new\n   ReqRep to both `request` (router) and awaitResponseLoop_out (pending copy). Wait up to\n   25 ms for a connection only when nothing is pending.\n3. Count resolutions; at WEBSERVER_MAX_REQUESTS request shutdown.\nAfter shutdown, stop accepting and close the listener once nothing is pending.",
+        "specificationLanguageId": "markdown",
+        "tests": "- With an unused port, startup prints the listening URL and the process keeps running.\n- With the port already in use, initialization fails and the process exits non-zero.\n- Two concurrent clients receive the responses matching their own requests (ids differ).\n- WEBSERVER_MAX_REQUESTS=1 exits 0 after exactly one access-log line.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T01:05:33Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:12:54.564349361Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:28.009712855Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:35.158933431Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+      "name": "Request",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": -945.191727111649,
+        "y": 930.6629842440962,
+        "width": 220.0,
+        "height": 86.0,
+        "closedWidth": 220.0,
+        "closedHeight": 86.0,
+        "openWidth": 220.0,
+        "openHeight": 86.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Raw HTTP request: `header` is the request line and header fields including the final empty line; `body` is the Content-Length body (empty string when absent). Both NUL-terminated.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "header",
+            "typeId": "char *",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "body",
+            "typeId": "char *",
+            "isReference": false,
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:59:46Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "TESTING",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:13:05.623513924Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:18.160006967Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:39.023962690Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "TESTING"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+      "name": "Response",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": -945.191727111649,
+        "y": 708.7577438999701,
+        "width": 220.0,
+        "height": 86.0,
+        "closedWidth": 220.0,
+        "closedHeight": 86.0,
+        "openWidth": 220.0,
+        "openHeight": 86.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "HTTP response under construction: `status` code, `content_type` (string literal), `header` rendered by socket_respond, `body` allocated by the route.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "status",
+            "typeId": "int",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "content_type",
+            "typeId": "const char *",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "header",
+            "typeId": "char *",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "body",
+            "typeId": "char *",
+            "isReference": false,
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:59:46Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "TESTING",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:13:15.208336751Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:19.542718491Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:40.291439401Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "TESTING"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+      "name": "ReqRep",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": -945.191727111649,
+        "y": 1122.5682245882222,
+        "width": 220.0,
+        "height": 268.0,
+        "closedWidth": 220.0,
+        "closedHeight": 268.0,
+        "openWidth": 220.0,
+        "openHeight": 268.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "One request/response exchange: `id` \"req-<n>\" unique per server run, `connection` socket descriptor, the parsed `request`, and the `response` filled downstream. See the ownership rules in the WebServer specification.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "id",
+            "typeId": "string",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "connection",
+            "typeId": "int",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "request",
+            "typeId": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
+            "isReference": false,
+            "typeExpression": null
+          },
+          {
+            "name": "response",
+            "typeId": "node_17489b2a-30cf-4a5a-9958-bfa317dc00a2",
+            "isReference": false,
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:59:46Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "TESTING",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:14:29.586825517Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:17.044081665Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "FUNCTIONAL"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:37.741160440Z",
+          "initStatus": "FUNCTIONAL",
+          "endStatus": "TESTING"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "link_ff70c67f-8f63-48a5-9b9a-df23d3686dfd",
+      "name": "awaitResponseLoop",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "single-file",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Self-feedback of pending ReqRep copies that own the request strings until resolution; both of its buffers are the store of in-flight requests that socket_accept searches by id.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:57Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+      "name": "socket_respond",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+        "6ba831b4-0e75-4dbc-bcc0-bad8f3e2db23"
+      ],
+      "outgoingLinks": [
+        "link_47dfe6fa-791b-4863-99ff-002db0ff8f88"
+      ],
+      "layout": {
+        "x": -481.92205758974734,
+        "y": 890.6240943417532,
+        "width": 200.0,
+        "height": 138.0,
+        "closedWidth": 200.0,
+        "closedHeight": 138.0,
+        "openWidth": 200.0,
+        "openHeight": 138.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "ReqRep item;\n\nwhile (threadwork_buffer_count(response) > 0U) {\n    if (pop(response, &item) != THREADWORK_OK) {\n        return THREADWORK_ERROR;\n    }\n    item.response.header = libhttp->http_render_header(&item.response);\n    if (item.response.header == NULL) {\n        return THREADWORK_ERROR;\n    }\n    if (push(rendered, &item) != THREADWORK_OK) {\n        return THREADWORK_ERROR;\n    }\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Renders the response header of every completed ReqRep arriving on the `response` port\n(libhttp.http_render_header: status line, Content-Type, Content-Length, Connection: close,\nServer; Allow for 405) and forwards it on `rendered` to socket_accept. Any number of\nconsumer links may feed the `response` port; they share one input buffer.",
+        "specificationLanguageId": "markdown",
+        "tests": "- A 200 text body of 32 bytes yields \"Content-Length: 32\" and ends the header with an empty line.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T01:00:45Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:18:51.543616506Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:31.442193153Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "link_47dfe6fa-791b-4863-99ff-002db0ff8f88",
+      "name": "rendered",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Completed responses (header rendered) from socket_respond back to socket_accept.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+      "name": "base_lib",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [
+        "95f28f57-d01a-4781-bc3c-ecca3987459d",
+        "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8"
+      ],
+      "layout": {
+        "x": -573.5542537018822,
+        "y": 748.9269310770951,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "/* Platform headers for the server libraries: POSIX sockets, polling and errors. */\n#include <sys/types.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n#include <poll.h>\n#include <errno.h>",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "Platform library: the POSIX socket, polling and errno headers shared by the server code,\nlent to socket_accept as `platform` and to lib_http_server. It declares no functions.",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:59:12Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:29:17.242951872Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:14.546557084Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "link_559f3fef-7b5a-4d0e-9d55-8f70aa5c46b8",
+      "name": "platform",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+      "name": "lib_http_server",
+      "kind": "Processor",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "95f28f57-d01a-4781-bc3c-ecca3987459d"
+      ],
+      "outgoingLinks": [
+        "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+        "992f1269-5aa2-4929-91a3-5745c23f6cb9"
+      ],
+      "layout": {
+        "x": -204.98622018170352,
+        "y": 735.9605822627288,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "/* HTTP/1.1 helpers for the WebServer network. Lent to consumers as `libhttp`. */\n#include <sys/types.h>\n#include <sys/socket.h>\n#include <sys/select.h> /* struct timeval for SO_RCVTIMEO */\n#include <netinet/in.h>\n#include <fcntl.h>\n#include <poll.h>\n#include <errno.h>\n\n#define HTTP_MAX_HEADER 8192\n#define HTTP_MAX_BODY 65536\n\n/* Listening socket shared by the http_* functions; -1 when closed. */\nstatic int http_listener = -1;\n\n/* Heap copy of `length` bytes plus a terminating NUL, or NULL. */\nstatic char *http_copy(const char *text, size_t length)\n{\n    char *copy = (char *)malloc(length + 1U);\n\n    if (copy != NULL) {\n        memcpy(copy, text, length);\n        copy[length] = '\\0';\n    }\n    return copy;\n}\n\nstatic int http_lower(int c)\n{\n    return (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c;\n}\n\n/* Non-negative integer value of a header field (case-insensitive name), or -1. */\nstatic long http_header_number(const char *header, const char *name)\n{\n    size_t length = strlen(name);\n    const char *line = strstr(header, \"\\r\\n\");\n\n    while (line != NULL && line[2] != '\\0' && !(line[2] == '\\r' && line[3] == '\\n')) {\n        const char *field = line + 2;\n        size_t i = 0U;\n\n        while (i < length && field[i] != '\\0'\n            && http_lower((unsigned char)field[i]) == http_lower((unsigned char)name[i])) {\n            i++;\n        }\n        if (i == length && field[i] == ':') {\n            char *end = NULL;\n            long value = strtol(field + i + 1, &end, 10);\n            return (end != field + i + 1 && value >= 0) ? value : -1;\n        }\n        line = strstr(field, \"\\r\\n\");\n    }\n    return -1;\n}\n\nconst char *http_status_text(int status)\n{\n    switch (status) {\n    case 200: return \"OK\";\n    case 400: return \"Bad Request\";\n    case 404: return \"Not Found\";\n    case 405: return \"Method Not Allowed\";\n    case 408: return \"Request Timeout\";\n    case 413: return \"Content Too Large\";\n    case 431: return \"Request Header Fields Too Large\";\n    case 500: return \"Internal Server Error\";\n    default: return \"Unknown\";\n    }\n}\n\n/* Writes every byte, retrying on EINTR and never raising SIGPIPE; 0 on success. */\nstatic int http_write_all(int connection, const char *data, size_t length)\n{\n    while (length > 0U) {\n#ifdef MSG_NOSIGNAL\n        ssize_t written = send(connection, data, length, MSG_NOSIGNAL);\n#else\n        ssize_t written = send(connection, data, length, 0);\n#endif\n        if (written < 0) {\n            if (errno == EINTR) {\n                continue;\n            }\n            return -1;\n        }\n        data += written;\n        length -= (size_t)written;\n    }\n    return 0;\n}\n\n/* Answers a connection that never became a request, then closes it. */\nstatic void http_reject(int connection, int status)\n{\n    char reply[256];\n    const char *text = http_status_text(status);\n    int length = snprintf(reply, sizeof(reply),\n        \"HTTP/1.1 %d %s\\r\\nContent-Type: text/plain; charset=utf-8\\r\\nContent-Length: %zu\\r\\n\"\n        \"Connection: close\\r\\nServer: Wirecraft-WebServer/0.1\\r\\n\\r\\n%d %s\\n\",\n        status, text, strlen(text) + 5U, status, text);\n\n    if (length > 0) {\n        (void)http_write_all(connection, reply, (size_t)length);\n    }\n    /* Closing with unread request bytes would reset the connection and lose the reply:\n       finish sending, then discard what the client still sends (bounded by the 2 s timeout). */\n    if (shutdown(connection, SHUT_WR) == 0) {\n        char discard[4096];\n        size_t drained = 0U;\n        ssize_t count;\n\n        while (drained < (size_t)HTTP_MAX_BODY\n               && (count = recv(connection, discard, sizeof(discard), 0)) > 0) {\n            drained += (size_t)count;\n        }\n    }\n    close(connection);\n}\n\nint http_listen(int port, int any_address)\n{\n    struct sockaddr_in address;\n    int enable = 1;\n    int flags;\n\n    if (port <= 0 || port > 65535) {\n        return -1;\n    }\n    http_listener = socket(AF_INET, SOCK_STREAM, 0);\n    if (http_listener < 0) {\n        return -1;\n    }\n    (void)setsockopt(http_listener, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));\n    memset(&address, 0, sizeof(address));\n    address.sin_family = AF_INET;\n    address.sin_port = htons((uint16_t)port);\n    address.sin_addr.s_addr = htonl(any_address ? INADDR_ANY : INADDR_LOOPBACK);\n    flags = fcntl(http_listener, F_GETFL, 0);\n    if (bind(http_listener, (struct sockaddr *)&address, sizeof(address)) != 0\n        || listen(http_listener, 64) != 0 || flags < 0\n        || fcntl(http_listener, F_SETFL, flags | O_NONBLOCK) != 0) {\n        close(http_listener);\n        http_listener = -1;\n        return -1;\n    }\n    return 0;\n}\n\nint http_wait(int timeout_ms)\n{\n    struct pollfd watched;\n\n    if (http_listener < 0) {\n        return 0;\n    }\n    watched.fd = http_listener;\n    watched.events = POLLIN;\n    watched.revents = 0;\n    return poll(&watched, 1, timeout_ms) > 0 && (watched.revents & POLLIN) != 0;\n}\n\nvoid http_close(void)\n{\n    if (http_listener >= 0) {\n        close(http_listener);\n        http_listener = -1;\n    }\n}\n\nint http_accept(unsigned long sequence, ReqRep *out)\n{\n    static char buffer[HTTP_MAX_HEADER + HTTP_MAX_BODY + 1];\n    struct timeval timeout = { 2, 0 };\n    size_t received = 0U;\n    size_t header_length;\n    size_t total;\n    char *end = NULL;\n    char id[32];\n    long body_length;\n    int connection = accept(http_listener, NULL, NULL);\n\n    if (connection < 0) {\n        return (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) ? 0 : -1;\n    }\n    (void)setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));\n    while (end == NULL) {\n        ssize_t count;\n\n        if (received >= HTTP_MAX_HEADER) {\n            http_reject(connection, 431);\n            return 0;\n        }\n        count = recv(connection, buffer + received, HTTP_MAX_HEADER - received, 0);\n        if (count < 0 && errno == EINTR) {\n            continue;\n        }\n        if (count <= 0) {\n            http_reject(connection, received == 0U && count < 0 ? 408 : 400);\n            return 0;\n        }\n        received += (size_t)count;\n        buffer[received] = '\\0';\n        end = strstr(buffer, \"\\r\\n\\r\\n\");\n    }\n    header_length = (size_t)(end - buffer) + 4U;\n    body_length = http_header_number(buffer, \"Content-Length\");\n    if (body_length < 0) {\n        body_length = 0;\n    }\n    if (body_length > HTTP_MAX_BODY) {\n        http_reject(connection, 413);\n        return 0;\n    }\n    total = header_length + (size_t)body_length;\n    while (received < total) {\n        ssize_t count = recv(connection, buffer + received, total - received, 0);\n\n        if (count < 0 && errno == EINTR) {\n            continue;\n        }\n        if (count <= 0) {\n            http_reject(connection, 400);\n            return 0;\n        }\n        received += (size_t)count;\n    }\n    (void)snprintf(id, sizeof(id), \"req-%lu\", sequence);\n    memset(out, 0, sizeof(*out));\n    out->connection = connection;\n    out->id = http_copy(id, strlen(id));\n    out->request.header = http_copy(buffer, header_length);\n    out->request.body = http_copy(buffer + header_length, (size_t)body_length);\n    if (out->id == NULL || out->request.header == NULL || out->request.body == NULL) {\n        free(out->id);\n        free(out->request.header);\n        free(out->request.body);\n        http_reject(connection, 500);\n        return 0;\n    }\n    return 1;\n}\n\nchar *http_render_header(const Response *response)\n{\n    static const char format[] =\n        \"HTTP/1.1 %d %s\\r\\nContent-Type: %s\\r\\nContent-Length: %zu\\r\\nConnection: close\\r\\n\"\n        \"Server: Wirecraft-WebServer/0.1\\r\\n%s\\r\\n\";\n    const char *type = response->content_type != NULL ? response->content_type : \"text/plain; charset=utf-8\";\n    const char *allow = response->status == 405 ? \"Allow: GET, HEAD\\r\\n\" : \"\";\n    size_t body = response->body != NULL ? strlen(response->body) : 0U;\n    int length = snprintf(NULL, 0, format, response->status, http_status_text(response->status), type, body, allow);\n    char *header;\n\n    if (length < 0) {\n        return NULL;\n    }\n    header = (char *)malloc((size_t)length + 1U);\n    if (header != NULL) {\n        (void)snprintf(header, (size_t)length + 1U, format, response->status,\n            http_status_text(response->status), type, body, allow);\n    }\n    return header;\n}\n\nint http_resolve(ReqRep *pending, ReqRep *resolved)\n{\n    const char *header = resolved->response.header;\n    const char *body = resolved->response.body;\n    size_t body_length = body != NULL ? strlen(body) : 0U;\n    int head = strncmp(pending->request.header, \"HEAD \", 5) == 0;\n    int status = 0;\n    char method[8] = \"\";\n    char path[128] = \"\";\n\n    if (header == NULL || http_write_all(pending->connection, header, strlen(header)) != 0\n        || (!head && body_length > 0U && http_write_all(pending->connection, body, body_length) != 0)) {\n        status = -1;\n    }\n    (void)sscanf(pending->request.header, \"%7s %127s\", method, path);\n    printf(\"%s %s %s %d %zu\\n\", pending->id, method, path, resolved->response.status, body_length);\n    (void)fflush(stdout);\n    close(pending->connection);\n    free(pending->id);\n    free(pending->request.header);\n    free(pending->request.body);\n    free(resolved->response.header);\n    free(resolved->response.body);\n    return status;\n}",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "HTTP/1.1 socket helpers lent as `libhttp` to socket_accept and socket_respond.\n- http_listen(port, any_address): non-blocking IPv4 listener with SO_REUSEADDR; 0 or -1.\n- http_wait(timeout_ms): 1 when a connection is ready to accept.\n- http_accept(sequence, out): accept one connection, read the header (≤ 8 KiB, up to the\n  blank line) and Content-Length body (≤ 64 KiB) with a 2 s timeout, then fill a ReqRep with\n  id \"req-<sequence>\", the connection and heap copies of header and body. Returns 1 for a\n  request, 0 when nothing was accepted or the connection was answered directly (408, 400,\n  413, 431, 500), -1 on a listener failure.\n- http_status_text(status): reason phrase.\n- http_render_header(response): heap-allocated response header; NULL on allocation failure.\n- http_resolve(pending, resolved): write header and (except for HEAD) body, print the access\n  log line, close the connection and free the strings each copy owns; 0 or -1 on write error.\n- http_close(): close the listener.\nWrites retry on EINTR and suppress SIGPIPE.",
+        "specificationLanguageId": "markdown",
+        "tests": "- A request split over several TCP segments is assembled before routing.\n- A 9 KiB header is answered 431 without entering the network.\n- A client that disconnects early does not terminate the server.",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        },
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:59:12Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "BUSINESS",
+      "statusChanges": [
+        {
+          "userId": "local",
+          "changedDate": "2026-10-27T09:02:20Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        }
+      ],
+      "assignee": null
+    },
+    {
+      "id": "992f1269-5aa2-4929-91a3-5745c23f6cb9",
+      "name": "libhttp",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "32e5289b-5f71-4d77-a5a5-e0a8b107bc63",
+      "name": "libhttp",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "95f28f57-d01a-4781-bc3c-ecca3987459d",
+      "name": "platform",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_edd0ae62-3c39-40da-83d6-16d04bcd1cd4",
+        "sourcePortName": "out",
+        "targetNodeId": "cf346fce-593a-4903-b9ac-51afa8814a9a",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "lib",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T13:03:20Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "node_a75bf178-d2b9-40a9-9e5f-c1c4ea6b78bf",
+      "name": "requestOut",
+      "kind": "Node",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [
+        "c59f3e73-47cc-4cfd-b212-d0b2ce2f7a85"
+      ],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 433.1696136765096,
+        "y": 1052.2735343942709,
+        "width": 73.0,
+        "height": 73.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "",
+        "tests": "",
+        "testsLanguageId": "",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": ""
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "input_in",
+          "name": "in",
+          "direction": "Input",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T01:00:41Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:29:17.242951872Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:14.546557084Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null,
+      "stereotype": "Exterior"
+    },
+    {
+      "id": "node_f41ab97c-dbae-4950-8574-a772f2beb25b",
+      "name": "responseIn",
+      "kind": "Node",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [
+        "6ba831b4-0e75-4dbc-bcc0-bad8f3e2db23"
+      ],
+      "layout": {
+        "x": 433.1696136765096,
+        "y": 886.1992357346402,
+        "width": 73.0,
+        "height": 73.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "",
+        "tests": "",
+        "testsLanguageId": "",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": ""
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T01:00:37Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "IMPLEMENTATION",
+      "statusChanges": [
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:29:17.242951872Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        },
+        {
+          "userId": "alfu64",
+          "changedDate": "2026-10-26T13:31:14.546557084Z",
+          "initStatus": "BUSINESS",
+          "endStatus": "IMPLEMENTATION"
+        }
+      ],
+      "assignee": null,
+      "stereotype": "Exterior"
+    },
+    {
+      "id": "c59f3e73-47cc-4cfd-b212-d0b2ce2f7a85",
+      "name": "request",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "New requests from socket_accept to the router (router copy; borrows strings).",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "sourcePortName": "out",
+        "targetNodeId": "node_a75bf178-d2b9-40a9-9e5f-c1c4ea6b78bf",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "6ba831b4-0e75-4dbc-bcc0-bad8f3e2db23",
+      "name": "response",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "New requests from socket_accept to the router (router copy; borrows strings).",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "node_f41ab97c-dbae-4950-8574-a772f2beb25b",
+        "sourcePortName": "out",
+        "targetNodeId": "node_07b1aef5-8a59-4274-a70b-90995d6ea9b3",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "data",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "node_0a2c7213-3906-4fc0-bed6-adaf8a829401",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-27T22:44:56Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "ca25dee6-8e63-400c-a2a5-6a0cc6627435",
+      "name": "listenerConfigIn",
+      "kind": "Node",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [
+        "1c48b73b-828b-4838-bb5c-ccd588d63519"
+      ],
+      "layout": {
+        "x": -481.92205758974734,
+        "y": 1039.3902628430856,
+        "width": 73.0,
+        "height": 73.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [
+        {
+          "id": "output_out",
+          "name": "out",
+          "direction": "Output",
+          "dataType": "",
+          "metadata": {}
+        }
+      ],
+      "link": null,
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T01:00:26Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "BUSINESS",
+      "statusChanges": [
+        {
+          "userId": "local",
+          "changedDate": "2026-10-28T00:55:54Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        }
+      ],
+      "assignee": null,
+      "stereotype": "Exterior"
+    },
+    {
+      "id": "1c48b73b-828b-4838-bb5c-ccd588d63519",
+      "name": "listenerConfig",
+      "kind": "Link",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": {
+        "sourceNodeId": "ca25dee6-8e63-400c-a2a5-6a0cc6627435",
+        "sourcePortName": "out",
+        "targetNodeId": "node_b3fdad12-aa8a-4d1f-a50c-bc43654bb903",
+        "targetPortName": "in",
+        "transportKind": "in-process",
+        "interactionKind": "auto",
+        "typeName": "",
+        "payloadDefinition": "",
+        "typeDefinitionId": "e0231627-e715-465b-9054-dcb4241e0f80",
+        "compositeBoundaryIds": [],
+        "typeExpression": null
+      },
+      "typeDefinition": null,
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:57:38Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": null,
+      "statusChanges": [],
+      "assignee": null
+    },
+    {
+      "id": "e0231627-e715-465b-9054-dcb4241e0f80",
+      "name": "ListenerConfig",
+      "kind": "Type",
+      "parentId": "root",
+      "children": [],
+      "incomingLinks": [],
+      "outgoingLinks": [],
+      "layout": {
+        "x": -468.16252530387015,
+        "y": 1126.4465943681394,
+        "width": 200.0,
+        "height": 70.0,
+        "closedWidth": 200.0,
+        "closedHeight": 70.0,
+        "openWidth": 200.0,
+        "openHeight": 70.0,
+        "isExpanded": true
+      },
+      "fileLayoutStrategyId": "none",
+      "text": {
+        "source": "",
+        "sourceLanguageId": "",
+        "initialization": "",
+        "initializationLanguageId": "",
+        "specification": "",
+        "specificationLanguageId": "markdown",
+        "tests": "",
+        "testsLanguageId": "json",
+        "aiInstructions": "",
+        "aiInstructionsLanguageId": "markdown"
+      },
+      "binaryContent": null,
+      "technology": {
+        "languageId": "",
+        "technologyId": "",
+        "compilerId": "",
+        "fileExtension": "",
+        "contentType": ""
+      },
+      "ports": [],
+      "link": null,
+      "typeDefinition": {
+        "fields": [
+          {
+            "name": "port",
+            "typeId": "string",
+            "typeExpression": null
+          },
+          {
+            "name": "host",
+            "typeId": "string",
+            "typeExpression": null
+          }
+        ],
+        "qualifier": "object",
+        "genericTypeIds": []
+      },
+      "metadata": {},
+      "pluginData": {},
+      "revision": {
+        "name": "",
+        "date": ""
+      },
+      "responsible": null,
+      "modified": {
+        "date": "2026-10-28T00:59:23Z",
+        "user": "local"
+      },
+      "diagnostics": [],
+      "nameDetail": "",
+      "status": "BUSINESS",
+      "statusChanges": [
+        {
+          "userId": "local",
+          "changedDate": "2026-10-28T00:56:52Z",
+          "initStatus": null,
+          "endStatus": "BUSINESS"
+        }
+      ],
+      "assignee": null
+    }
+  ],
+  "metadata": {},
+  "masterRevision": {
+    "name": "",
+    "date": ""
+  },
+  "users": []
+}

@@ -1,0 +1,46 @@
+{
+  "language": "Türkçe",
+  "description": "Yazılımı bir veri akışı grafiği olarak tasarlayın, ardından programı ondan üretin.\n\nWirecraft, olay güdümlü ve veri akışı tabanlı yazılımlar için ücretsiz ve açık kaynaklı bir tasarım aracıdır. İşlemcileri, veri türlerini ve türlü bağlantıları bir tuvale yerleştirin, bunları bileşik öğelerde gruplayın ve 45 derecelik yönlendirmenin büyük topolojileri bile okunur tutmasına izin verin. Her bağlantı türlü bir arabellek, her işlemci bir işlevdir ve hizmet kitaplıkları onları kullanan işlemcilere ödünç verilir.\n\nAynı tasarımdan Wirecraft; C17, Rust, Go, Kotlin, JavaScript (Node.js) ve PHP dillerinde eksiksiz programlar üretir. Her işlemcinin gövdesini, üretilen işlev başlığını kodunuzun üstüne sabitleyen bir düzenleyicide yazın; böylece üreticinin geçireceği parametreleri her zaman görürsünüz. clang, clangd veya rust-analyzer yüklüyken kod tamamlama, üzerine gelince belgeler, anlamsal renklendirme, tanıma git, başvuruları bul ve yazdığınız varlık ile satıra bağlanan derleyici tanılamaları elde edersiniz.\n\nTasarımın bölümlerini türlü bağlantı noktalarına sahip yeniden kullanılabilir bileşenler olarak yayımlayın ve diğer tasarımlardan bunlara başvurun; başvurular içerik karmasıyla sabitlenir, böylece güncellemeler bilinçli yapılır. Yeni işlere arketip kitaplığından başlayın ve tasarımı veri, hata ve bağımlılık akışlarının ağ analiziyle inceleyin.\n\nTasarımın çevresinde ayrıca proje yönetimi (durum, sorumluluk ve revizyon geçmişi içeren Kanban panosu ve iş listesi), yazdırma ve paylaşma için planları ve belgeleri PDF, SVG, PNG ve Mermaid biçimine aktarma ve uyumlu yapay zekâ ajanlarının belgelenmiş araçlarla tasarımı okuyup düzenleyebildiği isteğe bağlı yerel bir MCP sunucusu bulunur.\n\nWirecraft, Threadworks .orch projelerini açar ve verilerini korur. Hesap gerekmez ve tasarım çevrimdışı çalışır. Uygulama arabirimi İngilizcedir. Wirecraft etkin olarak geliştirilmektedir.",
+  "shortDescription": "Veri akışı yazılımlarını görsel olarak tasarlayın ve C17, Rust, Go, Kotlin, JavaScript veya PHP programları üretin. İşlemci gövdelerini dil sunucularının yardımıyla düzenleyin, bileşenleri yeniden kullanın, planları dışa aktarın ve yapay zekâ ajanlarını yerel bir MCP sunucusuyla bağlayın.",
+  "features": [
+    "İşlemciler, türler, türlü bağlantılar ve bileşik öğelerle görsel veri akışı tasarımcısı",
+    "Büyük topolojiler için okunur 45 derecelik bağlantı yönlendirmesi",
+    "Tek bir tasarımdan C17, Rust, Go, Kotlin, JavaScript ve PHP programları üretin",
+    "Üretilen işlev başlığının kodun üstüne sabitlendiği gövde düzenleyicisi",
+    "clangd veya rust-analyzer ile tamamlama, ipuçları, anlamsal renkler ve tanılamalar",
+    "İşlemci gövdeleri arasında tanıma git ve başvuruları bul",
+    "Türlü bağlantı noktalı, içerik karmasıyla sabitlenen yeniden kullanılabilir bileşenler",
+    "Arketip kitaplığı ve veri, hata ve bağımlılık akışlarının ağ analizi",
+    "Kanban panosu, iş listesi, sorumluluk ve revizyon geçmişi",
+    "Planları PDF, SVG, PNG ve Mermaid'e aktarma ve yapay zekâ ajanları için yerel MCP sunucusu"
+  ],
+  "searchTerms": [
+    "veri akışı",
+    "yazılım tasarımı",
+    "kod üretimi",
+    "C17",
+    "Rust",
+    "MCP sunucusu",
+    "mimari"
+  ],
+  "captions": [
+    "Bir web sunucusunu işlemciler, türler ve bağlantılardan oluşan bir veri akışı olarak tasarlayın.",
+    "İşlemcileri bileşiklerde gruplayın; yönlendirilen bağlantılar her arabelleği gösterir.",
+    "Bir tasarımı türlü giriş ve çıkış bağlantı noktalarına sahip bir bileşen olarak yayımlayın.",
+    "Başka bir tasarımdan bir bileşene başvurun; bağlantı noktaları bağlantılarınıza katılır.",
+    "Bir işlemci gövdesini sabitlenmiş, üretilmiş C17 işlev başlığının altında düzenleyin.",
+    "clangd ile ödünç alınan kitaplığın üyelerini yazarken tamamlayın.",
+    "rust-analyzer yüklüyken Rust gövdelerinde üzerine gelince belgeleri okuyun.",
+    "Antetli planları önizleyin ve PDF, SVG, PNG veya Mermaid'e aktarın.",
+    "Varlıkları durum, sorumluluk ve atananlarla bir Kanban panosunda izleyin.",
+    "Yapay zekâ ajanlarının yerel MCP sunucusu ve erişim günlüğü üzerinden çalışmasına izin verin."
+  ],
+  "minimumHardware": [
+    "DirectX 11 destekli grafik sürücüleri",
+    "Klavye ve fare"
+  ],
+  "recommendedHardware": [
+    "Kod denetimleri için clang, clangd veya rust-analyzer yüklü",
+    "Tuvali kaydırmak için üç düğmeli fare"
+  ]
+}

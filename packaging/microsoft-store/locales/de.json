@@ -1,0 +1,46 @@
+{
+  "language": "Deutsch",
+  "description": "Entwerfen Sie Software als Datenflussgraph und erzeugen Sie das Programm daraus.\n\nWirecraft ist ein kostenloser Open-Source-Designer für ereignisgesteuerte und datenflussbasierte Software. Platzieren Sie Prozessoren, Datentypen und typisierte Verbindungen auf einer Zeichenfläche, fassen Sie sie zu Kompositen zusammen und lassen Sie das 45-Grad-Routing auch große Topologien lesbar halten. Jede Verbindung ist ein typisierter Puffer, jeder Prozessor eine Funktion, und Dienstbibliotheken werden den Prozessoren bereitgestellt, die sie nutzen.\n\nAus demselben Entwurf erzeugt Wirecraft vollständige Programme in C17, Rust, Go, Kotlin, JavaScript (Node.js) und PHP. Schreiben Sie den Rumpf jedes Prozessors in einem Editor, der den generierten Funktionskopf über Ihrem Code anheftet, sodass Sie immer die Parameter sehen, die der Generator übergibt. Mit installiertem clang, clangd oder rust-analyzer erhalten Sie Vervollständigung, Hover-Dokumentation, semantische Farben, Gehe zu Definition, Verweise suchen und Compilerdiagnosen, die auf die Entität und Zeile zurückgeführt werden, die Sie geschrieben haben.\n\nVeröffentlichen Sie Teile eines Entwurfs als wiederverwendbare Komponenten mit typisierten Ports und referenzieren Sie sie aus anderen Entwürfen, per Inhaltshash fixiert, damit Aktualisierungen bewusst erfolgen. Beginnen Sie neue Arbeit mit einer Bibliothek von Archetypen und untersuchen Sie einen Entwurf mit einer Netzwerkanalyse seiner Daten-, Fehler- und Abhängigkeitsflüsse.\n\nRund um den Entwurf erhalten Sie außerdem Projektmanagement (Kanban-Board und Backlog mit Status, Verantwortung und Revisionsverlauf), den Export von Plänen und Dokumentation als PDF, SVG, PNG und Mermaid zum Drucken und Teilen sowie einen optionalen lokalen MCP-Server, über den kompatible KI-Agenten den Entwurf mit dokumentierten Werkzeugen lesen und bearbeiten können.\n\nWirecraft öffnet Threadworks-.orch-Projekte und bewahrt ihre Daten. Es ist kein Konto erforderlich, und der Entwurf funktioniert offline. Die Benutzeroberfläche ist auf Englisch. Wirecraft wird aktiv weiterentwickelt.",
+  "shortDescription": "Entwerfen Sie Datenflusssoftware visuell und erzeugen Sie daraus Programme in C17, Rust, Go, Kotlin, JavaScript oder PHP. Bearbeiten Sie Prozessorrümpfe mit Sprachserver-Unterstützung, nutzen Sie Komponenten wieder, exportieren Sie Pläne und verbinden Sie KI-Agenten über einen lokalen MCP-Server.",
+  "features": [
+    "Visueller Datenfluss-Designer mit Prozessoren, Typen, typisierten Verbindungen und Kompositen",
+    "Lesbares 45-Grad-Routing von Verbindungen für große Topologien",
+    "Programme in C17, Rust, Go, Kotlin, JavaScript und PHP aus einem Entwurf erzeugen",
+    "Rumpf-Editor mit dem generierten Funktionskopf über Ihrem Code",
+    "Vervollständigung, Hover, semantische Farben und Diagnosen mit clangd oder rust-analyzer",
+    "Gehe zu Definition und Verweise suchen über Prozessorrümpfe hinweg",
+    "Wiederverwendbare Komponenten mit typisierten Ports, per Inhaltshash fixiert",
+    "Archetyp-Bibliothek und Netzwerkanalyse von Daten-, Fehler- und Abhängigkeitsflüssen",
+    "Kanban-Board, Backlog, Verantwortung und Revisionsverlauf",
+    "Planexport als PDF, SVG, PNG und Mermaid sowie lokaler MCP-Server für KI-Agenten"
+  ],
+  "searchTerms": [
+    "Datenfluss",
+    "Softwareentwurf",
+    "Codegenerierung",
+    "C17",
+    "Rust",
+    "MCP-Server",
+    "Architektur"
+  ],
+  "captions": [
+    "Entwerfen Sie einen Webserver als Datenflussgraph aus Prozessoren, Typen und Verbindungen.",
+    "Fassen Sie Prozessoren zu Kompositen zusammen; geroutete Verbindungen zeigen jeden Puffer.",
+    "Veröffentlichen Sie einen Entwurf als Komponente mit typisierten Ein- und Ausgabeports.",
+    "Referenzieren Sie eine Komponente aus einem anderen Entwurf; ihre Ports verbinden sich.",
+    "Bearbeiten Sie einen Prozessorrumpf unter seinem angehefteten, generierten C17-Funktionskopf.",
+    "Vervollständigen Sie beim Tippen die Mitglieder einer Bibliothek, unterstützt von clangd.",
+    "Lesen Sie Hover-Dokumentation in Rust-Rümpfen, wenn rust-analyzer installiert ist.",
+    "Zeigen Sie Pläne mit Schriftfeld in der Vorschau und exportieren Sie PDF, SVG, PNG oder Mermaid.",
+    "Verfolgen Sie Entitäten auf einem Kanban-Board mit Status, Verantwortung und Bearbeitern.",
+    "Lassen Sie KI-Agenten über den lokalen MCP-Server und sein Zugriffsprotokoll arbeiten."
+  ],
+  "minimumHardware": [
+    "Grafiktreiber mit DirectX-11-Unterstützung",
+    "Tastatur und Maus"
+  ],
+  "recommendedHardware": [
+    "clang, clangd oder rust-analyzer für Codeprüfungen installiert",
+    "Eine Maus mit drei Tasten zum Verschieben der Zeichenfläche"
+  ]
+}

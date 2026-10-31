@@ -1,0 +1,46 @@
+{
+  "language": "Norsk bokmål",
+  "description": "Utform programvare som en dataflytgraf, og generer programmet fra den.\n\nWirecraft er en gratis designer med åpen kildekode for hendelsesdrevet programvare og dataflytprogramvare. Plasser prosessorer, datatyper og typede koblinger på et lerret, grupper dem i kompositter, og la 45-graders ruting holde store topologier lesbare. Hver kobling er en typet buffer, hver prosessor en funksjon, og tjenestebiblioteker lånes ut til prosessorene som bruker dem.\n\nFra det samme designet genererer Wirecraft komplette programmer i C17, Rust, Go, Kotlin, JavaScript (Node.js) og PHP. Skriv hver prosessors kropp i en redigerer som fester den genererte funksjonsheaderen over koden din, slik at du alltid ser parameterne generatoren sender. Med clang, clangd eller rust-analyzer installert får du autofullføring, dokumentasjon ved peking, semantiske farger, gå til definisjon, finn referanser og kompilatordiagnostikk knyttet til enheten og linjen du skrev.\n\nPubliser deler av et design som gjenbrukbare komponenter med typede porter, og referer til dem fra andre design, låst med en innholdshash slik at oppdateringer skjer bevisst. Start nytt arbeid fra et bibliotek med arketyper, og undersøk et design med nettverksanalyse av data-, feil- og avhengighetsflytene.\n\nRundt designet får du også prosjektstyring (Kanban-tavle og backlog med status, ansvar og revisjonshistorikk), eksport av tegninger og dokumentasjon til PDF, SVG, PNG og Mermaid for utskrift og deling, og en valgfri lokal MCP-server slik at kompatible KI-agenter kan lese og redigere designet med dokumenterte verktøy.\n\nWirecraft åpner Threadworks .orch-prosjekter og bevarer dataene deres. Ingen konto kreves, og designarbeidet fungerer uten nett. Programmets grensesnitt er på engelsk. Wirecraft er under aktiv utvikling.",
+  "shortDescription": "Utform dataflytprogramvare visuelt, og generer programmer i C17, Rust, Go, Kotlin, JavaScript eller PHP fra den. Rediger prosessorkropper med hjelp fra språkservere, gjenbruk komponenter, eksporter tegninger og koble til KI-agenter via en lokal MCP-server.",
+  "features": [
+    "Visuell dataflytdesigner med prosessorer, typer, typede koblinger og kompositter",
+    "Lesbar 45-graders ruting av koblinger i store topologier",
+    "Generer C17-, Rust-, Go-, Kotlin-, JavaScript- og PHP-programmer fra ett design",
+    "Kroppsredigerer med den genererte funksjonsheaderen festet over koden",
+    "Autofullføring, peking, semantiske farger og diagnostikk med clangd eller rust-analyzer",
+    "Gå til definisjon og finn referanser på tvers av prosessorkropper",
+    "Gjenbrukbare komponenter med typede porter, låst med innholdshash",
+    "Arketypebibliotek og nettverksanalyse av data-, feil- og avhengighetsflyt",
+    "Kanban-tavle, backlog, ansvar og revisjonshistorikk",
+    "Tegningseksport til PDF, SVG, PNG og Mermaid og lokal MCP-server for KI-agenter"
+  ],
+  "searchTerms": [
+    "dataflyt",
+    "programvaredesign",
+    "kodegenerering",
+    "C17",
+    "Rust",
+    "MCP-server",
+    "arkitektur"
+  ],
+  "captions": [
+    "Utform en webserver som en dataflytgraf av prosessorer, typer og typede koblinger.",
+    "Grupper prosessorer i kompositter; rutede koblinger viser hver typet buffer.",
+    "Publiser et design som en gjenbrukbar komponent med typede inn- og utporter.",
+    "Referer til en komponent fra et annet design; portene kobles til koblingene dine.",
+    "Rediger en prosessorkropp under den festede, genererte C17-funksjonsheaderen.",
+    "Fullfør medlemmene i et utlånt bibliotek mens du skriver, med clangd.",
+    "Les dokumentasjon ved peking i Rust-kropper når rust-analyzer er installert.",
+    "Forhåndsvis tegninger med tittelfelt, og eksporter dem til PDF, SVG, PNG eller Mermaid.",
+    "Følg enheter på en Kanban-tavle med status, ansvar og tildelte.",
+    "La KI-agenter arbeide via den lokale MCP-serveren og tilgangsloggen."
+  ],
+  "minimumHardware": [
+    "Grafikkdrivere med støtte for DirectX 11",
+    "Tastatur og mus"
+  ],
+  "recommendedHardware": [
+    "clang, clangd eller rust-analyzer installert for kodekontroller",
+    "En mus med tre knapper for å panorere lerretet"
+  ]
+}
