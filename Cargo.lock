@@ -7543,7 +7543,7 @@ dependencies = [
 
 [[package]]
 name = "wirecraft-core"
-version = "0.27.4"
+version = "0.27.5"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -7559,7 +7559,7 @@ dependencies = [
 
 [[package]]
 name = "wirecraft-desktop"
-version = "0.27.4"
+version = "0.27.5"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
@@ -7583,7 +7583,7 @@ dependencies = [
 
 [[package]]
 name = "wirecraft-runtime"
-version = "0.27.4"
+version = "0.27.5"
 dependencies = [
  "anyhow",
  "axum",
