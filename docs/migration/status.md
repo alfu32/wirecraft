@@ -36,6 +36,8 @@ Pending:
 
 0.27.1: the first Release run (v0.27.0) passed on Linux x86_64/aarch64, including the AppImage startup smoke, and on macOS Apple Silicon. On Windows ARM64, the installed MSIX refused to start `wirecraft.exe` (`Access is denied`), because only `wirecraft-desktop.exe` was declared in its manifest. The command line is now a second, unlisted console application with a `wirecraft.exe` alias.
 
+0.27.2: the v0.27.1 run passed on Linux and both macOS targets. On both Windows targets MakeAppx rejected the manifest, because a console-subsystem application must also declare `desktop4:SupportsMultipleInstances="true"`; the command-line application now declares it.
+
 0.26.1 fixed the committed WebServer example, which broke CI: the component's `socket_accept` body lacked a semicolon after `http_resolve`, and `examples/webserver.orch` still pinned the component before its `listenerConfig` port.
 
 ## Identifier default names (0.26.0)
