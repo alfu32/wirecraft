@@ -1,0 +1,300 @@
+name: Release
+
+# Select an existing vX.Y.Z tag in Run workflow (or gh workflow run --ref vX.Y.Z).
+# No tag input and no automatic release on push. Same matrix and gates as Meshcraft.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Pinned here rather than by rust-toolchain.toml, which would also switch local tools.
+  RUST_TOOLCHAIN: '1.99.1'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      sha: ${{ steps.meta.outputs.sha }}
+      toolchain: ${{ steps.meta.outputs.toolchain }}
+      epoch: ${{ steps.meta.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: meta
+        name: Require selected tag to match the workspace version
+        run: python3 scripts/release/meta.py >> "$GITHUB_OUTPUT"
+
+  validate:
+    # Wirecraft's tests compile and run generated C, Go and JavaScript programs and
+    # use clangd, so they run on the current runner, not in the old-glibc container.
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: '4'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_DEV_OPT_LEVEL: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ needs.prepare.outputs.toolchain }}
+          components: rustfmt, clippy
+      - name: Restore validation dependencies
+        id: validation-cache
+        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: validate-v1-${{ runner.os }}-${{ runner.arch }}-${{ needs.prepare.outputs.toolchain }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            validate-v1-${{ runner.os }}-${{ runner.arch }}-${{ needs.prepare.outputs.toolchain }}-
+      - name: Install test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends pkg-config cmake clang clangd golang-go nodejs uuid-dev \
+            poppler-utils fonts-dejavu-core libasound2-dev libxkbcommon-dev libxkbcommon-x11-dev libfontconfig1-dev \
+            libwayland-dev libx11-xcb-dev libxcb-shape0-dev libxcb-xfixes0-dev libssl-dev rpm openssl
+      - name: Validate release helpers and the Store listing
+        run: |
+          python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
+          python3 -m unittest discover -s scripts -p 'test_microsoft_store.py' -v
+          python3 scripts/microsoft_store.py --check
+      - name: Locked Rust checks
+        run: |
+          cargo fmt --all --check
+          cargo --config "profile.dev.package.\"*\".opt-level=0" test --workspace --locked
+          cargo --config "profile.dev.package.\"*\".opt-level=0" clippy --workspace --all-targets --locked -- -D warnings
+      - name: Save validation dependencies even if a later check fails
+        if: ${{ !cancelled() && steps.validation-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.validation-cache.outputs.cache-primary-key }}
+
+  build:
+    # Compile in parallel with validation; publication still requires both.
+    needs: prepare
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, os: linux, arch: x86_64, target: x86_64-unknown-linux-gnu }
+          - { runner: ubuntu-24.04-arm, os: linux, arch: aarch64, target: aarch64-unknown-linux-gnu }
+          - { runner: windows-2025, os: windows, arch: x64, target: x86_64-pc-windows-msvc }
+          - { runner: windows-11-arm, os: windows, arch: arm64, target: aarch64-pc-windows-msvc }
+          - { runner: macos-15-intel, os: macos, arch: x86_64, target: x86_64-apple-darwin }
+          - { runner: macos-15, os: macos, arch: aarch64, target: aarch64-apple-darwin }
+    name: ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '4'
+      WIRECRAFT_BUILD_SHA: ${{ needs.prepare.outputs.sha }}
+      SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.epoch }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TARGET: ${{ matrix.target }}
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ needs.prepare.outputs.toolchain }}
+          targets: ${{ matrix.target }}
+      - name: Restore native build dependencies
+        id: build-cache
+        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/linux-cargo
+            target/linux-build
+            target/release
+            target/${{ matrix.target }}
+          key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-${{ needs.prepare.outputs.toolchain }}-${{ hashFiles('packaging/linux/Dockerfile') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            native-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-${{ needs.prepare.outputs.toolchain }}-${{ hashFiles('packaging/linux/Dockerfile') }}-
+      - name: Build native Linux executables and portable archives against old glibc
+        if: matrix.os == 'linux'
+        run: |
+          docker build -t wirecraft-build -f packaging/linux/Dockerfile .
+          # Docker must not create root-owned host output/cache directories.
+          mkdir -p target/linux-build target/linux-cargo target/release-assets target/installer-tools
+          rm -rf target/linux-build/native
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/src" -v "$(rustc --print sysroot):/opt/rust:ro" \
+            -v "$PWD/target/linux-cargo:/cargo" -v "$PWD/target/linux-build:/build" \
+            -e CARGO_BUILD_JOBS -e RELEASE_TARGET -e RELEASE_VERSION -e SOURCE_DATE_EPOCH -e WIRECRAFT_BUILD_SHA wirecraft-build bash -euc '
+              cargo build --release --locked -p wirecraft-desktop -p wirecraft-runtime --target "$RELEASE_TARGET"
+              release="/build/$RELEASE_TARGET/release"
+              for command in wirecraft-desktop wirecraft; do
+                test "$("$release/$command" --version)" = "Wirecraft $RELEASE_VERSION"
+              done
+              python3 scripts/release/native_linux.py --target "$RELEASE_TARGET" \
+                --binary "wirecraft-desktop=$release/wirecraft-desktop" --binary "wirecraft=$release/wirecraft" \
+                --output /build/native --max-glibc 2.27
+              python3 scripts/release/portable.py --target "$RELEASE_TARGET" \
+                --binaries "$release" --native /build/native --output /src/target/release-assets
+            '
+      - name: Configure Windows static CRT and shader compiler
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          "RUSTFLAGS=-C target-feature=+crt-static" >> $env:GITHUB_ENV
+          $llvm = Join-Path $env:ProgramFiles 'LLVM\bin'
+          if (Test-Path "$llvm\libclang.dll") { "LIBCLANG_PATH=$llvm" >> $env:GITHUB_ENV }
+          $fxc = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter fxc.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $fxc) { throw 'Windows SDK fxc.exe is required by GPUI release shaders' }
+          "GPUI_FXC_PATH=$($fxc.FullName)" >> $env:GITHUB_ENV
+      - name: Build Windows or macOS native executables
+        if: matrix.os != 'linux'
+        run: cargo build --release --locked -p wirecraft-desktop -p wirecraft-runtime --target ${{ matrix.target }}
+      - name: Assemble Windows or macOS portable archives
+        if: matrix.os != 'linux'
+        shell: bash
+        run: |
+          release="target/$RELEASE_TARGET/release"
+          suffix=''
+          if [[ '${{ matrix.os }}' == windows ]]; then suffix=.exe; fi
+          for command in wirecraft-desktop wirecraft; do
+            test "$("$release/$command$suffix" --version | tr -d '\r')" = "Wirecraft $RELEASE_VERSION"
+          done
+          python_cmd=python3
+          if [[ '${{ matrix.os }}' == windows ]]; then python_cmd=python; fi
+          "$python_cmd" scripts/release/portable.py --target "$RELEASE_TARGET" --binaries "$release" --output target/release-assets
+      - name: Save native dependencies before packaging
+        if: ${{ !cancelled() && steps.build-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/linux-cargo
+            target/linux-build
+            target/release
+            target/${{ matrix.target }}
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
+      - name: Install Linux packagers
+        if: matrix.os == 'linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends desktop-file-utils squashfs-tools snapd libfuse2t64 xvfb xdotool firejail imagemagick mesa-vulkan-drivers libgl1-mesa-dri xfonts-base rpm
+      - name: Build Linux AppImage, Snap, DEB and RPM
+        if: matrix.os == 'linux'
+        run: |
+          archive="target/release-assets/wirecraft-$RELEASE_VERSION-$RELEASE_TARGET.tar.gz"
+          python3 scripts/release/appimage.py --archive "$archive" --output target/release-assets
+          python3 scripts/release/snap.py --archive "$archive" --output target/release-assets
+          python3 scripts/release/linux_packages.py --archive "$archive" --output target/release-assets
+      - name: Check DEB installation, command launch and removal
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get install -y ./target/release-assets/*.deb
+          test "$(wirecraft-desktop --version)" = "Wirecraft $RELEASE_VERSION"
+          test "$(wirecraft --version)" = "Wirecraft $RELEASE_VERSION"
+          sudo apt-get remove -y wirecraft
+          test ! -e /opt/wirecraft
+      - name: Check RPM installation, command launch and removal on Rocky Linux 8
+        if: matrix.os == 'linux'
+        run: |
+          docker run --rm -v "$PWD/target/release-assets:/packages:ro" \
+            -e RELEASE_VERSION \
+            rockylinux:8@sha256:9794037624aaa6212aeada1d28861ef5e0a935adaf93e4ef79837119f2a2d04c \
+            bash -euc '
+              dnf install -y /packages/*.rpm
+              test "$(wirecraft-desktop --version)" = "Wirecraft $RELEASE_VERSION"
+              test "$(wirecraft --version)" = "Wirecraft $RELEASE_VERSION"
+              rpm -V wirecraft
+              dnf remove -y wirecraft
+              test ! -e /opt/wirecraft
+            '
+      - name: Verify the packaged AppImage starts offline and paints its window
+        if: matrix.os == 'linux'
+        run: |
+          python3 scripts/release/smoke_linux.py \
+            --appimage "target/release-assets/wirecraft-$RELEASE_VERSION-${{ matrix.arch }}.AppImage" \
+            --output target/startup-smoke
+      - name: Preserve offline startup diagnostics
+        if: ${{ always() && matrix.os == 'linux' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: startup-smoke-${{ matrix.target }}
+          path: target/startup-smoke
+          if-no-files-found: warn
+      - name: Preserve Linux packages when startup checks fail
+        if: ${{ failure() && matrix.os == 'linux' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: failed-startup-packages-${{ matrix.target }}
+          path: target/release-assets
+          if-no-files-found: warn
+      - name: Build Windows MSI and self-signed MSIX
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: ./packaging/windows/package.ps1 -Arch '${{ matrix.arch }}' -Version "$env:RELEASE_VERSION"
+      - name: Check signed MSIX installation, identity and command launch
+        if: matrix.os == 'windows'
+        shell: powershell
+        run: ./packaging/windows/check-msix.ps1 -Arch '${{ matrix.arch }}' -Version "$env:RELEASE_VERSION"
+      - name: Build macOS application bundle and DMG
+        if: matrix.os == 'macos'
+        run: bash packaging/macos/package.sh "$RELEASE_VERSION" "$RELEASE_TARGET"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.target }}
+          path: target/release-assets/*
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, validate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: incoming
+          merge-multiple: true
+      - name: Verify the complete matrix and publish at the selected existing tag
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm openssl
+          python3 scripts/release/verify.py --directory incoming --version "$RELEASE_VERSION" --sha "$RELEASE_SHA"
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_SHA"
+          gh release create "$RELEASE_TAG" incoming/* target/SHA256SUMS.txt \
+            --verify-tag --target "$RELEASE_SHA" --title "Wirecraft $RELEASE_VERSION" --notes-file target/release-notes.md

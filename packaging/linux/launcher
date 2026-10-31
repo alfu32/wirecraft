@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+app_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Installed as both commands; each starts bin/<its own name>.
+app_command=$(basename -- "$0")
+case $app_command in
+  wirecraft|wirecraft-desktop) ;;
+  *) echo "Unknown Wirecraft command: $app_command" >&2; exit 1 ;;
+esac
+# Prefer desktop/driver-provider libraries, keeping the XKB core and X11 bridge
+# together: their private structures are incompatible across runtime versions.
+# System directories come first, so tools the backend starts (clangd, compilers)
+# keep their own libraries.
+case $(uname -m) in
+  x86_64) app_triplet=x86_64-linux-gnu ;;
+  aarch64) app_triplet=aarch64-linux-gnu ;;
+  *) echo 'Unsupported Wirecraft architecture' >&2; exit 1 ;;
+esac
+app_system_paths="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}/lib/$app_triplet:/usr/lib/$app_triplet:/lib64:/usr/lib64:/lib:/usr/lib"
+. "$app_root/xkb-runtime.sh"
+if wirecraft_needs_bundled_xkb "$app_system_paths"; then
+    export LD_LIBRARY_PATH="$app_root/lib/xkb:$app_system_paths:$app_root/lib"
+    # XLOCALEDIR preserves explicit XCOMPOSEFILE and ~/.XCompose preferences.
+    if [ "${XLOCALEDIR+x}" != x ]; then
+        export XLOCALEDIR="$app_root/share/X11/locale"
+    fi
+else
+    export LD_LIBRARY_PATH="$app_system_paths:$app_root/lib"
+fi
+if [ "${XKB_CONFIG_ROOT+x}" != x ] && [ -d "$app_root/share/X11/xkb" ]; then
+    export XKB_CONFIG_ROOT="$app_root/share/X11/xkb"
+fi
+export FONTCONFIG_FILE="$app_root/etc/fonts/fonts.conf"
+if [ -n "${WIRECRAFT_EXEC_WRAPPER:-}" ]; then
+    exec "$WIRECRAFT_EXEC_WRAPPER" "$app_root/bin/$app_command" "$@"
+fi
+exec "$app_root/bin/$app_command" "$@"

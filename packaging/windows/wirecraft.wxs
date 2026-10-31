@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Wirecraft" Manufacturer="Wirecraft" Version="$(var.Version)"
+           UpgradeCode="D1B9E264-A22E-4329-9D75-D96A1575A28B" Scope="perMachine" Compressed="yes" Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Wirecraft is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="AppIcon" SourceFile="$(var.Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <StandardDirectory Id="ProgramFiles6432Folder"><Directory Id="INSTALLFOLDER" Name="Wirecraft" /></StandardDirectory>
+    <Feature Id="Main" Title="Wirecraft" Level="1"><ComponentGroupRef Id="WirecraftFiles" /><ComponentRef Id="MenuShortcut" /></Feature>
+    <StandardDirectory Id="ProgramMenuFolder"><Directory Id="WirecraftMenu" Name="Wirecraft">
+      <Component Id="MenuShortcut" Guid="*">
+        <Shortcut Id="StartWirecraft" Name="Wirecraft" Target="[INSTALLFOLDER]wirecraft-desktop.exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        <RemoveFolder Id="RemoveWirecraftMenu" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="Software\Wirecraft" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </Directory></StandardDirectory>
+  </Package>
+  <Fragment><ComponentGroup Id="WirecraftFiles" Directory="INSTALLFOLDER"><Files Include="$(var.Stage)\**" /></ComponentGroup></Fragment>
+</Wix>

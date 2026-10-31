@@ -1,0 +1,93 @@
+{
+  "aarch64": {
+    "tool": {
+      "version": "1.9.1",
+      "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-aarch64.AppImage",
+      "sha256": "f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158"
+    },
+    "runtime": {
+      "version": "20251108",
+      "url": "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-aarch64",
+      "sha256": "00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444"
+    }
+  },
+  "tool": {
+    "version": "1.9.1",
+    "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage",
+    "sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+  },
+  "runtime": {
+    "version": "20251108",
+    "url": "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64",
+    "sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d",
+    "source": "https://github.com/AppImage/type2-runtime/tree/20251108",
+    "sourceArchive": "https://github.com/AppImage/type2-runtime/archive/refs/tags/20251108.tar.gz"
+  },
+  "notices": [
+    {
+      "file": "licenses/appimage-runtime/libfuse/AUTHORS",
+      "url": "https://raw.githubusercontent.com/libfuse/libfuse/fuse-3.15.0/AUTHORS",
+      "sha256": "fafe891ac0d23452355fe41d5e5538904fe5324b44cc03f519063e83deb9b0f8"
+    },
+    {
+      "file": "licenses/appimage-runtime/libfuse/GPL2.txt",
+      "url": "https://raw.githubusercontent.com/libfuse/libfuse/fuse-3.15.0/GPL2.txt",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "file": "licenses/appimage-runtime/libfuse/LGPL2.txt",
+      "url": "https://raw.githubusercontent.com/libfuse/libfuse/fuse-3.15.0/LGPL2.txt",
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551"
+    },
+    {
+      "file": "licenses/appimage-runtime/mimalloc/LICENSE",
+      "url": "https://raw.githubusercontent.com/microsoft/mimalloc/v2.1.7/LICENSE",
+      "sha256": "19c99805e7a44a34b297a75d1edea9985e300066dfc024d5c99d4236d4573b5d"
+    },
+    {
+      "file": "licenses/appimage-runtime/musl/COPYRIGHT",
+      "url": "https://git.musl-libc.org/cgit/musl/plain/COPYRIGHT?h=v1.2.5",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af"
+    },
+    {
+      "file": "licenses/appimage-runtime/runtime/BUILD.md",
+      "url": "https://raw.githubusercontent.com/AppImage/type2-runtime/20251108/BUILD.md",
+      "sha256": "d94c5dc40e550dfb1679aecef24a16830b3ae7d6880e65b042f8a3336be3174b"
+    },
+    {
+      "file": "licenses/appimage-runtime/runtime/LICENSE",
+      "url": "https://raw.githubusercontent.com/AppImage/type2-runtime/20251108/LICENSE",
+      "sha256": "aa154fc9070614bbe7921f89db11efd1dba7a1f3a41685958110e2230f9c0ca1"
+    },
+    {
+      "file": "licenses/appimage-runtime/runtime/install-dependencies.sh",
+      "url": "https://raw.githubusercontent.com/AppImage/type2-runtime/20251108/scripts/common/install-dependencies.sh",
+      "sha256": "45cf79ad6570c75c1f06bcbb629e4d55fbc5c6b1d44e974bb6037b1c209ed170"
+    },
+    {
+      "file": "licenses/appimage-runtime/runtime/libfuse-mount.patch",
+      "url": "https://raw.githubusercontent.com/AppImage/type2-runtime/20251108/patches/libfuse/mount.c.diff",
+      "sha256": "1c7fd9e26717545a476b226b083a9f9d05676c180edbd71a04bbd8a73599dc44"
+    },
+    {
+      "file": "licenses/appimage-runtime/squashfuse/LICENSE",
+      "url": "https://raw.githubusercontent.com/vasi/squashfuse/0.5.2/LICENSE",
+      "sha256": "9e909cc8a8ba27b1a649c964cf9eda37de911f3138c2b64e6d2f01703904ac13"
+    },
+    {
+      "file": "licenses/appimage-runtime/zlib/zlib.h",
+      "url": "https://raw.githubusercontent.com/madler/zlib/v1.3.1/zlib.h",
+      "sha256": "8a5579af72ea4f427ff00a4150f0ccb3fc5c1e4379f726e101133b1ab9fc600c"
+    },
+    {
+      "file": "licenses/appimage-runtime/zstd/COPYING",
+      "url": "https://raw.githubusercontent.com/facebook/zstd/v1.5.6/COPYING",
+      "sha256": "f9c375a1be4a41f7b70301dd83c91cb89e41567478859b77eef375a52d782505"
+    },
+    {
+      "file": "licenses/appimage-runtime/zstd/LICENSE",
+      "url": "https://raw.githubusercontent.com/facebook/zstd/v1.5.6/LICENSE",
+      "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+    }
+  ]
+}

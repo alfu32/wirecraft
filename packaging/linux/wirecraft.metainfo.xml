@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.alfu32.wirecraft</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>Wirecraft</name>
+  <summary>Dataflow topology designer that generates programs</summary>
+  <description>
+    <p>Design processors, types and links as a dataflow graph, edit their bodies
+    with language-server support, and generate C17, Rust, Go, Kotlin, JavaScript or
+    PHP programs from Threadworks-compatible .orch projects.</p>
+  </description>
+  <launchable type="desktop-id">wirecraft.desktop</launchable>
+  <provides>
+    <binary>wirecraft-desktop</binary>
+    <binary>wirecraft</binary>
+    <mediatype>application/x-threadworks-orch</mediatype>
+  </provides>
+  <url type="homepage">https://github.com/alfu32/wirecraft</url>
+  <url type="bugtracker">https://github.com/alfu32/wirecraft/issues</url>
+  <content_rating type="oars-1.1"/>
+</component>
