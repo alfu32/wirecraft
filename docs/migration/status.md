@@ -32,7 +32,7 @@ Verification:
 Pending:
 - The Release workflow has not run on GitHub. AppImage, Snap, Windows and macOS packaging, and the ARM builds, are unverified.
 - The Windows application itself has never been run.
-- The Store needs confirmation of the product name and a privacy policy page.
+- The Store needs confirmation of the product name. The privacy policy is [docs/PRIVACY_POLICY.md](../PRIVACY_POLICY.md) (0.27.6).
 
 0.27.1: the first Release run (v0.27.0) passed on Linux x86_64/aarch64, including the AppImage startup smoke, and on macOS Apple Silicon. On Windows ARM64, the installed MSIX refused to start `wirecraft.exe` (`Access is denied`), because only `wirecraft-desktop.exe` was declared in its manifest. The command line is now a second, unlisted console application with a `wirecraft.exe` alias.
 

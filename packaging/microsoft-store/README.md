@@ -120,9 +120,10 @@ product name, so one set serves every language.
 (**Developer tools**), pricing, website, support contact, Windows requirements and
 certification notes. Still to do in Partner Center:
 
-- **Privacy policy.** Wirecraft has no privacy policy page yet; one is needed
-  before submission (the listing answers Yes to personal information, since
-  project files can carry people's names and MCP clients can read them).
+- **Privacy policy.** Enter the URL of [docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md)
+  (https://github.com/alfu32/wirecraft/blob/master/docs/PRIVACY_POLICY.md).
+  The listing answers Yes to personal information, since project files can carry
+  people's names and MCP clients can read them; the policy says so.
 - **Package.** Upload the release workflow's `wirecraft-X.Y.Z-windows-x64.msix`
   and `-arm64.msix` (0.27.4 or later; 0.27.3 produced no MSIX). They carry the identity in
   `packaging/windows/msix-identity.json`, copied from Partner Center's

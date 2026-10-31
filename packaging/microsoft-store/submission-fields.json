@@ -14,7 +14,7 @@
     "inAppPurchases": "None",
     "website": "https://github.com/alfu32/wirecraft",
     "supportContact": "https://github.com/alfu32/wirecraft/issues",
-    "privacyPolicy": "To be published; Wirecraft has no privacy policy page yet (Meshcraft's is docs/PRIVACY_POLICY.md in its repository).",
+    "privacyPolicy": "https://github.com/alfu32/wirecraft/blob/master/docs/PRIVACY_POLICY.md",
     "accessesPersonalInformation": "Yes — user-selected project files may contain personal information (responsible, assignee and revision fields); optional local MCP clients can read the design. No automatic developer analytics or project upload.",
     "deviceFamily": "Windows.Desktop",
     "packageArchitectures": ["x64", "arm64"],
