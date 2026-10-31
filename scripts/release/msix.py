@@ -101,13 +101,13 @@ def manifest(version, arch, config=None):
     add(add(file_type, "uap:SupportedFileTypes"), "uap:FileType", ".orch")
     alias = add(extensions, "uap3:Extension", Category="windows.appExecutionAlias",
                 Executable="wirecraft-desktop.exe", EntryPoint="Windows.FullTrustApplication")
-    add(add(alias, "uap3:AppExecutionAlias"), "desktop:ExecutionAlias", Alias="wirecraft-desktop.exe")
-    # Windows refuses to start a packaged executable the manifest does not declare. The
-    # command line is declared by its own alias on the one application: the Store refuses
-    # a second, unlisted (AppListEntry="none") application without a headless-app waiver.
-    cli_alias = add(extensions, "uap3:Extension", Category="windows.appExecutionAlias",
-                    Executable="wirecraft.exe", EntryPoint="Windows.FullTrustApplication")
-    add(add(cli_alias, "uap3:AppExecutionAlias"), "desktop:ExecutionAlias", Alias="wirecraft.exe")
+    # Windows refuses to start an undeclared packaged executable, the Store refuses an
+    # unlisted (headless) second application, and an application has one alias extension
+    # whose aliases all start its executable. So `wirecraft.exe` is an alias of the desktop
+    # executable, which runs the command line when started under that name.
+    aliases = add(alias, "uap3:AppExecutionAlias")
+    for name in ("wirecraft-desktop.exe", "wirecraft.exe"):
+        add(aliases, "desktop:ExecutionAlias", Alias=name)
     add(add(root, "Capabilities"), "rescap:Capability", Name="runFullTrust")
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 

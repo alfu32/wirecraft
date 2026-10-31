@@ -2210,11 +2210,23 @@ impl Render for Wirecraft {
         div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(cx.listener(Self::go_to_definition)).on_action(cx.listener(Self::find_references)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).children(draft_notice).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
     }
 }
+/// The MSIX declares one application, so its `wirecraft.exe` alias starts this
+/// executable: started under that name, it is the command line.
+fn started_as_command_line(program: &str) -> bool {
+    let name = program.rsplit(['/', '\\']).next().unwrap_or_default();
+    name.eq_ignore_ascii_case("wirecraft") || name.eq_ignore_ascii_case("wirecraft.exe")
+}
+
 fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.first().map(String::as_str) == Some("--backend") {
+    let mut args = std::env::args();
+    let command_line = args
+        .next()
+        .is_some_and(|program| started_as_command_line(&program));
+    let args: Vec<String> = args.collect();
+    if command_line || args.first().map(String::as_str) == Some("--backend") {
+        let skip = usize::from(!command_line);
         return tokio::runtime::Runtime::new()?
-            .block_on(wirecraft_runtime::cli::run(args.into_iter().skip(1)));
+            .block_on(wirecraft_runtime::cli::run(args.into_iter().skip(skip)));
     }
     let mut state_dir = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
@@ -2347,4 +2359,29 @@ fn main() -> anyhow::Result<()> {
         });
     let _ = worker.join();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::started_as_command_line;
+
+    #[test]
+    fn the_wirecraft_alias_starts_the_command_line() {
+        for program in [
+            "wirecraft",
+            "wirecraft.exe",
+            r"C:\Users\me\AppData\Local\Microsoft\WindowsApps\Wirecraft.EXE",
+            "/opt/wirecraft/bin/wirecraft",
+        ] {
+            assert!(started_as_command_line(program), "{program}");
+        }
+        for program in [
+            "wirecraft-desktop",
+            "wirecraft-desktop.exe",
+            "/tmp/wirecraft/desktop",
+            "",
+        ] {
+            assert!(!started_as_command_line(program), "{program}");
+        }
+    }
 }

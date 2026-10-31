@@ -87,11 +87,12 @@ class MsixTests(unittest.TestCase):
             applications = root.findall(name + "Applications/" + name + "Application")
             self.assertEqual([a.get("Executable") for a in applications], ["wirecraft-desktop.exe"])
             self.assertNotIn(b"AppListEntry", data)
-            # Undeclared packaged executables cannot be started (Access is denied).
-            aliases = root.findall(".//{" + msix.NS["uap3"] + "}Extension")
-            self.assertEqual([(a.get("Executable"), a.find(".//{" + msix.NS["desktop"] + "}ExecutionAlias").get("Alias"))
-                              for a in aliases],
-                             [("wirecraft-desktop.exe", "wirecraft-desktop.exe"), ("wirecraft.exe", "wirecraft.exe")])
+            # Undeclared packaged executables cannot be started (Access is denied), and
+            # MakeAppx accepts one alias extension per application.
+            extensions = root.findall(".//{" + msix.NS["uap3"] + "}Extension")
+            self.assertEqual([e.get("Executable") for e in extensions], ["wirecraft-desktop.exe"])
+            aliases = root.findall(".//{" + msix.NS["desktop"] + "}ExecutionAlias")
+            self.assertEqual([a.get("Alias") for a in aliases], ["wirecraft-desktop.exe", "wirecraft.exe"])
             self.assertIn(b".orch", data)
             self.assertIn(b"windows.appExecutionAlias", data)
             msix.check_manifest(data, "0.41.1", arch)
