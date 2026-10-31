@@ -58,8 +58,10 @@ are pinned to commits/digests (`packaging/appimage-inputs.json`, notices under
 - **Windows** builds link the static CRT. The MSIX is signed with a self-signed
   certificate created for that run (publisher `CN=Wirecraft`, identity in
   `packaging/windows/msix-identity.json`); its public CER ships for Trusted
-  People installation. Release CI installs the MSIX, runs both executables'
-  `--version` and removes it. The MSI is unsigned.
+  People installation. The manifest declares both executables (the command line
+  as an unlisted console application with a `wirecraft.exe` alias): Windows
+  refuses to start an undeclared packaged executable. Release CI installs the
+  MSIX, runs both executables' `--version` and removes it. The MSI is unsigned.
 - **macOS** bundles are ad-hoc signed, without Developer ID signing or
   notarization.
 
