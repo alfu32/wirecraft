@@ -5,8 +5,9 @@ param(
   [Parameter(Mandatory=$true)][string]$SourceRevision,
   [Parameter(Mandatory=$true)][string]$PublicCertificate
 )
-# Signs with a certificate created for this run only: Wirecraft has no Store identity
-# or signing secrets. The private key never leaves the runner; the public CER ships.
+# Signs with a certificate created for this run only, whose subject is the reserved
+# Store publisher: there are no signing secrets, and the Store re-signs what it accepts.
+# The private key never leaves the runner; the public CER ships.
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $Identity = python (Join-Path $Root 'scripts\release\msix.py') --identity --version $Version --arch $Arch --output (Join-Path ([IO.Path]::GetTempPath()) 'wirecraft-identity-manifest.xml') | ConvertFrom-Json

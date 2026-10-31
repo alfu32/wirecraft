@@ -26,7 +26,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Msi)) { throw 'MSI build failed' }
 # WiX emits debug symbol files beside the installer; they are build outputs, not release assets.
 Get-ChildItem -Path $Assets -Filter '*.wixpdb' -File | Remove-Item -Force
 
-# The MSIX contains the same payload under the self-signed publisher identity.
+# The MSIX contains the same payload under the reserved Store identity, self-signed.
 $MsixStage = Join-Path $Root "target\msix-package-$Arch"
 if (Test-Path $MsixStage) { Remove-Item $MsixStage -Recurse -Force }
 Copy-Item $Payload $MsixStage -Recurse

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate and check sideloadable MSIX manifests with a self-signed publisher identity.
+"""Generate and check MSIX manifests carrying the reserved Microsoft Store identity.
 
-Wirecraft has no Microsoft Store reservation: each release run signs with a fresh
-self-signed certificate whose subject is the configured publisher, and ships its
-public CER for Trusted People installation.
+There are no signing secrets: each release run signs with a fresh self-signed
+certificate whose subject is the reserved publisher, and ships its public CER for
+Trusted People installation. The Store re-signs the packages it accepts.
 """
 
 import argparse
@@ -23,7 +23,6 @@ NS = {
     "uap": "http://schemas.microsoft.com/appx/manifest/uap/windows10",
     "uap3": "http://schemas.microsoft.com/appx/manifest/uap/windows10/3",
     "desktop": "http://schemas.microsoft.com/appx/manifest/desktop/windows10",
-    "desktop4": "http://schemas.microsoft.com/appx/manifest/desktop/windows10/4",
     "rescap": "http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities",
 }
 for prefix, namespace in NS.items():
@@ -50,7 +49,10 @@ def identity(path=IDENTITY):
         raise ValueError("MSIX publisher must be a single common name")
     if not isinstance(value.get("versionMajorOffset"), int) or value["versionMajorOffset"] < 0:
         raise ValueError("Invalid MSIX version major offset")
-    value["packageFamilyName"] = value["name"] + "_" + publisher_id(value["publisher"])
+    # The family name is copied from Partner Center's Product identity; it must be the
+    # one Windows derives from the name and publisher.
+    if value.get("packageFamilyName") != value["name"] + "_" + publisher_id(value["publisher"]):
+        raise ValueError("MSIX package family name does not match the name and publisher")
     return value
 
 
@@ -77,7 +79,7 @@ def manifest(version, arch, config=None):
         return element
 
     description = "Wirecraft dataflow topology designer"
-    root = ET.Element("{" + NS[""] + "}Package", IgnorableNamespaces="uap uap3 desktop desktop4 rescap")
+    root = ET.Element("{" + NS[""] + "}Package", IgnorableNamespaces="uap uap3 desktop rescap")
     add(root, "Identity", Name=config["name"], Publisher=config["publisher"],
         Version=package_version(version, config), ProcessorArchitecture=arch)
     properties = add(root, "Properties")
@@ -88,8 +90,7 @@ def manifest(version, arch, config=None):
     add(add(root, "Resources"), "Resource", Language="en-us")
     add(add(root, "Dependencies"), "TargetDeviceFamily", Name="Windows.Desktop",
         MinVersion="10.0.17763.0", MaxVersionTested="10.0.22621.0")
-    applications = add(root, "Applications")
-    application = add(applications, "Application", Id="Wirecraft",
+    application = add(add(root, "Applications"), "Application", Id="Wirecraft",
                       Executable="wirecraft-desktop.exe", EntryPoint="Windows.FullTrustApplication")
     add(application, "uap:VisualElements", DisplayName=config["displayName"],
         Description=description, BackgroundColor="transparent",
@@ -101,18 +102,10 @@ def manifest(version, arch, config=None):
     alias = add(extensions, "uap3:Extension", Category="windows.appExecutionAlias",
                 Executable="wirecraft-desktop.exe", EntryPoint="Windows.FullTrustApplication")
     add(add(alias, "uap3:AppExecutionAlias"), "desktop:ExecutionAlias", Alias="wirecraft-desktop.exe")
-    # Windows refuses to start a packaged executable the manifest does not declare, so
-    # the command line is a second, unlisted application with its own console alias.
-    # MakeAppx only accepts a console subsystem on a multiple-instance application.
-    command_line = add(applications, "Application", Id="WirecraftCommandLine",
-                       Executable="wirecraft.exe", EntryPoint="Windows.FullTrustApplication",
-                       **{"{" + NS["desktop4"] + "}Subsystem": "console",
-                          "{" + NS["desktop4"] + "}SupportsMultipleInstances": "true"})
-    add(command_line, "uap:VisualElements", DisplayName=config["displayName"] + " command line",
-        Description="Wirecraft command line: MCP, validation and code generation",
-        BackgroundColor="transparent", AppListEntry="none",
-        Square150x150Logo="Assets\\Square150x150Logo.png", Square44x44Logo="Assets\\Square44x44Logo.png")
-    cli_alias = add(add(command_line, "Extensions"), "uap3:Extension", Category="windows.appExecutionAlias",
+    # Windows refuses to start a packaged executable the manifest does not declare. The
+    # command line is declared by its own alias on the one application: the Store refuses
+    # a second, unlisted (AppListEntry="none") application without a headless-app waiver.
+    cli_alias = add(extensions, "uap3:Extension", Category="windows.appExecutionAlias",
                     Executable="wirecraft.exe", EntryPoint="Windows.FullTrustApplication")
     add(add(cli_alias, "uap3:AppExecutionAlias"), "desktop:ExecutionAlias", Alias="wirecraft.exe")
     add(add(root, "Capabilities"), "rescap:Capability", Name="runFullTrust")

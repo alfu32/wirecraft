@@ -61,6 +61,15 @@ class MsixTests(unittest.TestCase):
         identity = msix.identity()
         self.assertEqual(identity["packageFamilyName"], identity["name"] + "_" + msix.publisher_id(identity["publisher"]))
 
+    def test_identity_matches_the_store_reservation(self):
+        identity = msix.identity()
+        self.assertEqual(identity["packageFamilyName"], "K3D0.wirecraft_tfmtd4yrk952g")
+        # Partner Center rejects a PublisherDisplayName other than the account's publisher.
+        store = json.loads((msix.ROOT / "packaging/microsoft-store/submission-fields.json").read_text())
+        self.assertEqual(identity["publisherDisplayName"], store["publisherDisplayName"])
+        self.assertEqual(identity["displayName"], store["productName"])
+        self.assertEqual(identity["storeId"], store["storeId"])
+
     def test_identity_both_architectures_and_version_mapping(self):
         identity = msix.identity()
         for arch in ("x64", "arm64"):
@@ -72,13 +81,17 @@ class MsixTests(unittest.TestCase):
             self.assertEqual(package.get("Publisher"), identity["publisher"])
             self.assertEqual(package.get("ProcessorArchitecture"), arch)
             self.assertEqual(package.get("Version"), "1.41.1.0")
+            self.assertEqual(root.find(name + "Properties/" + name + "PublisherDisplayName").text,
+                             identity["publisherDisplayName"])
+            # The Store refuses a headless (AppListEntry="none") application without a waiver.
             applications = root.findall(name + "Applications/" + name + "Application")
-            self.assertEqual([a.get("Executable") for a in applications], ["wirecraft-desktop.exe", "wirecraft.exe"])
+            self.assertEqual([a.get("Executable") for a in applications], ["wirecraft-desktop.exe"])
+            self.assertNotIn(b"AppListEntry", data)
             # Undeclared packaged executables cannot be started (Access is denied).
-            aliases = root.findall(".//{" + msix.NS["desktop"] + "}ExecutionAlias")
-            self.assertEqual([a.get("Alias") for a in aliases], ["wirecraft-desktop.exe", "wirecraft.exe"])
-            self.assertEqual(applications[1].get("{" + msix.NS["desktop4"] + "}Subsystem"), "console")
-            self.assertEqual(applications[1].get("{" + msix.NS["desktop4"] + "}SupportsMultipleInstances"), "true")
+            aliases = root.findall(".//{" + msix.NS["uap3"] + "}Extension")
+            self.assertEqual([(a.get("Executable"), a.find(".//{" + msix.NS["desktop"] + "}ExecutionAlias").get("Alias"))
+                              for a in aliases],
+                             [("wirecraft-desktop.exe", "wirecraft-desktop.exe"), ("wirecraft.exe", "wirecraft.exe")])
             self.assertIn(b".orch", data)
             self.assertIn(b"windows.appExecutionAlias", data)
             msix.check_manifest(data, "0.41.1", arch)

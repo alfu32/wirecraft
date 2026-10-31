@@ -178,9 +178,9 @@ if __name__ == "__main__":
         "The strictly confined Snap cannot reach host compilers or language servers (clang, clangd, "
         "rust-analyzer, Go, Node.js), so code checks and generated-program builds need another package.\n\n"
         "DEB/RPM packages are unsigned GitHub release downloads; APT/RPM repository publishing is not configured.\n\n"
-        "Windows MSIX packages are signed with a self-signed certificate created for this release (publisher "
-        "`CN=Wirecraft`); install the matching public CER into Trusted People to sideload them. "
-        "There is no Microsoft Store listing. MSI packages are unsigned. "
+        "Windows MSIX packages carry the reserved Microsoft Store identity and are signed with a self-signed "
+        "certificate created for this release; install the matching public CER into Trusted People to sideload "
+        "them. MSI packages are unsigned. "
         "macOS bundles are ad-hoc signed, without Developer ID signing or notarization. "
         "Native GUI testing on Windows/macOS and ARM64 remains to be qualified.\n"
     )

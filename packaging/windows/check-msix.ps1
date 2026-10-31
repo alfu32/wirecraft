@@ -27,10 +27,15 @@ try {
   if (-not $Installed -or $Installed.PackageFamilyName -cne $Identity.packageFamilyName -or
       $Installed.Publisher -cne $Identity.publisher -or $Installed.Version.ToString() -ne $Metadata.packageVersion -or
       $Installed.Architecture.ToString() -ine $Arch) { throw 'Installed MSIX identity/version/architecture mismatch' }
-  foreach ($Command in @('wirecraft-desktop.exe','wirecraft.exe')) {
-    $Executable = Join-Path $Installed.InstallLocation $Command
-    python -c "import subprocess,sys; actual=subprocess.check_output([sys.argv[1],'--version'],text=True).strip(); assert actual=='Wirecraft '+sys.argv[2],actual; print(actual)" $Executable $Version
-    if ($LASTEXITCODE -ne 0) { throw "Installed MSIX $Command launch failed" }
+  # The application starts from its install location; both commands start through the
+  # execution aliases Windows creates for the installing user, as from a terminal.
+  $Aliases = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+  $Launches = @((Join-Path $Installed.InstallLocation 'wirecraft-desktop.exe'),
+                (Join-Path $Aliases 'wirecraft-desktop.exe'), (Join-Path $Aliases 'wirecraft.exe'))
+  foreach ($Executable in $Launches) {
+    if (-not (Test-Path $Executable)) { throw "Installed MSIX command missing: $Executable" }
+    python -c "import subprocess,sys; actual=subprocess.check_output([sys.argv[1],'--version'],text=True).strip(); assert actual=='Wirecraft '+sys.argv[2],actual; print(sys.argv[1], actual)" $Executable $Version
+    if ($LASTEXITCODE -ne 0) { throw "Installed MSIX launch failed: $Executable" }
   }
 } finally {
   try {
