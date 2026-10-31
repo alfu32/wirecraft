@@ -2,6 +2,40 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Release matrix, licenses and Store listing (0.27.0)
+
+At the user's request, Wirecraft has Meshcraft's release workflow and six-target artifact matrix (`.github/workflows/distribution.yaml`, `scripts/release/`, `packaging/`; details in [packaging/README.md](../../packaging/README.md)). A manual **Release** run at an existing `vX.Y.Z` tag produces 28 verified artifacts:
+- Linux x86_64/aarch64: ZIP, tar.gz, AppImage, Snap, DEB, RPM, built in Ubuntu 18.04 against glibc 2.27 with every non-driver library bundled.
+- Windows x64/ARM64: ZIP, tar.gz, MSI, and an MSIX with its public CER.
+- macOS Intel/Apple Silicon: ZIP, tar.gz, DMG.
+
+Adaptations from Meshcraft:
+- **Executables:** each payload carries both `wirecraft-desktop` and the `wirecraft` command line, and both gained `--version` for the install checks.
+- **Tags and toolchain:** tags keep the `v` prefix. The toolchain is pinned in the workflow, because a `rust-toolchain.toml` would also switch local rust-analyzer.
+- **Validation runner:** validation runs on the current runner, since the tests need clang, clangd, Go and Node.js.
+- **MSIX signing:** the MSIX is signed with a self-signed `CN=Wirecraft` certificate created per run. There are no repository secrets.
+- **Snap:** strictly confined; it cannot reach host compilers or language servers.
+
+The workspace license is now `MIT OR Apache-2.0`, with `LICENSE-MIT` and `LICENSE-APACHE`. The icon PNG and ICO are drawn from `assets/wirecraft.svg`.
+
+**Microsoft Store listing:** `packaging/microsoft-store` prepares an import for Store ID 9NDMQVXLGBQJ ([README](../../packaging/microsoft-store/README.md)):
+- 32 locales, filled into the supplied Partner Center export.
+- Ten 1920×1080 screenshots of the real 0.27.0 release build on the working WebServer examples. The design features come first, then project management, plan export and the MCP server.
+- Nine artwork images composed from screenshot crops.
+- `scripts/capture_store_features.py` runs every scene on a private Xvfb with software Vulkan, so its clicks and typing never reach the desktop session.
+
+Verification:
+- The release unit tests passed (20/20, including real DEB/RPM builds and the 28-artifact verifier, in a container with rpm tools).
+- In the Ubuntu 18.04 container, a real x86_64 build produced both executables, a 23-file ELF bundle needing glibc ≤ 2.27, and portable archives. On this machine, the payload launchers ran both commands; a DEB from that archive installed, ran both commands and removed cleanly.
+- The Store builder tests passed (12/12), as did `microsoft_store.py --check` and a headless render of `review.html`.
+
+Pending:
+- The Release workflow has not run on GitHub. AppImage, Snap, Windows and macOS packaging, and the ARM builds, are unverified.
+- The Windows application itself has never been run.
+- The Store needs the reserved MSIX identity in `packaging/windows/msix-identity.json`, confirmation of the product name and publisher, and a privacy policy page.
+
+0.26.1 fixed the committed WebServer example, which broke CI: the component's `socket_accept` body lacked a semicolon after `http_resolve`, and `examples/webserver.orch` still pinned the component before its `listenerConfig` port.
+
 ## Identifier default names (0.26.0)
 
 At the user's request, entities and links created without a name are named with valid, unique identifiers: the kind's base followed by the first counter no entity or link name uses (`processor1`, `Type1`, `packet1`, `group1`, `note1`, `node1`). Before, the canvas named them `New processor`, `New type` and `packet`, so names had spaces and repeated. Core `Document::default_name` picks the name; the service uses it when `create_entity`/`create_link` get no name (the MCP schemas no longer require one), and the canvas preview shows the same name before the click. Names the user types are kept as they are, and port names still come from their link. Verification: `tests/services.rs` `unnamed_entities_and_links_get_unique_identifier_names`. Pending: names typed by the user are not checked to be identifiers.
