@@ -162,7 +162,7 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T17:25:24Z",
+        "date": "2026-10-28T01:40:13Z",
         "user": "local"
       },
       "diagnostics": [],
@@ -188,7 +188,8 @@
           "endStatus": "IMPLEMENTATION"
         }
       ],
-      "assignee": null
+      "assignee": null,
+      "io": "in"
     },
     {
       "id": "node_afca91af-9db7-4648-894e-948214e6b2d8",
@@ -300,8 +301,8 @@
       "incomingLinks": [],
       "outgoingLinks": [],
       "layout": {
-        "x": 1386.467284366889,
-        "y": 1051.0715120049415,
+        "x": 1165.153249972568,
+        "y": 1194.5730952454144,
         "width": 220.0,
         "height": 86.0,
         "closedWidth": 220.0,
@@ -359,7 +360,7 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:30:22Z",
+        "date": "2026-10-28T02:36:35Z",
         "user": "local"
       },
       "diagnostics": [],
@@ -396,8 +397,8 @@
       "incomingLinks": [],
       "outgoingLinks": [],
       "layout": {
-        "x": 1385.941799725824,
-        "y": 911.0698503301846,
+        "x": 1246.256654834311,
+        "y": 1023.4797156451874,
         "width": 220.0,
         "height": 86.0,
         "closedWidth": 220.0,
@@ -467,7 +468,7 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T13:30:19Z",
+        "date": "2026-10-28T02:36:41Z",
         "user": "local"
       },
       "diagnostics": [],
@@ -504,8 +505,8 @@
       "incomingLinks": [],
       "outgoingLinks": [],
       "layout": {
-        "x": 1748.0552715075034,
-        "y": 898.9986653209629,
+        "x": 1767.5226084067845,
+        "y": 917.7088418597278,
         "width": 220.0,
         "height": 268.0,
         "closedWidth": 220.0,
@@ -575,7 +576,7 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-27T22:44:57Z",
+        "date": "2026-10-28T02:36:45Z",
         "user": "local"
       },
       "diagnostics": [],

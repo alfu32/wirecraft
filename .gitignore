@@ -4,3 +4,8 @@
 .wirecraft-session.json
 .idea/
 __pycache__/
+.store
+dist
+.kode-rs
+.kode-rs.json
+.kode-rs.json.previous

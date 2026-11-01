@@ -159,7 +159,7 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-28T01:05:33Z",
+        "date": "2026-10-28T01:39:13Z",
         "user": "local"
       },
       "diagnostics": [],
@@ -185,7 +185,8 @@
           "endStatus": "IMPLEMENTATION"
         }
       ],
-      "assignee": null
+      "assignee": null,
+      "io": "inout"
     },
     {
       "id": "node_d65ea215-7d71-40bc-b29a-3815ca73018b",
@@ -642,7 +643,7 @@
       },
       "responsible": null,
       "modified": {
-        "date": "2026-10-28T01:00:45Z",
+        "date": "2026-10-30T10:40:11Z",
         "user": "local"
       },
       "diagnostics": [],
