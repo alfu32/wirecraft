@@ -724,3 +724,99 @@ async fn shutdown_closes_live_event_subscriptions() {
         .unwrap();
     drop(response);
 }
+
+/// What the desktop starts its backend with: always a document to work on.
+fn serve_project_or_new(path: &std::path::Path) -> (std::process::Child, Value) {
+    use std::io::BufRead;
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_wirecraft"))
+        .args(["serve", "--project-or-new"])
+        .arg(path)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    std::io::BufReader::new(child.stdout.as_mut().unwrap())
+        .read_line(&mut line)
+        .unwrap();
+    (child, serde_json::from_str(&line).unwrap())
+}
+async fn api(ready: &Value, command: &str, arguments: Value) -> Value {
+    reqwest::Client::new()
+        .post(format!("{}/api", ready["endpoint"].as_str().unwrap()))
+        .bearer_auth(ready["token"].as_str().unwrap())
+        .json(&json!({"command":command,"arguments":arguments}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap()
+}
+#[tokio::test]
+async fn a_missing_or_empty_project_opens_as_a_new_document_saved_on_request() {
+    let temp = tempfile::tempdir().unwrap();
+    let empty = temp.path().join("empty.orch");
+    std::fs::write(&empty, " \n").unwrap();
+    for (path, name) in [
+        (temp.path().join("missing.orch"), "missing"),
+        (empty, "empty"),
+    ] {
+        let before = std::fs::read(&path).ok();
+        let (mut child, ready) = serve_project_or_new(&path);
+        assert!(ready["projectError"].is_null(), "{ready}");
+        let snapshot = api(&ready, "session.snapshot", json!({})).await;
+        let root = snapshot["result"]["document"]["rootNodeId"]
+            .as_str()
+            .unwrap();
+        assert_eq!(snapshot["result"]["document"]["nodes"][root]["name"], name);
+        assert_eq!(std::fs::read(&path).ok(), before, "saved without a request");
+        let created = api(
+            &ready,
+            "threadwork.create_entity",
+            json!({"parentId":root,"name":"first","kind":"Processor"}),
+        )
+        .await;
+        assert_eq!(created["ok"], true, "{created}");
+        let saved = api(&ready, "file.save", json!({})).await;
+        assert_eq!(saved["ok"], true, "{saved}");
+        let stored = wirecraft_core::store::load(&path).unwrap();
+        assert!(stored.nodes.values().any(|n| n.name == "first"));
+        child.kill().unwrap();
+        child.wait().unwrap();
+    }
+}
+#[tokio::test]
+async fn a_corrupt_project_is_reported_and_kept_while_a_new_document_stays_usable() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("corrupt.orch");
+    std::fs::write(&path, "{not a project").unwrap();
+    let (mut child, ready) = serve_project_or_new(&path);
+    let error = ready["projectError"].as_str().unwrap();
+    assert!(error.contains("corrupt.orch"), "{error}");
+    let snapshot = api(&ready, "session.snapshot", json!({})).await;
+    assert!(snapshot["result"]["path"].is_null(), "{snapshot}");
+    let root = snapshot["result"]["document"]["rootNodeId"]
+        .as_str()
+        .unwrap();
+    let created = api(
+        &ready,
+        "threadwork.create_entity",
+        json!({"parentId":root,"name":"first","kind":"Processor"}),
+    )
+    .await;
+    assert_eq!(created["ok"], true, "{created}");
+    assert_eq!(api(&ready, "file.save", json!({})).await["ok"], false);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "{not a project");
+    child.kill().unwrap();
+    child.wait().unwrap();
+}
+#[test]
+fn a_headless_server_still_refuses_a_missing_project() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_wirecraft"))
+        .args(["serve", "--project"])
+        .arg(temp.path().join("missing.orch"))
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+}

@@ -161,7 +161,7 @@ fn worker(
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     if let Some(path) = project {
-        command.arg("--project").arg(path);
+        command.arg("--project-or-new").arg(path);
     }
     #[cfg(target_os = "linux")]
     {
@@ -218,6 +218,13 @@ fn worker(
         endpoint: backend.endpoint.clone(),
         token: backend.token.clone(),
     })?;
+    if let Some(message) = discovery["projectError"].as_str() {
+        updates.send_blocking(Update::Error {
+            message: message.into(),
+            commit: false,
+            command: None,
+        })?;
+    }
     let mut revision = None;
     let mut intelligence = Intelligence {
         root: state_dir.join("intelligence"),

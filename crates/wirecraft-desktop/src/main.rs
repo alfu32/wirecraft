@@ -550,7 +550,7 @@ impl Wirecraft {
             } => {
                 self.status = match command.as_str() {
                     // Background information, not the outcome of a user action.
-                    "editor.signature" => std::mem::take(&mut self.status),
+                    "editor.signature" | "mcp.status" => std::mem::take(&mut self.status),
                     "file.save" | "file.commit_and_save" => "Project saved".into(),
                     "threadwork.update_entity" | "entities.patch" => "Changes applied".into(),
                     _ => format!("{command} completed"),

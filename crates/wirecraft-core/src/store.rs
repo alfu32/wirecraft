@@ -60,6 +60,23 @@ pub fn load(path: &Path) -> Result<Document> {
     crate::components::resolve(&mut d, path.parent().unwrap_or(Path::new(".")));
     Ok(d)
 }
+/// Opens `path` as a project to work on: a file that does not exist or holds nothing is a
+/// new project, written only when saved. Anything else must be a valid project.
+pub fn load_or_new(path: &Path) -> Result<Document> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(error.into()),
+    };
+    if text.trim().is_empty() {
+        let name = path.file_stem().and_then(|stem| stem.to_str());
+        return Ok(Document::new(
+            name.filter(|n| !n.is_empty())
+                .unwrap_or("Untitled Wirecraft"),
+        ));
+    }
+    load(path)
+}
 pub fn save(document: &Document, path: &Path) -> Result<()> {
     atomic_write(path, encode(document)?.as_bytes())
 }

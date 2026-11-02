@@ -14,7 +14,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     }
     if mode == "help" || mode == "--help" {
         println!(
-            "Wirecraft {}\n\nwirecraft serve [--project FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft update-references FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY [--template-set ID] [--layout ID] [--compiler BUNDLE.json]\nwirecraft templates [ID]\nwirecraft export-compiler PROJECT.orch OUTPUT_DIRECTORY [TEMPLATE_SET]\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
+            "Wirecraft {}\n\nwirecraft serve [--project FILE | --project-or-new FILE] [--port PORT] [--token TOKEN] [--recovery FILE]\nwirecraft mcp-stdio [--project FILE]\nwirecraft validate FILE\nwirecraft update-references FILE\nwirecraft new FILE\nwirecraft compile PROJECT.orch OUTPUT_DIRECTORY [--template-set ID] [--layout ID] [--compiler BUNDLE.json]\nwirecraft templates [ID]\nwirecraft export-compiler PROJECT.orch OUTPUT_DIRECTORY [TEMPLATE_SET]\nwirecraft desktop [PROJECT.orch]\nwirecraft migrate-settings JAVA_PREFS_XML OUTPUT_JSON\n\nserve binds 127.0.0.1 only and prints a JSON readiness record.\nNo project file is saved unless requested. Recovery is opt-in.",
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
@@ -174,6 +174,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
         anyhow::bail!("Unknown mode '{mode}'; use --help");
     }
     let mut project = None;
+    let mut project_or_new = None;
     let mut port = 0u16;
     let mut token = uuid::Uuid::new_v4().to_string();
     let mut recovery = None;
@@ -184,6 +185,8 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
             .ok_or_else(|| anyhow::anyhow!("Missing value for {flag}"))?;
         match flag.as_str() {
             "--project" => project = Some(PathBuf::from(value)),
+            // The desktop needs a document to work on, whatever it was asked to open.
+            "--project-or-new" if mode == "serve" => project_or_new = Some(PathBuf::from(value)),
             "--port" => port = value.parse()?,
             "--token" => {
                 if value.len() < 16 {
@@ -196,8 +199,18 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
             _ => anyhow::bail!("Unknown option {flag}"),
         }
     }
+    let mut project_error = None;
     let service = if let Some(path) = &project {
         Service::new(store::load(path)?, project)
+    } else if let Some(path) = project_or_new {
+        match store::load_or_new(&path) {
+            Ok(document) => Service::new(document, Some(path)),
+            // Without a path, saving cannot replace the file that failed to open.
+            Err(error) => {
+                project_error = Some(format!("Cannot open {}: {error}", path.display()));
+                Service::new(Document::new("Untitled Wirecraft"), None)
+            }
+        }
     } else if let Some(path) = recovery.as_ref().filter(|p| p.exists()) {
         Service::read_recovery(path)?
     } else {
@@ -215,7 +228,7 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
     let addr = listener.local_addr()?;
     println!(
         "{}",
-        json!({"status":"ready","endpoint":format!("http://{addr}"),"mcp":format!("http://{addr}/mcp"),"token":token,"pid":std::process::id()})
+        json!({"status":"ready","endpoint":format!("http://{addr}"),"mcp":format!("http://{addr}/mcp"),"token":token,"pid":std::process::id(),"projectError":project_error})
     );
     let signal_app = app.clone();
     tokio::spawn(async move {
