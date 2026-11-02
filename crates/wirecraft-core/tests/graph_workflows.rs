@@ -506,3 +506,27 @@ fn simple_boxes_fit_their_text_and_lateral_port_rows() {
     // The stored model layout is untouched by the projection.
     assert_eq!(d.nodes[&hub].layout.width, 500.);
 }
+
+#[test]
+fn an_exterior_is_twice_a_port_cap_and_keeps_the_center_of_its_stored_box() {
+    use wirecraft_core::components::{EXTERIOR, EXTERIOR_DIAMETER};
+    assert_eq!(
+        EXTERIOR_DIAMETER,
+        2. * wirecraft_core::drawing::PORT_CAP_HEIGHT
+    );
+    let mut d = Document::new("Root");
+    let id = d.create("root", "port", NodeKind::Node).unwrap();
+    d.patch(
+        &id,
+        &serde_json::json!({"stereotype":EXTERIOR,"layout":{"x":100.,"y":200.,"width":73.,"height":73.}}),
+    )
+    .unwrap();
+    let drawing = wirecraft_core::drawing::Drawing::new(&d, "root");
+    let rect = drawing.shapes[&id].rect;
+    assert_eq!(
+        (rect.width, rect.height),
+        (EXTERIOR_DIAMETER, EXTERIOR_DIAMETER)
+    );
+    assert_eq!(rect.x + rect.width / 2., 136.5);
+    assert_eq!(rect.y + rect.height / 2., 236.5);
+}

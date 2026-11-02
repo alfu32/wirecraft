@@ -176,8 +176,8 @@ fn svg_impl(d: &Document, parent: &str, include_parts: bool, technical: bool) ->
             } else {
                 -1.
             };
-            let arm = r.width * 0.16;
-            write!(out,"<circle class=\"exterior\" cx=\"{cx}\" cy=\"{cy}\" r=\"{radius}\" fill=\"#e3f2fa\" stroke=\"#1f7fb0\" stroke-width=\"2.5\"/><polyline points=\"{},{} {},{} {},{}\" fill=\"none\" stroke=\"#1f7fb0\" stroke-width=\"3\"/><text x=\"{}\" y=\"{}\" text-anchor=\"{}\" font-size=\"13\">{}</text>",cx-arm*0.5*sign,cy-arm,cx+arm*0.5*sign,cy,cx-arm*0.5*sign,cy+arm,if exterior.link_right{r.x-9.}else{r.x+r.width+9.},cy+4.,if exterior.link_right{"end"}else{"start"},escape(&if exterior.type_name.is_empty(){s.name.clone()}else{format!("{}: {}",s.name,exterior.type_name)})).unwrap();
+            let arm = r.width * 0.22;
+            write!(out,"<circle class=\"exterior\" cx=\"{cx}\" cy=\"{cy}\" r=\"{radius}\" fill=\"#e3f2fa\" stroke=\"#1f7fb0\" stroke-width=\"2\"/><polyline points=\"{},{} {},{} {},{}\" fill=\"none\" stroke=\"#1f7fb0\" stroke-width=\"1.5\"/><text x=\"{}\" y=\"{}\" text-anchor=\"{}\" font-size=\"13\">{}</text>",cx-arm*0.5*sign,cy-arm,cx+arm*0.5*sign,cy,cx-arm*0.5*sign,cy+arm,if exterior.link_right{r.x-9.}else{r.x+r.width+9.},cy+4.,if exterior.link_right{"end"}else{"start"},escape(&if exterior.type_name.is_empty(){s.name.clone()}else{format!("{}: {}",s.name,exterior.type_name)})).unwrap();
             continue;
         }
         let (stroke, outline) = match s.io {

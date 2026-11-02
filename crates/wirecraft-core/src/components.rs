@@ -20,8 +20,8 @@ use std::{
 
 pub const EXTERIOR: &str = "Exterior";
 pub const REFERENCE: &str = "Reference";
-/// An Exterior circle is as tall as a single-port processing node.
-pub const EXTERIOR_DIAMETER: f64 = 73.;
+/// An Exterior circle is twice as tall as a link's port cap.
+pub const EXTERIOR_DIAMETER: f64 = 2. * crate::drawing::PORT_CAP_HEIGHT;
 /// Link extras set by expansion only; the C17 emitter reads them, files never store them.
 pub const SOURCE_ARGUMENT: &str = "wirecraftSourceArgument";
 pub const TARGET_ARGUMENT: &str = "wirecraftTargetArgument";

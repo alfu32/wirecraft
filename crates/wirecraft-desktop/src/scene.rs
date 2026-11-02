@@ -511,6 +511,10 @@ impl Scene {
             .values()
             .map(|n| n.2)
             .chain(self.drawing.annotations.values().map(|a| a.rect))
+            .chain(self.nodes.keys().filter_map(|id| {
+                let shape = self.drawing.shapes.get(id)?;
+                Some(exterior_label_rect(shape, shape.exterior.as_ref()?))
+            }))
             .collect::<Vec<_>>();
         let min_x = rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
         let min_y = rects.iter().map(|r| r.y).fold(f64::INFINITY, f64::min);
@@ -1103,7 +1107,7 @@ impl Scene {
             rect,
             diameter / 2.,
             rgb(self.color(0x16303f)),
-            px(if active { 4. } else { 2.5 } * zoom.clamp(0.5, 1.5)),
+            px(if active { 3. } else { 2. } * zoom.clamp(0.5, 1.5)),
             rgb(self.color(if active { 0x70d5c6 } else { 0x4fb3d9 })),
             BorderStyle::Solid,
         ));
@@ -1111,8 +1115,8 @@ impl Scene {
         let towards_right = exterior.output != exterior.link_right;
         let sign = if towards_right { 1. } else { -1. };
         let center = rect.center();
-        let arm = diameter * 0.16;
-        let mut chevron = PathBuilder::stroke(px((3. * zoom).max(1.5)));
+        let arm = diameter * 0.22;
+        let mut chevron = PathBuilder::stroke(px((1.5 * zoom).max(1.)));
         chevron.move_to(center + point(-arm * 0.5 * sign, -arm));
         chevron.line_to(center + point(arm * 0.5 * sign, px(0.)));
         chevron.line_to(center + point(-arm * 0.5 * sign, arm));
@@ -1121,11 +1125,7 @@ impl Scene {
         }
         if view.zoom >= 0.2 {
             let font_size = (13. * zoom).max(7.);
-            let label = if exterior.type_name.is_empty() {
-                shape.name.clone()
-            } else {
-                format!("{}: {}", shape.name, exterior.type_name)
-            };
+            let label = exterior_label(shape, exterior);
             let side = if exterior.link_right {
                 rect.left()
             } else {
@@ -1141,7 +1141,7 @@ impl Scene {
             );
         }
         if shape.diagnostics > 0 {
-            let badge = px((14. * zoom).max(8.));
+            let badge = px((8. * zoom).max(6.));
             window.paint_quad(quad(
                 Bounds::new(rect.top_right() - point(badge, px(0.)), size(badge, badge)),
                 badge / 2.,
@@ -1290,6 +1290,34 @@ impl Scene {
     }
 }
 
+fn exterior_label(
+    shape: &wirecraft_core::drawing::Shape,
+    exterior: &wirecraft_core::drawing::ExteriorView,
+) -> String {
+    if exterior.type_name.is_empty() {
+        shape.name.clone()
+    } else {
+        format!("{}: {}", shape.name, exterior.type_name)
+    }
+}
+/// Roughly where an Exterior's label is painted beside its circle, away from the link.
+fn exterior_label_rect(
+    shape: &wirecraft_core::drawing::Shape,
+    exterior: &wirecraft_core::drawing::ExteriorView,
+) -> Rect {
+    const CHARACTER_WIDTH: f64 = 7.5;
+    let width = exterior_label(shape, exterior).chars().count() as f64 * CHARACTER_WIDTH;
+    let r = shape.rect;
+    Rect {
+        x: if exterior.link_right {
+            r.x - width
+        } else {
+            r.x + r.width
+        },
+        width,
+        ..r
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::Scene;

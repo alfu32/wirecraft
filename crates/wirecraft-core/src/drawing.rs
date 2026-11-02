@@ -50,6 +50,8 @@ pub struct Edge {
     pub source: String,
     pub target: String,
 }
+/// The height of the caps `port_glyphs` draws.
+pub const PORT_CAP_HEIGHT: f64 = 9.6;
 /// Technical drawing port symbols follow the actual endpoint directions.
 pub fn port_glyphs(points: &[[f64; 2]]) -> (Vec<[f64; 2]>, Vec<[f64; 2]>) {
     if points.len() < 2 {
@@ -217,11 +219,14 @@ impl Drawing {
                 _ => fields,
             };
             let rect = if exterior {
+                // Centered in the stored box, so a circle saved at another size stays
+                // level with what it connects to.
                 let diameter = crate::components::EXTERIOR_DIAMETER;
                 Rect {
+                    x: rect.x + (rect.width - diameter) / 2.,
+                    y: rect.y + (rect.height - diameter) / 2.,
                     width: diameter,
                     height: diameter,
-                    ..rect
                 }
             } else {
                 rect
