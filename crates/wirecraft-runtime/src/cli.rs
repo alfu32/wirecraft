@@ -230,7 +230,10 @@ pub async fn run(mut args: impl Iterator<Item = String>) -> anyhow::Result<()> {
             }
         }
         #[cfg(not(unix))]
-        let _ = tokio::signal::ctrl_c().await;
+        if tokio::signal::ctrl_c().await.is_err() {
+            // No console to wait on: the desktop owns this backend's lifetime.
+            std::future::pending::<()>().await;
+        }
         let _ = signal_app
             .execute(Request::new("system.shutdown", json!({})))
             .await;

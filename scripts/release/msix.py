@@ -15,9 +15,10 @@ import re
 import subprocess
 import xml.etree.ElementTree as ET
 
-from common import ROOT, safe, sha, validate_binary
+from common import ROOT, pe_subsystem, safe, sha, validate_binary
 
 IDENTITY = ROOT / "packaging/windows/msix-identity.json"
+PE_GUI, PE_CONSOLE = 2, 3
 NS = {
     "": "http://schemas.microsoft.com/appx/manifest/foundation/windows10",
     "uap": "http://schemas.microsoft.com/appx/manifest/uap/windows10",
@@ -100,14 +101,12 @@ def manifest(version, arch, config=None):
                     "uap:FileTypeAssociation", Name="orch")
     add(add(file_type, "uap:SupportedFileTypes"), "uap:FileType", ".orch")
     alias = add(extensions, "uap3:Extension", Category="windows.appExecutionAlias",
-                Executable="wirecraft-desktop.exe", EntryPoint="Windows.FullTrustApplication")
-    # Windows refuses to start an undeclared packaged executable, the Store refuses an
-    # unlisted (headless) second application, and an application has one alias extension
-    # whose aliases all start its executable. So `wirecraft.exe` is an alias of the desktop
-    # executable, which runs the command line when started under that name.
-    aliases = add(alias, "uap3:AppExecutionAlias")
-    for name in ("wirecraft-desktop.exe", "wirecraft.exe"):
-        add(aliases, "desktop:ExecutionAlias", Alias=name)
+                Executable="wirecraft.exe", EntryPoint="Windows.FullTrustApplication")
+    # The application is a GUI executable, which opens no console and does not write to a
+    # terminal. The alias starts the console executable and declares it, since Windows
+    # refuses to start an undeclared packaged executable. An application has one alias
+    # extension, and the Store refuses an unlisted second application without a waiver.
+    add(add(alias, "uap3:AppExecutionAlias"), "desktop:ExecutionAlias", Alias="wirecraft.exe")
     add(add(root, "Capabilities"), "rescap:Capability", Name="runFullTrust")
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -184,8 +183,12 @@ def check_package(archive, version, arch, portable_manifest=None):
             value = archive.read(name)
             if len(value) != entry["size"] or sha(value) != entry["sha256"]:
                 raise ValueError("MSIX payload digest mismatch: " + name)
-        for command in ("wirecraft-desktop.exe", "wirecraft.exe"):
-            validate_binary(portable_manifest["target"], archive.read(command))
+        # A console-subsystem application opens a console window when started.
+        for command, subsystem in (("wirecraft-desktop.exe", PE_GUI), ("wirecraft.exe", PE_CONSOLE)):
+            data = archive.read(command)
+            validate_binary(portable_manifest["target"], data)
+            if pe_subsystem(data) != subsystem:
+                raise ValueError("MSIX executable has the wrong subsystem: " + command)
 
 
 if __name__ == "__main__":

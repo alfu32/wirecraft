@@ -128,6 +128,11 @@ def payload(archive, directory):
     return package, manifest
 
 
+def pe_subsystem(data):
+    """The Subsystem field of a PE executable's optional header."""
+    return struct.unpack_from("<H", data, struct.unpack_from("<I", data, 60)[0] + 24 + 68)[0]
+
+
 def validate_binary(target, data):
     """Check native executable kind/CPU independently of the artifact filename."""
     arch = target.split("-")[0]

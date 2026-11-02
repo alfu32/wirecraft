@@ -1,5 +1,13 @@
-//! Platform-specific ownership guard shared by tool adapters.
-pub fn terminate_with_parent(command: &mut tokio::process::Command) {
+//! Platform-specific process setup shared by tool adapters.
+
+/// Ties a tool to this process and keeps it out of sight. The desktop's backend has no
+/// console on Windows, where each console tool it starts would otherwise open a window.
+pub fn supervise(command: &mut tokio::process::Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
     #[cfg(target_os = "linux")]
     {
         // SAFETY: this hook uses only async-signal-safe syscalls between fork and exec.
@@ -15,6 +23,6 @@ pub fn terminate_with_parent(command: &mut tokio::process::Command) {
             });
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", windows)))]
     let _ = command;
 }

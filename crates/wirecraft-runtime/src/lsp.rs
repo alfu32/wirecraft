@@ -79,7 +79,7 @@ impl LanguageSession {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true);
-        crate::process::terminate_with_parent(&mut cmd);
+        crate::process::supervise(&mut cmd);
         let mut child = cmd.spawn().map_err(|e| {
             Error::new(
                 "tool_unavailable",

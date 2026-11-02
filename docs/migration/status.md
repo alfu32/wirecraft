@@ -31,10 +31,12 @@ Verification:
 
 Pending:
 - The Release workflow has not run on GitHub. AppImage, Snap, Windows and macOS packaging, and the ARM builds, are unverified.
-- The Windows application itself has never been run.
+- The Windows application has only been started by hand from the MSIX; its GUI is not qualified by any automated check.
 - The Store needs confirmation of the product name. The privacy policy is [docs/PRIVACY_POLICY.md](../PRIVACY_POLICY.md) (0.27.6).
 
 0.27.7: the user-facing description follows the user's definition of Wirecraft: a framework for scaffolding software visually, where explicit links declare the data channels that conventional code leaves implicit in its call graph; the workflow is design, then each component's algorithm, then generation; and without links, composites are folders and entities files that keep code, specification and tests together. The Store listing (all 32 locales; rewritten description, short description, features, search terms and three captions, machine-translated without native review), the README introduction, and the Linux metainfo, Snap, DEB, RPM, desktop-entry and MSIX descriptions were rewritten.
+
+0.27.8: at the user's request, the Windows desktop application no longer opens a console window. Release builds of `wirecraft-desktop.exe` use the GUI subsystem, so its own `--version` and `--help` reach pipes but print nothing in a terminal; `wirecraft --version` and `wirecraft help` do. The MSIX alias `wirecraft.exe` now starts the console `wirecraft.exe` directly, which replaces the 0.27.4 start-name dispatch and removes the `wirecraft-desktop.exe` alias; `wirecraft desktop` opens the application from a terminal. Tools started by the backend (clangd, build jobs) use `CREATE_NO_WINDOW`, because a backend without a console would otherwise open one window per tool. Release verification checks each executable's PE subsystem, and CI checks on the installed MSIX that the console-less backend reports ready and stays up. Pending: neither the absence of a console window nor the tools' behaviour has been observed in a real Windows session by an automated check.
 
 0.27.1: the first Release run (v0.27.0) passed on Linux x86_64/aarch64, including the AppImage startup smoke, and on macOS Apple Silicon. On Windows ARM64, the installed MSIX refused to start `wirecraft.exe` (`Access is denied`), because only `wirecraft-desktop.exe` was declared in its manifest. The command line is now a second, unlisted console application with a `wirecraft.exe` alias.
 

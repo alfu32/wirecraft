@@ -5,7 +5,7 @@ use wirecraft_core::{Error, Result};
 pub async fn list() -> Result<Value> {
     let mut command = tokio::process::Command::new("lpstat");
     command.arg("-a").kill_on_drop(true);
-    crate::process::terminate_with_parent(&mut command);
+    crate::process::supervise(&mut command);
     let output = tokio::time::timeout(std::time::Duration::from_secs(5), command.output())
         .await
         .map_err(|_| Error::new("timeout", "Printer discovery timed out"))?

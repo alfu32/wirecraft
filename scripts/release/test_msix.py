@@ -7,6 +7,7 @@ runs on the native Windows CI runners, never against these test packages.
 import base64
 import io
 import json
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -88,11 +89,12 @@ class MsixTests(unittest.TestCase):
             self.assertEqual([a.get("Executable") for a in applications], ["wirecraft-desktop.exe"])
             self.assertNotIn(b"AppListEntry", data)
             # Undeclared packaged executables cannot be started (Access is denied), and
-            # MakeAppx accepts one alias extension per application.
+            # MakeAppx accepts one alias extension per application. The alias is the
+            # console command line; the application is the GUI executable.
             extensions = root.findall(".//{" + msix.NS["uap3"] + "}Extension")
-            self.assertEqual([e.get("Executable") for e in extensions], ["wirecraft-desktop.exe"])
+            self.assertEqual([e.get("Executable") for e in extensions], ["wirecraft.exe"])
             aliases = root.findall(".//{" + msix.NS["desktop"] + "}ExecutionAlias")
-            self.assertEqual([a.get("Alias") for a in aliases], ["wirecraft-desktop.exe", "wirecraft.exe"])
+            self.assertEqual([a.get("Alias") for a in aliases], ["wirecraft.exe"])
             self.assertIn(b".orch", data)
             self.assertIn(b"windows.appExecutionAlias", data)
             msix.check_manifest(data, "0.41.1", arch)
@@ -100,6 +102,30 @@ class MsixTests(unittest.TestCase):
         for version in ("v1.0.0", "0.01.0", "65535.0.0", "0.65536.0", "0.0.65536"):
             with self.assertRaises(ValueError):
                 msix.package_version(version)
+
+    def test_payload_needs_a_gui_application_and_a_console_command_line(self):
+        def executable(subsystem):
+            header = bytearray(0x200)
+            header[:2] = b"MZ"
+            struct.pack_into("<I", header, 60, 0x80)
+            header[0x80:0x84] = b"PE\0\0"
+            struct.pack_into("<H", header, 0x84, 0x8664)
+            struct.pack_into("<H", header, 0x80 + 24 + 68, subsystem)
+            return bytes(header)
+
+        def check(desktop, command):
+            files = {"wirecraft-desktop.exe": executable(desktop), "wirecraft.exe": executable(command)}
+            portable = {"target": "x86_64-pc-windows-msvc",
+                        "files": {name: {"size": len(data), "sha256": sha(data)} for name, data in files.items()}}
+            files["package-manifest.json"] = json.dumps(portable).encode()
+            with zipfile.ZipFile(io.BytesIO(package_fixture("0.41.1", "x64", files))) as archive:
+                msix.check_package(archive, "0.41.1", "x64", portable)
+
+        check(msix.PE_GUI, msix.PE_CONSOLE)
+        with self.assertRaisesRegex(ValueError, "wrong subsystem: wirecraft-desktop.exe"):
+            check(msix.PE_CONSOLE, msix.PE_CONSOLE)
+        with self.assertRaisesRegex(ValueError, "wrong subsystem: wirecraft.exe"):
+            check(msix.PE_GUI, msix.PE_GUI)
 
     def test_rejects_an_identity_without_a_single_common_name(self):
         with tempfile.TemporaryDirectory() as temp:
