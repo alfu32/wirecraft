@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import struct
 import shutil
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -72,6 +73,39 @@ class ReleaseTests(unittest.TestCase):
             io.StringIO()
         ):
             return portable.assemble(target, binaries, output, native)
+
+    def test_snap_launcher_reaches_the_wayland_socket_or_falls_back_to_x11(self):
+        def run(socket_exists, display="wayland-7"):
+            session = Path(tempfile.mkdtemp(dir=self.root))
+            runtime = session / "snap.wirecraft"
+            runtime.mkdir()
+            app = session / "snap/opt/wirecraft"
+            app.mkdir(parents=True)
+            (app / "wirecraft-desktop").write_text('#!/bin/sh\necho "display=$WAYLAND_DISPLAY args=$*"\n')
+            (app / "wirecraft-desktop").chmod(0o755)
+            script = session / "launcher"
+            script.write_text(snap_packager.launcher("wirecraft-desktop"))
+            server = None
+            if socket_exists:
+                server = socket.socket(socket.AF_UNIX)
+                server.bind(str(session / display))
+                self.addCleanup(server.close)
+            env = dict(os.environ, SNAP=str(session / "snap"), SNAP_USER_COMMON=str(session),
+                       XDG_RUNTIME_DIR=str(runtime), WAYLAND_DISPLAY=display)
+            output = subprocess.run(["sh", str(script), "a", "b c"], env=env, check=True,
+                                    capture_output=True, text=True).stdout.strip()
+            return output, runtime / display
+
+        output, link = run(True)
+        self.assertEqual(output, "display=wayland-7 args=a b c")
+        self.assertTrue(link.is_socket())
+        # The compositor is unreachable: GPUI must not be told about it.
+        output, link = run(False)
+        self.assertEqual(output, "display= args=a b c")
+        self.assertFalse(link.is_socket())
+        # X11 sessions have nothing to link.
+        output, link = run(False, "")
+        self.assertEqual(output, "display= args=a b c")
 
     def test_portable_formats_are_reproducible_and_manifested(self):
         path = self.archive()

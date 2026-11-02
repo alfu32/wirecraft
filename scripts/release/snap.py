@@ -13,6 +13,28 @@ from common import ROOT, payload, publish, sha
 APPS = {"wirecraft": "wirecraft", "desktop": "wirecraft-desktop"}
 
 
+def launcher(command):
+    """The app's entry script. Strict confinement gives the app its own XDG_RUNTIME_DIR, a
+    directory below the session's one, without the Wayland socket clients look for there.
+    GPUI panics when WAYLAND_DISPLAY names a socket it cannot reach, so without one it is
+    unset and the application uses X11."""
+    return (
+        '#!/bin/sh\nexport XDG_CONFIG_HOME="$SNAP_USER_COMMON/.config"\n'
+        'export XDG_CACHE_HOME="$SNAP_USER_COMMON/.cache"\n'
+        'export XDG_STATE_HOME="$SNAP_USER_COMMON/.local/state"\n'
+        'export WIRECRAFT_EXEC_WRAPPER="$SNAP/gpu-2404/bin/gpu-2404-provider-wrapper"\n'
+        'case "${WAYLAND_DISPLAY:-}" in\n'
+        '"" | /*) ;;\n'
+        '*)\n'
+        '    socket="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"\n'
+        '    [ -S "$socket" ] || ln -sf "../$WAYLAND_DISPLAY" "$socket" 2>/dev/null\n'
+        '    [ -S "$socket" ] || unset WAYLAND_DISPLAY\n'
+        '    ;;\n'
+        'esac\n'
+        'exec "$SNAP/opt/wirecraft/' + command + '" "$@"\n'
+    )
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--archive", type=Path, required=True)
@@ -31,13 +53,7 @@ def main():
         (root / "bin").mkdir()
         (root / "gpu-2404").mkdir()
         for app, command in APPS.items():
-            (root / "bin" / app).write_text(
-                '#!/bin/sh\nexport XDG_CONFIG_HOME="$SNAP_USER_COMMON/.config"\n'
-                'export XDG_CACHE_HOME="$SNAP_USER_COMMON/.cache"\n'
-                'export XDG_STATE_HOME="$SNAP_USER_COMMON/.local/state"\n'
-                'export WIRECRAFT_EXEC_WRAPPER="$SNAP/gpu-2404/bin/gpu-2404-provider-wrapper"\n'
-                'exec "$SNAP/opt/wirecraft/' + command + '" "$@"\n'
-            )
+            (root / "bin" / app).write_text(launcher(command))
             (root / "bin" / app).chmod(0o755)
         (root / "meta/gui").mkdir(parents=True)
         shutil.copyfile(
