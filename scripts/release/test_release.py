@@ -36,7 +36,7 @@ class ReleaseTests(unittest.TestCase):
     def archive(self, target="x86_64-pc-windows-msvc"):
         binaries = self.root / ("binaries-" + target)
         binaries.mkdir(exist_ok=True)
-        data = bytearray(128)
+        data = bytearray(256)
         if "linux" in target:
             data[:6] = b"\x7fELF\x02\x01"
             struct.pack_into(
@@ -55,6 +55,10 @@ class ReleaseTests(unittest.TestCase):
                 "<I", data, 4, 0x100000C if target.startswith("aarch64") else 0x1000007
             )
         for command in common.COMMANDS:
+            if "windows" in target:
+                # PE optional-header Subsystem: the desktop is GUI, the command line console.
+                struct.pack_into("<H", data, 64 + 24 + 68,
+                                 msix.PE_GUI if command == "wirecraft-desktop" else msix.PE_CONSOLE)
             (binaries / (command + (".exe" if "windows" in target else ""))).write_bytes(data)
         output = self.root / "assets"
         native = None

@@ -40,7 +40,7 @@ try {
   python -c "import subprocess,sys; actual=subprocess.check_output([sys.argv[1],'help'],text=True,timeout=60); assert 'wirecraft compile' in actual,actual; print(sys.argv[1], 'help: command line')" $Command
   if ($LASTEXITCODE -ne 0) { throw 'The wirecraft alias did not start the command line' }
   # The desktop reads its backend's readiness from a pipe; without a console it must stay up.
-  python -c "import json,subprocess,sys,time; p=subprocess.Popen([sys.argv[1],'--backend','serve','--token','check'],stdout=subprocess.PIPE,text=True); ready=json.loads(p.stdout.readline()); assert ready['status']=='ready',ready; time.sleep(3); assert p.poll() is None,'backend exited'; p.kill(); print(sys.argv[1], 'backend: ready')" $Desktop
+  python -c "import json,subprocess,sys,time; p=subprocess.Popen([sys.argv[1],'--backend','serve','--token','msix-check-backend-token'],stdout=subprocess.PIPE,text=True); ready=json.loads(p.stdout.readline()); assert ready['status']=='ready',ready; time.sleep(3); assert p.poll() is None,'backend exited'; p.kill(); print(sys.argv[1], 'backend: ready')" $Desktop
   if ($LASTEXITCODE -ne 0) { throw 'The console-less backend did not stay up' }
 } finally {
   try {
