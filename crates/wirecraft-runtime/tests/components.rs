@@ -341,6 +341,201 @@ fn reference_paths_stay_inside_the_design_directory() {
     );
 }
 
+/// A collapsed `stage` holding `double`, which feeds `count` free output ports.
+fn collapsed_stage(count: usize) -> (Service, String, String, Vec<String>) {
+    let mut s = Service::new(Document::new("Nested"), None);
+    let root = s.document.root_node_id.clone();
+    let stage = entity(&mut s, "stage", "");
+    let create = |s: &mut Service, name: &str, parent: &str, x: f64, y: f64, exterior: bool| {
+        let mut attributes = json!({"layout":{"x":x,"y":y}});
+        if exterior {
+            attributes["stereotype"] = json!("Exterior");
+        }
+        run(
+            s,
+            "threadwork.create_entity",
+            json!({"name":name,"kind":"Node","parentId":parent,"attributes":attributes}),
+        )["entity"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let double = create(&mut s, "double", &stage, 100., 100., false);
+    let mut free = vec![];
+    // Created bottom to top: their stored order, not creation, decides.
+    for i in 0..count {
+        let port = create(&mut s, "port", &stage, 300., 500. - i as f64 * 100., true);
+        run(
+            &mut s,
+            "threadwork.create_link",
+            json!({"name":format!("result{i}"),"sourceNodeId":double,"targetNodeId":port,"link":{"typeDefinitionId":"int"}}),
+        );
+        free.push(port);
+    }
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":stage,"patch":{"layout":{"isExpanded":false,"x":400.,"y":400.}}}),
+    );
+    free.reverse();
+    (s, root, stage, free)
+}
+
+#[test]
+fn free_ports_share_the_distribution_of_a_collapsed_composites_ports() {
+    let (mut s, root, stage, free) = collapsed_stage(4);
+    let sink = entity(&mut s, "sink", "");
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":sink,"patch":{"layout":{"x":620.,"y":900.}}}),
+    );
+    let (double, _) = s
+        .document
+        .nodes
+        .iter()
+        .find(|(_, n)| n.name == "double")
+        .map(|(id, n)| (id.clone(), n))
+        .unwrap();
+    run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"direct","sourceNodeId":double,"targetNodeId":sink,"link":{"typeDefinitionId":"int"}}),
+    );
+    let drawing = wirecraft_core::drawing::Drawing::new(&s.document, &root);
+    let box_ = drawing.shapes[&stage].rect;
+    let centers = free
+        .iter()
+        .map(|id| {
+            let r = drawing.shapes[id].rect;
+            assert_eq!(r.x, box_.x + box_.width, "against the right border");
+            r.y + r.height / 2.
+        })
+        .collect::<Vec<_>>();
+    let link = s
+        .document
+        .nodes
+        .iter()
+        .find(|(_, n)| n.name == "direct")
+        .map(|(id, _)| id.clone())
+        .unwrap();
+    let start = drawing.edges[&link].points[0][1];
+    // The linked port comes first, then the free ones by stored height; even and clear.
+    let rows = std::iter::once(start)
+        .chain(centers.iter().copied())
+        .collect::<Vec<_>>();
+    let pitch = rows[1] - rows[0];
+    assert!(pitch >= wirecraft_core::drawing::PORT_PITCH, "{rows:?}");
+    for pair in rows.windows(2) {
+        assert!((pair[1] - pair[0] - pitch).abs() < 1e-6, "{rows:?}");
+    }
+    assert!(rows[0] > box_.y && rows[rows.len() - 1] < box_.y + box_.height);
+    let svg = wirecraft_core::export::svg(&s.document, &root).unwrap();
+    assert_eq!(svg.matches("class=\"exterior\"").count(), free.len());
+    // A route heading down past them keeps clear of the free ports' labels.
+    for id in &free {
+        let label = drawing.shapes[id].exterior_label_rect().unwrap();
+        for segment in drawing.edges[&link].points.windows(2) {
+            let (a, b) = (segment[0], segment[1]);
+            let steps = (b[0] - a[0]).hypot(b[1] - a[1]).ceil().max(1.);
+            for step in 0..=steps as usize {
+                let t = step as f64 / steps;
+                let (x, y) = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
+                assert!(
+                    x < label.x
+                        || x > label.x + label.width
+                        || y < label.y
+                        || y > label.y + label.height,
+                    "{segment:?} crosses {label:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_port_linked_outside_a_collapsed_composite_is_drawn_as_a_normal_port() {
+    let (mut s, root, stage, _) = collapsed_stage(0);
+    let sink = entity(&mut s, "sink", "");
+    let source = entity(&mut s, "source", "");
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":sink,"patch":{"layout":{"x":1000.,"y":400.}}}),
+    );
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":source,"patch":{"layout":{"x":0.,"y":400.}}}),
+    );
+    let port = |s: &mut Service, x: f64| {
+        run(
+            s,
+            "threadwork.create_entity",
+            json!({"name":"port","kind":"Node","parentId":stage,"attributes":{"stereotype":"Exterior","layout":{"x":x,"y":450.}}}),
+        )["entity"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let outgoing = port(&mut s, 500.);
+    let incoming = port(&mut s, 450.);
+    let out = run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"result","sourceNodeId":outgoing,"targetNodeId":sink,"link":{"typeDefinitionId":"int"}}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let into = run(
+        &mut s,
+        "threadwork.create_link",
+        json!({"name":"feed","sourceNodeId":source,"targetNodeId":incoming,"link":{"typeDefinitionId":"int"}}),
+    )["entity"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let collapsed = wirecraft_core::drawing::Drawing::new(&s.document, &root);
+    assert!(!collapsed.shapes.contains_key(&outgoing), "no circle");
+    assert!(!collapsed.shapes.contains_key(&incoming), "no circle");
+    assert_eq!(collapsed.visible_ancestor[&outgoing], stage);
+    let box_ = collapsed.shapes[&stage].rect;
+    let (a, b) = (&collapsed.edges[&out], &collapsed.edges[&into]);
+    assert_eq!(
+        (a.source.as_str(), a.target.as_str()),
+        (stage.as_str(), sink.as_str())
+    );
+    assert_eq!(
+        (b.source.as_str(), b.target.as_str()),
+        (source.as_str(), stage.as_str())
+    );
+    // Exactly where a normal port's cap goes: 20 outside for an output, at the border
+    // for an input.
+    assert_eq!(a.points[0][0], box_.x + box_.width + 20.);
+    assert_eq!(b.points.last().unwrap()[0], box_.x);
+
+    // Expanded nothing changes: the circles stay where they are stored, links on them.
+    run(
+        &mut s,
+        "threadwork.update_entity",
+        json!({"nodeId":stage,"patch":{"layout":{"isExpanded":true}}}),
+    );
+    let expanded = wirecraft_core::drawing::Drawing::new(&s.document, &root);
+    for id in [&outgoing, &incoming] {
+        let shape = &expanded.shapes[id];
+        assert_eq!(shape.pinned_to, None);
+        let stored = &s.document.nodes[id].layout;
+        assert_eq!(
+            shape.rect.x + shape.rect.width / 2.,
+            stored.x + stored.width / 2.
+        );
+    }
+    assert_eq!(expanded.edges[&out].source, outgoing);
+    assert_eq!(expanded.edges[&into].target, incoming);
+}
+
 #[test]
 fn ports_inside_composites_publish_expand_and_stay_visible_when_collapsed() {
     let dir = tempfile::tempdir().unwrap();
@@ -402,7 +597,7 @@ fn ports_inside_composites_publish_expand_and_stay_visible_when_collapsed() {
         ["doubled", "numbers"]
     );
 
-    // Collapsed, the composite keeps both ports beside it: input left, output right.
+    // Collapsed, both ports are free: on the border, input left, output right.
     run(
         &mut s,
         "threadwork.update_entity",
@@ -414,19 +609,16 @@ fn ports_inside_composites_publish_expand_and_stay_visible_when_collapsed() {
         let port = &drawing.shapes[id];
         assert_eq!(port.pinned_to.as_deref(), Some(stage.as_str()));
         if right {
-            assert!(port.rect.x > box_.x + box_.width);
+            assert_eq!(port.rect.x, box_.x + box_.width);
         } else {
-            assert!(port.rect.x + port.rect.width < box_.x);
+            assert_eq!(port.rect.x + port.rect.width, box_.x);
         }
-        assert!(
-            drawing
-                .edges
-                .values()
-                .any(|e| (e.source == stage && &e.target == id)
-                    || (&e.source == id && e.target == stage)),
-            "the port link is drawn from the collapsed composite"
-        );
+        assert!(port.rect.y >= box_.y && port.rect.y + port.rect.height <= box_.y + box_.height);
     }
+    assert!(
+        drawing.edges.is_empty(),
+        "their links stay inside the composite"
+    );
     assert!(!drawing.shapes.contains_key(&double));
     run(&mut s, "file.save", json!({}));
 

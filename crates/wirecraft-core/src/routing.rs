@@ -5,7 +5,7 @@ use crate::{
     drawing::{BoundaryPort, Drawing},
     viewport::Rect,
 };
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 const GAP: f64 = 10.;
 const STUB: f64 = 46.;
@@ -20,6 +20,8 @@ struct Port {
     toward_target: bool,
     other: Point,
     point: Point,
+    /// A free port of a collapsed composite: `edge` is its Exterior, with no link to route.
+    free: bool,
 }
 fn center(r: Rect) -> Point {
     [r.x + r.width / 2., r.y + r.height / 2.]
@@ -73,6 +75,7 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
                     toward_target,
                     other,
                     point: [0.; 2],
+                    free: false,
                 });
             };
         // For data/error links both ends may use either side. Dependencies are
@@ -115,12 +118,28 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
         );
         paths.insert(id.clone(), (path, common));
     }
+    let mut free_owners = BTreeSet::new();
+    for (id, shape) in &drawing.shapes {
+        if let (Some(owner), Some(view)) = (&shape.pinned_to, &shape.exterior) {
+            free_owners.insert(owner.clone());
+            ports.push(Port {
+                owner: owner.clone(),
+                edge: id.clone(),
+                right: view.output,
+                boundary: false,
+                toward_target: false,
+                other: [0.; 2],
+                point: [0.; 2],
+                free: true,
+            });
+        }
+    }
     // Count the existing side occupancy before adding either feedback port.
     // Provider/type callouts occupy the right side; dependency flagpoles are
     // on top and do not contribute to either horizontal side.
     let mut occupancy: BTreeMap<(String, bool), usize> = BTreeMap::new();
     for p in &ports {
-        if drawing.edges[&p.edge].source != drawing.edges[&p.edge].target {
+        if p.free || drawing.edges[&p.edge].source != drawing.edges[&p.edge].target {
             *occupancy.entry((p.owner.clone(), p.right)).or_default() += 1;
         }
     }
@@ -158,9 +177,18 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
             // atan2 against the outward side normal gives a stable top-to-bottom
             // angular fan, rather than alphabetic or link creation order.
             let angle = |p: &Port| (p.other[1] - c[1]).atan2((p.other[0] - c[0]).abs());
+            // Free ports follow the linked ones, in their stored vertical order.
+            let rank = |p: &Port| {
+                if p.free {
+                    d.nodes[&p.edge].layout.y
+                } else {
+                    angle(p)
+                }
+            };
             ids.sort_by(|a, b| {
-                let is_self =
-                    |p: &Port| drawing.edges[&p.edge].source == drawing.edges[&p.edge].target;
+                let is_self = |p: &Port| {
+                    !p.free && drawing.edges[&p.edge].source == drawing.edges[&p.edge].target
+                };
                 is_self(&ports[*b])
                     .cmp(&is_self(&ports[*a]))
                     .then_with(|| {
@@ -174,14 +202,19 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
                             std::cmp::Ordering::Equal
                         }
                     })
-                    .then_with(|| angle(&ports[*a]).total_cmp(&angle(&ports[*b])))
+                    .then_with(|| ports[*a].free.cmp(&ports[*b].free))
+                    .then_with(|| rank(&ports[*a]).total_cmp(&rank(&ports[*b])))
                     .then_with(|| ports[*a].edge.cmp(&ports[*b].edge))
             });
-            let inset = if drawing.shapes[owner].composite {
-                64_f64.min(r.height / 3.)
-            } else {
-                12_f64.min(r.height / 4.)
-            };
+            // A collapsed composite with free ports spreads its ports like a simple box,
+            // over the rows `auto_size` gave it, so their circles do not overlap.
+            let composite = &drawing.shapes[owner];
+            let inset =
+                if composite.composite && (composite.expanded || !free_owners.contains(owner)) {
+                    64_f64.min(r.height / 3.)
+                } else {
+                    12_f64.min(r.height / 4.)
+                };
             let count = ids.len();
             for (i, id) in ids.into_iter().enumerate() {
                 ports[id].point = [
@@ -214,6 +247,12 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
                 };
             }
         }
+    }
+    // Against the border, where a normal port's cap sits; routes avoid them from here on.
+    for port in ports.iter().filter(|p| p.free) {
+        let rect = &mut drawing.shapes.get_mut(&port.edge).unwrap().rect;
+        rect.x = port.point[0] - if port.right { 0. } else { rect.width };
+        rect.y = port.point[1] - rect.height / 2.;
     }
     let mut occupied: Vec<(Point, Point)> = vec![];
     let mut paths = paths.into_iter().collect::<Vec<_>>();
@@ -280,6 +319,15 @@ pub(crate) fn route_drawing(d: &Document, drawing: &mut Drawing) {
                     true
                 })
                 .map(|(_, s)| expand(s.rect, 8.))
+                // A free port's label sits where routes leaving its owner would run.
+                .chain(
+                    drawing
+                        .shapes
+                        .values()
+                        .filter(|s| s.pinned_to.is_some())
+                        .filter_map(|s| s.exterior_label_rect())
+                        .map(|r| expand(r, 4.)),
+                )
                 .chain(
                     drawing
                         .annotations

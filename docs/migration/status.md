@@ -2,6 +2,17 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Ports of a collapsed composite (0.28.0)
+
+At the user's request, a collapsed composite no longer draws its inner ports 140 units away with a link from the box. Expanded composites are unchanged. Collapsed:
+- **Connected:** a port whose link leaves the composite projects onto the box and is drawn as a normal port: normal cap, label and side.
+- **Free:** a port with nothing connected outside it keeps its circle, against the border where a cap would sit, with inputs on the left and outputs on the right. It takes a slot in the side's even distribution and counts towards the box height, after the linked ports and in stored vertical order. Its inner link is not drawn. Routes treat its label as an obstacle.
+- A collapsed composite with free ports spreads its ports like a simple box (12-unit inset) rather than over its middle third, so 19.2-unit circles do not overlap. Composites without free ports route exactly as before, keeping baseline parity.
+
+Verification: `tests/components.rs` covers both cases, the even spacing and order mixed with a linked port, routes clearing the labels (this assertion fails without the obstacles), the expanded drawing and the SVG. A real window on a private display was inspected, expanded and collapsed, with two free inputs, three free outputs, two connected ports and an ordinary boundary link.
+
+Pending: a free port's label is not checked against right-side library or type callouts on the same composite, which can overlap. An unlinked port has no direction and sits on the left. The Microsoft Store screenshots predate this and the smaller circles.
+
 ## Release matrix, licenses and Store listing (0.27.0)
 
 At the user's request, Wirecraft has Meshcraft's release workflow and six-target artifact matrix (`.github/workflows/distribution.yaml`, `scripts/release/`, `packaging/`; details in [packaging/README.md](../../packaging/README.md)). A manual **Release** run at an existing `vX.Y.Z` tag produces 28 verified artifacts:

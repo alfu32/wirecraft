@@ -513,7 +513,7 @@ impl Scene {
             .chain(self.drawing.annotations.values().map(|a| a.rect))
             .chain(self.nodes.keys().filter_map(|id| {
                 let shape = self.drawing.shapes.get(id)?;
-                Some(exterior_label_rect(shape, shape.exterior.as_ref()?))
+                shape.exterior_label_rect()
             }))
             .collect::<Vec<_>>();
         let min_x = rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
@@ -1125,7 +1125,7 @@ impl Scene {
         }
         if view.zoom >= 0.2 {
             let font_size = (13. * zoom).max(7.);
-            let label = exterior_label(shape, exterior);
+            let label = shape.exterior_label().unwrap_or_default();
             let side = if exterior.link_right {
                 rect.left()
             } else {
@@ -1290,34 +1290,6 @@ impl Scene {
     }
 }
 
-fn exterior_label(
-    shape: &wirecraft_core::drawing::Shape,
-    exterior: &wirecraft_core::drawing::ExteriorView,
-) -> String {
-    if exterior.type_name.is_empty() {
-        shape.name.clone()
-    } else {
-        format!("{}: {}", shape.name, exterior.type_name)
-    }
-}
-/// Roughly where an Exterior's label is painted beside its circle, away from the link.
-fn exterior_label_rect(
-    shape: &wirecraft_core::drawing::Shape,
-    exterior: &wirecraft_core::drawing::ExteriorView,
-) -> Rect {
-    const CHARACTER_WIDTH: f64 = 7.5;
-    let width = exterior_label(shape, exterior).chars().count() as f64 * CHARACTER_WIDTH;
-    let r = shape.rect;
-    Rect {
-        x: if exterior.link_right {
-            r.x - width
-        } else {
-            r.x + r.width
-        },
-        width,
-        ..r
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::Scene;

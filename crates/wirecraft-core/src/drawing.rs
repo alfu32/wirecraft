@@ -23,9 +23,36 @@ pub struct Shape {
     pub exterior: Option<ExteriorView>,
     /// User-designated IO role badge ("IO-in", "IO-out", "IO-in/out").
     pub io: Option<&'static str>,
-    /// A port inside this collapsed composite, drawn beside it rather than at its
-    /// stored layout; it cannot be dragged from there.
+    /// A free port of this collapsed composite: nothing outside connects to it, so it
+    /// takes a slot among the composite's ports instead of its stored layout. It cannot
+    /// be dragged from there.
     pub pinned_to: Option<String>,
+}
+impl Shape {
+    /// An Exterior's name and port type, drawn beside its circle.
+    pub fn exterior_label(&self) -> Option<String> {
+        let exterior = self.exterior.as_ref()?;
+        Some(if exterior.type_name.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}: {}", self.name, exterior.type_name)
+        })
+    }
+    /// Roughly where that label is painted, away from the link.
+    pub fn exterior_label_rect(&self) -> Option<Rect> {
+        const CHARACTER_WIDTH: f64 = 7.5;
+        let width = self.exterior_label()?.chars().count() as f64 * CHARACTER_WIDTH;
+        let r = self.rect;
+        Some(Rect {
+            x: if self.exterior.as_ref()?.link_right {
+                r.x - width
+            } else {
+                r.x + r.width
+            },
+            width,
+            ..r
+        })
+    }
 }
 #[derive(Clone)]
 pub struct ExteriorView {
@@ -149,7 +176,8 @@ impl Drawing {
                 continue;
             }
             if let Some(ancestor) = hidden {
-                // Ports stay visible on a collapsed composite; placed once its size is known.
+                // Ports stay visible on a collapsed composite; sorted out once every
+                // visible entity is known.
                 if crate::components::is_exterior(n) {
                     pinned.push((id.clone(), depth, ancestor));
                     continue;
@@ -283,6 +311,25 @@ impl Drawing {
         }
         for (id, depth, ancestor) in &pinned {
             let n = &d.nodes[id];
+            // A link leaving the composite makes this an ordinary port of the box.
+            let connected = n
+                .incoming_links
+                .iter()
+                .chain(&n.outgoing_links)
+                .filter_map(|l| d.nodes.get(l)?.link.as_ref())
+                .map(|l| {
+                    if &l.source_node_id == id {
+                        &l.target_node_id
+                    } else {
+                        &l.source_node_id
+                    }
+                })
+                .any(|other| visible_ancestor.get(other).is_some_and(|v| v != ancestor));
+            if connected {
+                visible_ancestor.insert(id.clone(), ancestor.clone());
+                continue;
+            }
+            let output = exterior_link(d, n).is_some_and(|(_, output)| output);
             let diameter = crate::components::EXTERIOR_DIAMETER;
             shapes.insert(
                 id.clone(),
@@ -304,8 +351,9 @@ impl Drawing {
                     fields: vec![],
                     diagnostics: 0,
                     exterior: Some(ExteriorView {
-                        output: false,
-                        link_right: true,
+                        output,
+                        // It faces the box: outputs sit on the right, inputs on the left.
+                        link_right: !output,
                         type_name: String::new(),
                     }),
                     io: None,
@@ -326,6 +374,10 @@ impl Drawing {
                     continue;
                 };
                 if a == b && l.source_node_id != l.target_node_id {
+                    continue;
+                }
+                // A free port's link stays inside the collapsed composite, like any other.
+                if shapes[a].pinned_to.is_some() || shapes[b].pinned_to.is_some() {
                     continue;
                 }
                 if matches!(
@@ -432,7 +484,6 @@ impl Drawing {
             }
         }
         auto_size(d, &mut shapes, &edges, &callouts);
-        place_pinned(d, &mut shapes);
         let centers: BTreeMap<String, f64> = shapes
             .iter()
             .map(|(id, s)| (id.clone(), s.rect.x + s.rect.width / 2.))
@@ -441,13 +492,7 @@ impl Drawing {
             let Some(view) = &mut shape.exterior else {
                 continue;
             };
-            let Some((link, output)) = d.nodes[id]
-                .outgoing_links
-                .iter()
-                .map(|l| (l, false))
-                .chain(d.nodes[id].incoming_links.iter().map(|l| (l, true)))
-                .find_map(|(l, output)| d.nodes.get(l).map(|l| (l, output)))
-            else {
+            let Some((link, output)) = exterior_link(d, &d.nodes[id]) else {
                 continue;
             };
             let l = link.link.as_ref().unwrap();
@@ -458,7 +503,9 @@ impl Drawing {
             };
             view.output = output;
             view.type_name = crate::components::link_type(d, link);
-            if let Some(center) = visible_ancestor.get(other).and_then(|o| centers.get(o)) {
+            if shape.pinned_to.is_none()
+                && let Some(center) = visible_ancestor.get(other).and_then(|o| centers.get(o))
+            {
                 view.link_right = *center >= shape.rect.x + shape.rect.width / 2.;
             }
         }
@@ -690,36 +737,13 @@ pub fn composite_padding(n: &crate::Node) -> Padding {
         value => Padding::uniform(side(value)),
     }
 }
-/// Ports inside a collapsed composite line up beside it: outputs on the right,
-/// inputs on the left, in their stored vertical order.
-fn place_pinned(d: &Document, shapes: &mut BTreeMap<String, Shape>) {
-    const GAP: f64 = 140.;
-    const SPACING: f64 = 12.;
-    let mut sides: BTreeMap<(String, bool), Vec<(f64, String)>> = BTreeMap::new();
-    for (id, shape) in shapes.iter() {
-        if let Some(owner) = &shape.pinned_to {
-            let output = !d.nodes[id].incoming_links.is_empty();
-            sides
-                .entry((owner.clone(), output))
-                .or_default()
-                .push((d.nodes[id].layout.y, id.clone()));
-        }
-    }
-    for ((owner, output), mut ports) in sides {
-        let Some(owner) = shapes.get(&owner).map(|s| s.rect) else {
-            continue;
-        };
-        ports.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
-        for (i, (_, id)) in ports.iter().enumerate() {
-            let rect = &mut shapes.get_mut(id).unwrap().rect;
-            rect.x = if output {
-                owner.x + owner.width + GAP
-            } else {
-                owner.x - GAP - rect.width
-            };
-            rect.y = owner.y + i as f64 * (rect.height + SPACING);
-        }
-    }
+/// An Exterior's link and whether packets arrive over it, making it an output port.
+fn exterior_link<'a>(d: &'a Document, n: &crate::Node) -> Option<(&'a crate::Node, bool)> {
+    n.outgoing_links
+        .iter()
+        .map(|l| (l, false))
+        .chain(n.incoming_links.iter().map(|l| (l, true)))
+        .find_map(|(l, output)| d.nodes.get(l).map(|l| (l, output)))
 }
 /// Text width estimate for the canvas sans-serif face; slightly generous so
 /// proportional glyphs never cross the border.
@@ -776,6 +800,12 @@ fn auto_size(
         *sides
             .entry((edge.target.clone(), center(a) >= center(b)))
             .or_default() += 1;
+    }
+    // Free ports take a row on their side: outputs on the right, inputs on the left.
+    for shape in shapes.values() {
+        if let (Some(owner), Some(view)) = (&shape.pinned_to, &shape.exterior) {
+            *sides.entry((owner.clone(), view.output)).or_default() += 1;
+        }
     }
     for owner in loops {
         let left = sides.get(&(owner.into(), false)).copied().unwrap_or(0);
