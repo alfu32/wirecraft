@@ -130,7 +130,7 @@ struct Wirecraft {
     rewire: Option<(String, bool)>,
     /// The design as the pending click would leave it, routed in the background.
     preview: Option<preview::Preview>,
-    preview_timer: Option<Task<()>>,
+    preview_queued: bool,
     preview_inflight: bool,
     tab: String,
     section: String,
@@ -322,7 +322,7 @@ impl Wirecraft {
             hover_world: None,
             rewire: None,
             preview: None,
-            preview_timer: None,
+            preview_queued: false,
             preview_inflight: false,
             tab: if session.tab.is_empty() {
                 "Designer".into()
@@ -1969,7 +1969,10 @@ impl Render for Wirecraft {
             if let Some(p) = preview {
                 selected.extend(p.created.iter().cloned());
             }
-            let drag = if self.resize_start.is_some() {
+            let motion = self.preview_motion();
+            let drag = if let Some((_, offset)) = &motion {
+                *offset
+            } else if self.resize_start.is_some() {
                 [0., 0.]
             } else {
                 [
@@ -1983,7 +1986,7 @@ impl Render for Wirecraft {
                 .filter(|d| d["severity"] == 1 || d["severity"] == 2)
                 .filter_map(|d| d["source"]["nodeId"].as_str().map(str::to_string))
                 .collect::<BTreeSet<_>>();
-            let moving = self.drag_ids.clone();
+            let moving = motion.map_or_else(|| self.drag_ids.clone(), |(follows, _)| follows);
             // Preview contour: the current box grown by each side's padding change.
             let resize = self.resize_start.as_ref().map(|(id, _, r, corner)| {
                 let n = &self.snapshot.document.nodes[id];

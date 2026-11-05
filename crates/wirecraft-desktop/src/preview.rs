@@ -1,6 +1,7 @@
 //! Placement and link previews: the design as the pending click would leave it.
-//! A cheap outline follows the pointer at once; the routed projection of a cloned
-//! document with the would-be entity or link follows in the background.
+//! The routed projection of a cloned document with the would-be entity or link comes from
+//! the background. Between projections, what the click would place at the pointer is drawn
+//! offset to it, so it follows at once.
 use super::*;
 use std::time::Duration;
 use wirecraft_core::{
@@ -39,6 +40,17 @@ pub(super) struct Preview {
     pub scene: Arc<scene::Scene>,
     /// IDs the click would create, highlighted in the preview.
     pub created: BTreeSet<String>,
+    /// Those placed at the pointer, as opposed to a port already chosen as the source.
+    follows: BTreeSet<String>,
+}
+impl Preview {
+    /// How far the pointer has moved since this projection was computed.
+    fn offset(&self, key: &Key) -> [f64; 2] {
+        match (self.key.at, key.at) {
+            (Some(then), Some(now)) => [now[0] - then[0], now[1] - then[1]],
+            _ => [0., 0.],
+        }
+    }
 }
 
 /// Adds the would-be entities and link to a copy of the design.
@@ -49,6 +61,7 @@ fn build(
 ) -> Option<Preview> {
     let mut d = document.clone();
     let mut created = BTreeSet::new();
+    let mut follows = BTreeSet::new();
     let exterior = |d: &mut Document, [x, y]: [f64; 2]| -> Option<String> {
         let id = d.create(&key.parent, "port", NodeKind::Node).ok()?;
         d.patch(&id, &json!({"stereotype":EXTERIOR,"layout":{"x":x,"y":y,"width":EXTERIOR_DIAMETER,"height":EXTERIOR_DIAMETER}}))
@@ -68,10 +81,13 @@ fn build(
             let id = d.create(&key.parent, &d.default_name(kind), kind).ok()?;
             d.patch(&id, &json!({"layout":{"x":at[0],"y":at[1]}}))
                 .ok()?;
+            follows.insert(id.clone());
             created.insert(id);
         }
         Mode::Port => {
-            created.insert(exterior(&mut d, centred(key.at?))?);
+            let id = exterior(&mut d, centred(key.at?))?;
+            follows.insert(id.clone());
+            created.insert(id);
         }
         Mode::Link => {
             let source = match (&key.source, key.exterior) {
@@ -87,6 +103,7 @@ fn build(
                 Some(id) => id.clone(),
                 None => {
                     let id = exterior(&mut d, centred(key.at?))?;
+                    follows.insert(id.clone());
                     created.insert(id.clone());
                     id
                 }
@@ -113,6 +130,7 @@ fn build(
                 Some(id) => id.clone(),
                 None => {
                     let id = exterior(&mut d, centred(key.at?))?;
+                    follows.insert(id.clone());
                     created.insert(id.clone());
                     id
                 }
@@ -128,6 +146,7 @@ fn build(
         key: key.clone(),
         scene: Arc::new(scene),
         created,
+        follows,
     })
 }
 
@@ -204,16 +223,30 @@ impl Wirecraft {
         let key = self.preview_key()?;
         self.preview.as_ref().filter(|p| p.key.same_action(&key))
     }
+    /// What to draw offset to the pointer until the next projection, and by how much.
+    pub(super) fn preview_motion(&self) -> Option<(BTreeSet<String>, [f64; 2])> {
+        let key = self.preview_key()?;
+        let preview = self.preview.as_ref().filter(|p| p.key.same_action(&key))?;
+        Some((preview.follows.clone(), preview.offset(&key)))
+    }
+    /// Projects the pointer's latest position at most every 50 ms while it moves. A pointer
+    /// that never stops must not starve this, as restarting the wait on each move did.
     pub(super) fn queue_preview(&mut self, cx: &mut Context<Self>) {
-        if self.preview_key().is_none()
+        if self.preview_queued
+            || self.preview_key().is_none()
             || self.preview.as_ref().map(|p| &p.key) == self.preview_key().as_ref()
         {
             return;
         }
-        self.preview_timer = Some(cx.spawn(async move |this, cx| {
+        self.preview_queued = true;
+        cx.spawn(async move |this, cx| {
             Timer::after(Duration::from_millis(50)).await;
-            let _ = this.update(cx, |this, cx| this.start_preview(cx));
-        }));
+            let _ = this.update(cx, |this, cx| {
+                this.preview_queued = false;
+                this.start_preview(cx);
+            });
+        })
+        .detach();
     }
     fn start_preview(&mut self, cx: &mut Context<Self>) {
         if self.preview_inflight {
@@ -263,9 +296,17 @@ impl Wirecraft {
             .map(|s| s.rect);
         // Routed: outline exactly what the preview would create.
         if let Some(preview) = self.current_preview() {
+            let offset = self
+                .preview_key()
+                .map_or([0., 0.], |key| preview.offset(&key));
             for id in &preview.created {
                 if let Some(shape) = preview.scene.drawing.shapes.get(id) {
-                    band.ghosts.push((shape.rect, shape.exterior.is_some()));
+                    let mut rect = shape.rect;
+                    if preview.follows.contains(id) {
+                        rect.x += offset[0];
+                        rect.y += offset[1];
+                    }
+                    band.ghosts.push((rect, shape.exterior.is_some()));
                 }
             }
             return Some(band);
@@ -331,5 +372,51 @@ impl Wirecraft {
             }
         }
         Some(band)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Document, Key, Mode, NodeKind, build};
+    fn key(mode: Mode, at: Option<[f64; 2]>) -> Key {
+        Key {
+            revision: 0,
+            parent: "root".into(),
+            mode,
+            source: None,
+            exterior: None,
+            target: None,
+            rewire: None,
+            at,
+        }
+    }
+    #[test]
+    fn an_older_projection_is_placed_at_the_pointer_by_its_offset() {
+        let document = Document::new("Design");
+        let appearance = wirecraft_runtime::config::Appearance::default();
+        let preview = build(&document, &key(Mode::Node, Some([100., 50.])), appearance).unwrap();
+        assert_eq!(preview.follows, preview.created);
+        let id = preview.follows.iter().next().unwrap();
+        let rect = preview.scene.drawing.shapes[id].rect;
+        let later = key(Mode::Node, Some([340., 410.]));
+        assert!(preview.key.same_action(&later));
+        let offset = preview.offset(&later);
+        assert_eq!([rect.x + offset[0], rect.y + offset[1]], [340., 410.]);
+    }
+    #[test]
+    fn a_link_from_a_new_port_leaves_that_port_where_it_was_chosen() {
+        let mut document = Document::new("Design");
+        let target = document
+            .create("root", "target", NodeKind::Processor)
+            .unwrap();
+        let mut pending = key(Mode::Link, None);
+        pending.exterior = Some([10., 10.]);
+        let appearance = wirecraft_runtime::config::Appearance::default();
+        // Over an entity, nothing is placed at the pointer.
+        pending.target = Some(target);
+        let preview = build(&document, &pending, appearance).unwrap();
+        assert!(!preview.created.is_empty());
+        assert!(preview.follows.is_empty());
+        assert_eq!(preview.offset(&pending), [0., 0.]);
     }
 }

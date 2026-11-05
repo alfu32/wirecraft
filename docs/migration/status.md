@@ -2,6 +2,14 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Placement shadow follows the pointer (0.29.1)
+
+At the user's request. The shadow of a new entity was the last routed preview, drawn where it had been computed, and each pointer move restarted the 50 ms wait for the next one. So it stayed behind until the pointer paused, then jumped. Now it is drawn offset to the pointer between projections, and projections keep coming while the pointer moves. See [canvas-interactions.md](canvas-interactions.md).
+
+Verification: on a private display with `webserver-rust.orch`, a debug build and a pointer moving without pausing, the distance between pointer and shadow went from a median of 234 pixels (stuck at the last pause, up to 553) to 27, about one frame of that build. Unit tests in `preview.rs` cover the offset and a link that places nothing at the pointer.
+
+Pending: `scripts/rubber_band_smoke.py` still needs the coordinate update listed under 0.29.0, so it was not rerun.
+
 ## Home screen and title bar (0.29.0)
 
 At the user's request, modelled on Meshcraft's home screen and title bar. This is a Wirecraft addition, not baseline parity.
