@@ -48,7 +48,7 @@ Three crates. Business logic is shared, never duplicated per transport.
 - **`wirecraft-desktop`**: the GPUI client.
   - It spawns its own backend child process and talks to it over HTTP from a worker (`client.rs`). Snapshots are immutable.
   - `scene.rs` paints the canvas, with world-space culling. `interaction.rs` handles pointer gestures for each mode (Select/Node/Type/Link).
-  - `workbench.rs` holds menus, the command palette and views. `inspector.rs` is the property editor. `compiler_issues.rs` shows background C17 diagnostics.
+  - `titlebar.rs` holds the title bar and its command search list, `home.rs` the home screen, and `workbench.rs` the menus and views. `inspector.rs` is the property editor. `compiler_issues.rs` shows background C17 diagnostics.
   - A gesture sends one backend mutation on release; the canvas previews it locally until then.
 
 ## Domain conventions worth knowing

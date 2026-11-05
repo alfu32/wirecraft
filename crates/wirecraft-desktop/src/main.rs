@@ -8,6 +8,7 @@ mod completion;
 mod editor_hover;
 mod editor_tokens;
 mod fonts;
+mod home;
 mod icons;
 mod inspector;
 mod inspector_widgets;
@@ -15,8 +16,11 @@ mod interaction;
 mod navigation;
 mod options;
 mod preview;
+#[cfg(target_os = "linux")]
+mod prompt;
 mod reports;
 mod scene;
+mod titlebar;
 mod workbench;
 use client::{Client, Message, Update};
 use gpui::{prelude::*, *};
@@ -83,6 +87,7 @@ struct UiSession {
     tab: String,
     section: String,
     draft: Option<Draft>,
+    recent: Vec<String>,
     export_settings: reports::ExportState,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -100,6 +105,9 @@ struct Draft {
     tables: Option<Value>,
 }
 struct Wirecraft {
+    home: home::Home,
+    /// A fit requested before the canvas had a size, as when a project opens from home.
+    pending_fit: bool,
     connected_document: bool,
     initial_document_id: String,
     client: Client,
@@ -232,9 +240,11 @@ impl Wirecraft {
         rx: async_channel::Receiver<Update>,
         session: UiSession,
         settings: wirecraft_runtime::config::Settings,
+        mut home: home::Home,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        home.recent = session.recent.clone();
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Entity name"));
         let editor = cx.new(|cx| {
             InputState::new(window, cx)
@@ -263,11 +273,21 @@ impl Wirecraft {
         let inspector = workbench::make_fields(window, cx);
         let query = cx.new(|cx| InputState::new(window, cx).placeholder("Search commands…"));
         cx.subscribe_in(&query, window, |this, _, event: &InputEvent, window, cx| {
-            if matches!(event, InputEvent::PressEnter { .. }) {
-                this.submit_command(window, cx);
-            } else if matches!(event, InputEvent::Change) {
-                this.palette_index = 0;
-                this.palette_scroll.scroll_to_item(0);
+            let open = this.menu.as_deref() == Some("Commands");
+            match event {
+                InputEvent::PressEnter { .. } if open => this.submit_command(window, cx),
+                InputEvent::Change => {
+                    this.palette_index = 0;
+                    this.palette_scroll.scroll_to_item(0);
+                    if !open && !this.query.read(cx).value().is_empty() {
+                        this.menu = Some("Commands".into());
+                    }
+                }
+                InputEvent::Focus | InputEvent::PressEnter { .. } if !open => {
+                    this.palette_index = 0;
+                    this.menu = Some("Commands".into());
+                }
+                _ => {}
             }
             cx.notify();
         })
@@ -275,6 +295,8 @@ impl Wirecraft {
         let focus = cx.focus_handle();
         focus.focus(window);
         let this = Self {
+            home,
+            pending_fit: false,
             connected_document: false,
             initial_document_id: session.document_id,
             client,
@@ -488,6 +510,9 @@ impl Wirecraft {
     fn receive(&mut self, update: Update, window: &mut Window, cx: &mut Context<Self>) {
         match update {
             Update::Connected { endpoint, token } => {
+                if self.home.open {
+                    self.refresh_home();
+                }
                 self.endpoint = endpoint;
                 self.token = token;
                 self.status = "Connected".into();
@@ -550,11 +575,21 @@ impl Wirecraft {
             } => {
                 self.status = match command.as_str() {
                     // Background information, not the outcome of a user action.
-                    "editor.signature" | "mcp.status" => std::mem::take(&mut self.status),
+                    "editor.signature" | "mcp.status" | "home.overview" => {
+                        std::mem::take(&mut self.status)
+                    }
+                    "file.open" | "examples.open" => "Project opened".into(),
+                    "file.new" => "New project".into(),
                     "file.save" | "file.commit_and_save" => "Project saved".into(),
                     "threadwork.update_entity" | "entities.patch" => "Changes applied".into(),
                     _ => format!("{command} completed"),
                 };
+                if command == "home.overview" {
+                    self.home.receive(&value);
+                }
+                if ["file.open", "file.new", "examples.open"].contains(&command.as_str()) {
+                    self.leave_home();
+                }
                 if ["threadwork.create_entity", "threadwork.create_link"]
                     .contains(&command.as_str())
                     && let Some(id) = value["entity"]["id"].as_str()
@@ -735,11 +770,17 @@ impl Wirecraft {
                     self.clear_drag_preview();
                     self.move_pending = false;
                 }
+                let was_connected = self.connected_document;
                 self.connected_document = true;
                 if snapshot.document.id != self.snapshot.document.id {
                     self.editor_entity = None;
                 }
                 self.snapshot = Arc::new(*snapshot);
+                self.note_recent(cx);
+                // Another client, such as an MCP tool, opened a project.
+                if document_changed && was_connected {
+                    self.leave_home();
+                }
                 if graph_changed {
                     self.compiler_failure = None;
                     self.queue_compiler_check(cx);
@@ -917,6 +958,7 @@ impl Wirecraft {
             tab: self.tab.clone(),
             section: self.section.clone(),
             export_settings: self.export_settings.clone(),
+            recent: self.home.recent.clone(),
             draft: if self.has_draft(cx) {
                 self.selected.first().map(|id| Draft {
                     document_id: self.snapshot.document.id.clone(),
@@ -1195,13 +1237,18 @@ impl Wirecraft {
         });
         cx.spawn_in(window, async move |this, cx| match paths.await {
             Ok(Ok(Some(paths))) => {
-                let _=this.update_in(cx,|this,window,cx|{if let Some(path)=paths.first(){
-                    let arguments=json!({"path":path});
-                    if this.snapshot.dirty||this.has_draft(cx){
-                        let answer=window.prompt(PromptLevel::Warning,"Open another design?",Some("This discards current unsaved graph changes and the editor draft."),&["Discard and open","Cancel"],cx);
-                        cx.spawn_in(window,async move|this,cx|{if answer.await.ok()==Some(0){let _=this.update_in(cx,|this,_,_|{let mut arguments=arguments;arguments["discardChanges"]=json!(true);this.client.send("file.open",arguments);});}}).detach();
-                    }else{this.client.send("file.open",arguments);}
-                }});
+                let _ = this.update_in(cx, |this, window, cx| {
+                    if let Some(path) = paths.first() {
+                        this.replace_document(
+                            "file.open",
+                            json!({"path":path}),
+                            "Open another design?",
+                            "Discard and open",
+                            window,
+                            cx,
+                        );
+                    }
+                });
             }
             Ok(Err(e)) => {
                 let _ = this.update_in(cx, |this, _, cx| {
@@ -1308,24 +1355,42 @@ impl Wirecraft {
         .detach();
     }
     fn new_project(&mut self, _: &New, window: &mut Window, cx: &mut Context<Self>) {
+        self.replace_document(
+            "file.new",
+            json!({}),
+            "Create a new design?",
+            "Discard and create",
+            window,
+            cx,
+        );
+    }
+    /// Sends a command that replaces the open project, asking first if that loses work.
+    fn replace_document(
+        &mut self,
+        command: &'static str,
+        mut arguments: Value,
+        question: &'static str,
+        confirm: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.snapshot.dirty || self.has_draft(cx) {
             let answer = window.prompt(
                 PromptLevel::Warning,
-                "Create a new design?",
-                Some("This discards the current unsaved graph changes and editor draft."),
-                &["Discard and create", "Cancel"],
+                question,
+                Some("Unsaved changes will be lost."),
+                &[confirm, "Cancel"],
                 cx,
             );
             cx.spawn_in(window, async move |this, cx| {
                 if answer.await.ok() == Some(0) {
-                    let _ = this.update_in(cx, |this, _, _| {
-                        this.client.send("file.new", json!({"discardChanges":true}))
-                    });
+                    arguments["discardChanges"] = json!(true);
+                    let _ = this.update_in(cx, |this, _, _| this.client.send(command, arguments));
                 }
             })
             .detach();
         } else {
-            self.client.send("file.new", json!({}));
+            self.client.send(command, arguments);
         }
     }
     fn undo(&mut self, _: &Undo, _: &mut Window, _: &mut Context<Self>) {
@@ -1335,6 +1400,9 @@ impl Wirecraft {
         self.client.send("edit.redo", json!({}));
     }
     fn delete(&mut self, _: &DeleteSelection, _: &mut Window, cx: &mut Context<Self>) {
+        if self.home.open {
+            return;
+        }
         if self.has_draft(cx) || self.editor_request_pending {
             self.status = "Apply the editor draft before deleting".into();
             cx.notify();
@@ -1347,7 +1415,13 @@ impl Wirecraft {
             }
         }
     }
-    fn select_mode(&mut self, _: &SelectMode, _: &mut Window, cx: &mut Context<Self>) {
+    fn select_mode(&mut self, _: &SelectMode, w: &mut Window, cx: &mut Context<Self>) {
+        if self.menu.as_deref() == Some("Commands") {
+            self.close_command_list(w, cx);
+        } else if self.menu.is_none() && self.home.open {
+            self.toggle_home(w, cx);
+            return;
+        }
         self.menu = None;
         self.cancel_pointer_gesture(cx);
         self.mode = Mode::Select;
@@ -1369,6 +1443,11 @@ impl Wirecraft {
     }
     fn fit(&mut self, _: &Fit, _: &mut Window, cx: &mut Context<Self>) {
         let b = self.bounds.get();
+        if b.size.width < px(1.) {
+            self.pending_fit = true;
+            cx.notify();
+            return;
+        }
         self.viewport = self.scene.fitted([
             f64::from(f32::from(b.size.width)),
             f64::from(f32::from(b.size.height)),
@@ -1383,12 +1462,18 @@ impl Wirecraft {
         }
     }
     fn cut(&mut self, _: &CutEntities, _: &mut Window, cx: &mut Context<Self>) {
+        if self.home.open {
+            return;
+        }
         if !self.has_draft(cx) {
             self.client
                 .send("entities.cut", json!({"nodeIds":self.selected}));
         }
     }
     fn paste(&mut self, _: &PasteEntities, _: &mut Window, cx: &mut Context<Self>) {
+        if self.home.open {
+            return;
+        }
         if self.has_draft(cx) {
             self.status = "Apply the editor draft before pasting".into();
             cx.notify();
@@ -1658,6 +1743,15 @@ fn button(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Statef
 }
 impl Render for Wirecraft {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The canvas gets its size while this frame paints; the next one can fit it.
+        if self.pending_fit && !self.home.open && self.tab == "Designer" {
+            if self.bounds.get().size.width < px(1.) {
+                window.request_animation_frame();
+            } else {
+                self.pending_fit = false;
+                self.fit(&Fit, window, cx);
+            }
+        }
         let title = format!(
             "{}{}",
             self.snapshot.document.project_name(),
@@ -1675,63 +1769,6 @@ impl Render for Wirecraft {
             window.set_window_title(&window_title);
             self.window_title = window_title;
         }
-        let muted = crate::chrome::color(0x8fa6b5);
-        let toolbar = div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_3()
-            .py_2()
-            .bg(crate::chrome::color(0x171d25))
-            .child(
-                div()
-                    .flex()
-                    .items_baseline()
-                    .gap_1()
-                    .child(
-                        div()
-                            .text_lg()
-                            .text_color(crate::chrome::color(0x75d4d6))
-                            .child("Wirecraft"),
-                    )
-                    .child(div().text_xs().text_color(muted).child(version)),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .items_baseline()
-                    .gap_2()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .child(title)
-                    .child(div().text_sm().text_color(muted).child(file)),
-            )
-            .child(
-                button("new", "New")
-                    .on_click(cx.listener(|this, _, w, cx| this.new_project(&New, w, cx))),
-            )
-            .child(
-                button("open", "Open")
-                    .on_click(cx.listener(|this, _, w, cx| this.open(&Open, w, cx))),
-            )
-            .child(
-                button("save", "Save")
-                    .on_click(cx.listener(|this, _, w, cx| this.save(&Save, w, cx))),
-            )
-            .child(
-                button("save-as", "Save as")
-                    .on_click(cx.listener(|this, _, w, cx| this.save_as(&SaveAs, w, cx))),
-            )
-            .child(
-                button("undo", "Undo")
-                    .on_click(cx.listener(|this, _, w, cx| this.undo(&Undo, w, cx))),
-            )
-            .child(
-                button("redo", "Redo")
-                    .on_click(cx.listener(|this, _, w, cx| this.redo(&Redo, w, cx))),
-            );
         let mut tabs = div().flex().gap_2().px_3().py_2();
         for tab in [
             "Designer",
@@ -2210,7 +2247,8 @@ impl Render for Wirecraft {
                         )),
                     )
             });
-        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(cx.listener(Self::go_to_definition)).on_action(cx.listener(Self::find_references)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_menubar(cx)).child(toolbar).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content)).children(draft_notice).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
+        let home = self.home.open.then(|| self.render_home(cx));
+        div().capture_action(cx.listener(|this,_:&gpui_component::input::MoveUp,w,cx|{if !this.command_list_key("up",w,cx)&&!this.completion_action("up",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::MoveDown,w,cx|{if !this.command_list_key("down",w,cx)&&!this.completion_action("down",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,action:&gpui_component::input::Enter,w,cx|{if action.secondary && this.menu.is_none(){cx.stop_propagation();this.completion=None;this.apply(&Apply,w,cx);}else if !this.completion_action("enter",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::Escape,w,cx|{if !this.command_list_key("escape",w,cx)&&!this.completion_action("escape",w,cx){cx.propagate();}})).capture_action(cx.listener(|this,_:&gpui_component::input::IndentInline,w,cx|{if !this.completion_action("tab",w,cx){cx.propagate();}})).key_context("Wirecraft").track_focus(&self.focus).on_action(cx.listener(Self::open)).on_action(cx.listener(Self::save)).on_action(cx.listener(Self::save_as)).on_action(cx.listener(Self::new_project)).on_action(cx.listener(Self::undo)).on_action(cx.listener(Self::redo)).on_action(cx.listener(Self::delete)).on_action(cx.listener(Self::select_mode)).on_action(cx.listener(Self::node_mode)).on_action(cx.listener(Self::link_mode)).on_action(cx.listener(Self::fit)).on_action(cx.listener(Self::apply)).on_action(cx.listener(Self::copy)).on_action(cx.listener(Self::cut)).on_action(cx.listener(Self::paste)).on_action(cx.listener(Self::palette)).on_action(cx.listener(Self::show_export)).on_action(cx.listener(Self::show_options)).on_action(cx.listener(Self::request_completion)).on_action(cx.listener(Self::go_to_definition)).on_action(cx.listener(Self::find_references)).on_action(|_:&Quit,_,cx|cx.quit()).relative().size_full().flex().flex_col().bg(crate::chrome::color(0x10161e)).text_color(crate::chrome::color(0xe1e9ef)).text_sm().child(self.render_titlebar(title,file,window,cx)).children(home).when(!self.home.open,|b|b.child(self.render_menubar(cx)).child(tabs).child(div().flex().flex_1().min_h_0().when(["Designer","Editor","Tools"].contains(&self.tab.as_str()), |b| b.child(sidebar).child(self.panel_separator(false,cx))).child(content))).children(draft_notice).child(div().px_3().py_2().flex().items_center().gap_3().bg(crate::chrome::color(0x171d25)).child(div().flex_1().min_w_0().truncate().child(format!("{}   |   rev {}   |   {:.0}%   |   Wheel: zoom · Middle drag: pan · Shift: add · Ctrl: remove",self.status,self.snapshot.revision,self.viewport.zoom*100.))).child(button("compiler-issues",format!("{} · {} issue{}",if self.compiler_inflight {"Checking"}else{"Compiler"},self.compiler_issues().len(),if self.compiler_issues().len()==1 {""}else{"s"})).on_click(cx.listener(|this,_,_,cx|{this.menu=Some("Diagnostics".into());cx.notify();})))).children(self.render_completion(window,cx)).children(self.render_menu(window,cx)).child(self.pointer_capture(cx))
     }
 }
 fn main() -> anyhow::Result<()> {
@@ -2259,6 +2297,7 @@ fn main() -> anyhow::Result<()> {
         .unwrap_or_default();
     let settings = wirecraft_runtime::config::Settings::load(&state_dir.join("settings.json"))?;
     let initial_settings = settings.clone();
+    let home = home::Home::new(project.is_none(), state_dir.join("examples"));
     let (client, rx, worker) = Client::start(state_dir.clone(), settings, project);
     editor_tokens::register_languages();
     gpui::Application::new()
@@ -2268,6 +2307,8 @@ fn main() -> anyhow::Result<()> {
                 eprintln!("Font registration: {error}");
             }
             gpui_component::init(cx);
+            #[cfg(target_os = "linux")]
+            cx.set_prompt_builder(prompt::build);
             crate::chrome::set_light(initial_settings.appearance.theme == "light");
             Theme::change(
                 if initial_settings.appearance.theme == "light" {
@@ -2302,7 +2343,7 @@ fn main() -> anyhow::Result<()> {
                     Some("Input"),
                 ),
                 KeyBinding::new("ctrl-p", ShowExport, Some("Wirecraft")),
-                KeyBinding::new("ctrl-comma", ShowOptions, Some("Wirecraft")),
+                KeyBinding::new("ctrl-,", ShowOptions, Some("Wirecraft")),
                 KeyBinding::new("ctrl-o", Open, Some("Wirecraft")),
                 KeyBinding::new("ctrl-c", CopyEntities, Some("Wirecraft")),
                 KeyBinding::new("ctrl-x", CutEntities, Some("Wirecraft")),
@@ -2334,13 +2375,17 @@ fn main() -> anyhow::Result<()> {
                     } else {
                         None
                     },
+                    titlebar: Some(TitlebarOptions {
+                        title: Some("Wirecraft".into()),
+                        ..gpui_component::TitleBar::title_bar_options()
+                    }),
                     window_min_size: Some(size(px(900.), px(600.))),
                     ..Default::default()
                 },
                 move |window, cx| {
                     window.set_window_title("Wirecraft");
                     let view = cx.new(|cx| {
-                        Wirecraft::new(client, rx, session, initial_settings, window, cx)
+                        Wirecraft::new(client, rx, session, initial_settings, home, window, cx)
                     });
                     cx.new(|cx| Root::new(view, window, cx))
                 },

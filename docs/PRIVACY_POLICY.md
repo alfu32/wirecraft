@@ -19,7 +19,7 @@ developer or to anyone else.
   as responsible or assignee on the project board and in revision history.
 - **Settings and session state** in Wirecraft's state directory: `settings.json`,
   the editor session and unapplied drafts (`ui.json`) and a crash-recovery copy of
-  the open project (`recovery.json`). On Linux this is `$XDG_STATE_HOME/wirecraft`
+  the open project (`recovery.json`). `ui.json` also holds the paths of your recent projects for the home screen, which reads those files to show their pictures and ages. Examples you open are copied to `examples/` here. On Linux this is `$XDG_STATE_HOME/wirecraft`
   or `~/.local/state/wirecraft`; elsewhere it is `.local/state/wirecraft` under
   your home directory (`HOME`), or under the temporary folder if `HOME` is not
   set. `--state-dir` chooses another directory.

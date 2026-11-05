@@ -95,14 +95,23 @@ impl Render for Ticket {
     }
 }
 #[derive(Clone, Copy)]
-struct Command {
-    id: &'static str,
-    group: &'static str,
-    label: &'static str,
-    shortcut: &'static str,
-    icon: &'static str,
+pub(super) struct Command {
+    pub(super) id: &'static str,
+    pub(super) group: &'static str,
+    pub(super) label: &'static str,
+    pub(super) shortcut: &'static str,
+    pub(super) icon: &'static str,
 }
-const COMMANDS: &[Command] = &[
+/// The commands a search matches, in list order.
+pub(super) fn matching_commands(query: &str) -> impl Iterator<Item = &'static Command> {
+    let query = query.to_lowercase();
+    COMMANDS.iter().filter(move |c| {
+        format!("{} {}", c.group, c.label)
+            .to_lowercase()
+            .contains(&query)
+    })
+}
+pub(super) const COMMANDS: &[Command] = &[
     Command {
         id: "new",
         group: "File",
@@ -523,6 +532,7 @@ impl Wirecraft {
         cx.notify();
     }
     pub(super) fn show_export(&mut self, _: &ShowExport, _: &mut Window, cx: &mut Context<Self>) {
+        self.leave_home();
         self.tab = "Export".into();
         self.refresh_preview();
         self.tool("printers.list");
@@ -530,27 +540,40 @@ impl Wirecraft {
         cx.notify();
     }
     pub(super) fn show_options(&mut self, _: &ShowOptions, _: &mut Window, cx: &mut Context<Self>) {
-        self.tab = "Options".into();
+        if !self.show_home_settings() {
+            self.tab = "Options".into();
+        }
         self.menu = None;
         cx.notify();
     }
     pub(super) fn submit_command(&mut self, w: &mut Window, cx: &mut Context<Self>) {
-        let query = self.query.read(cx).value().to_lowercase();
-        if let Some(command) = COMMANDS
-            .iter()
-            .filter(|c| {
-                format!("{} {}", c.group, c.label)
-                    .to_lowercase()
-                    .contains(&query)
-            })
-            .nth(self.palette_index)
+        if let Some(command) =
+            matching_commands(&self.query.read(cx).value()).nth(self.palette_index)
         {
-            self.command(command.id, w, cx);
-            self.focus.focus(w);
+            self.run_listed_command(command.id, w, cx);
         }
+    }
+    pub(super) fn run_listed_command(&mut self, id: &str, w: &mut Window, cx: &mut Context<Self>) {
+        self.close_command_list(w, cx);
+        self.command(id, w, cx);
     }
     fn command(&mut self, id: &str, w: &mut Window, cx: &mut Context<Self>) {
         self.menu = None;
+        // Anything but the file workflow needs the workspace.
+        if !matches!(
+            id,
+            "new"
+                | "open"
+                | "save"
+                | "save-as"
+                | "options"
+                | "palette"
+                | "about"
+                | "guide"
+                | "quit"
+        ) {
+            self.leave_home();
+        }
         match id {
             "new" => self.new_project(&New, w, cx),
             "open" => self.open(&Open, w, cx),
@@ -677,12 +700,13 @@ impl Wirecraft {
     }
     pub(super) fn render_menubar(&self, cx: &mut Context<Self>) -> AnyElement {
         let mut bar = div()
-            .h(px(32.))
+            .flex_none()
+            .h(px(30.))
             .flex()
             .items_center()
             .gap_1()
             .px_3()
-            .bg(crate::chrome::color(0x10161e))
+            .bg(crate::chrome::color(0x171d25))
             .border_b_1()
             .border_color(crate::chrome::color(0x29323d));
         for label in MENUBAR {
@@ -736,28 +760,7 @@ impl Wirecraft {
                     ),
             );
         }
-        let bar = bar
-            .child(div().flex_1())
-            .child(
-                div()
-                    .id("command-search")
-                    .flex()
-                    .gap_2()
-                    .cursor_pointer()
-                    .on_click(cx.listener(|this, _, w, cx| this.palette(&CommandPalette, w, cx)))
-                    .child(icons::icon("search"))
-                    .child("Commands  Ctrl Shift P"),
-            )
-            .into_any_element();
-        if cfg!(target_os = "linux") {
-            gpui_component::TitleBar::new()
-                .h(px(32.))
-                .pl_0()
-                .child(div().flex_1().min_w_0().child(bar))
-                .into_any_element()
-        } else {
-            bar
-        }
+        bar.into_any_element()
     }
     pub(super) fn render_menu(
         &self,
@@ -765,6 +768,9 @@ impl Wirecraft {
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         let group = self.menu.as_deref()?;
+        if group == "Commands" {
+            return Some(self.render_command_list(window, cx));
+        }
         let context_menu = group.starts_with("Context");
         let dropdown = MENUBAR.contains(&group);
         let padding = gpui_component::window_paddings(window);
@@ -792,26 +798,6 @@ impl Wirecraft {
             if event.keystroke.key == "escape" {
                 this.menu = None;
                 this.focus.focus(w);
-                cx.stop_propagation();
-                cx.notify();
-            } else if this.menu.as_deref() == Some("Commands")
-                && ["up", "down"].contains(&event.keystroke.key.as_str())
-            {
-                let query = this.query.read(cx).value().to_lowercase();
-                let count = COMMANDS
-                    .iter()
-                    .filter(|c| {
-                        format!("{} {}", c.group, c.label)
-                            .to_lowercase()
-                            .contains(&query)
-                    })
-                    .count();
-                this.palette_index = if event.keystroke.key == "up" {
-                    this.palette_index.saturating_sub(1)
-                } else {
-                    (this.palette_index + 1).min(count.saturating_sub(1))
-                };
-                this.palette_scroll.scroll_to_item(this.palette_index);
                 cx.stop_propagation();
                 cx.notify();
             }
@@ -1128,14 +1114,6 @@ impl Wirecraft {
             }
             panel = panel.child(list);
         } else {
-            if group == "Commands" {
-                panel = panel.child(Input::new(&self.query));
-            }
-            let query = if group == "Commands" {
-                self.query.read(cx).value().to_lowercase()
-            } else {
-                String::new()
-            };
             panel = panel.child(
                 div()
                     .id("command-list")
@@ -1154,14 +1132,8 @@ impl Wirecraft {
                     .children(
                         COMMANDS
                             .iter()
-                            .filter(|c| {
-                                (["Commands", "Context"].contains(&group) || c.group == group)
-                                    && format!("{} {}", c.group, c.label)
-                                        .to_lowercase()
-                                        .contains(&query)
-                            })
-                            .enumerate()
-                            .map(|(index, c)| {
+                            .filter(|c| group == "Context" || c.group == group)
+                            .map(|c| {
                                 let id = c.id;
                                 div()
                                     .id(id)
@@ -1172,21 +1144,16 @@ impl Wirecraft {
                                     .p_2()
                                     .rounded_sm()
                                     .cursor_pointer()
-                                    .when(group == "Commands" && index == self.palette_index, |s| {
-                                        s.bg(crate::chrome::color(0x255452))
-                                    })
                                     .hover(|s| s.bg(crate::chrome::color(0x2d3b48)))
                                     .on_click(
                                         cx.listener(move |this, _, w, cx| this.command(id, w, cx)),
                                     )
                                     .child(icons::icon(c.icon))
-                                    .child(div().flex_1().child(
-                                        if ["Commands", "Context"].contains(&group) {
-                                            format!("{}: {}", c.group, c.label)
-                                        } else {
-                                            c.label.into()
-                                        },
-                                    ))
+                                    .child(div().flex_1().child(if group == "Context" {
+                                        format!("{}: {}", c.group, c.label)
+                                    } else {
+                                        c.label.into()
+                                    }))
                                     .child(
                                         div()
                                             .text_xs()

@@ -2,6 +2,27 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## Home screen and title bar (0.29.0)
+
+At the user's request, modelled on Meshcraft's home screen and title bar. This is a Wirecraft addition, not baseline parity.
+
+- **Title bar, on top of the window:** Wirecraft and its version; icon-only home, new, open, save, save as, undo and redo; the project and file names; command search; the window controls. The menus moved to a row under it, and the row of labelled buttons is gone.
+- **Command search:** an always visible box with a search button and a list toggle. The list opens under the box, with its match count and key hints. It replaces the centered palette; the commands are unchanged.
+- **Home screen:** shown when the application starts without a file, and from the home button. See the README. `home.overview` reads recent files and pictures outside the project lock. `core::thumbnail` draws a picture from the shared drawing projection. Recent paths are kept in `ui.json`, per state directory.
+- **New project:** `file.new` takes an optional `technology`.
+- **Examples:** the eight curated files are embedded in the backend. `examples.open` copies one under `<state>/examples/<version>/` and keeps an existing copy, so it never overwrites saved work. Those copies are not added to the recent list.
+- **Fixed:** the Ctrl+, shortcut never worked, because GPUI names that key `,`.
+- **Fixed:** on Linux, GPUI's fallback prompt let clicks through, so a press on its button also pressed what lay behind it. On the home screen that asked again instead of proceeding. Linux now has a themed prompt that blocks them, with Enter and Esc.
+
+Verification: `tests/services.rs` and `examples.rs` cover new projects by technology, the unsaved-work check, example copies and the overview with missing and corrupt files. On Linux, real windows on a private display showed the title bar, the menu row and the search list (filter, ↑/↓, Enter, Esc, toggle). They also showed home at startup and with a file, Esc, new by technology, opening an example and a recent file, Save from home, the discard prompt, removal from the list, a corrupt recent file, Settings, the close button and the light theme.
+
+Pending:
+- Windows and macOS have not run the new title bar. It now uses GPUI's transparent title bar there, as Meshcraft does, and the release workflow only starts the application.
+- Under X11 without a window manager, moving, minimizing and maximizing by the title bar could not be exercised.
+- Native file dialogs did not open on the private display, so Open and Save As from home were not driven through a dialog. They call the same code as the menus.
+- `scripts/*_smoke.py` and `scripts/capture_store_features.py` click fixed coordinates: the workspace moved up 14 pixels, and a start without a file now lands on home. They need updating before their next use. The Microsoft Store screenshots show the old layout.
+- Home has no keyboard selection of its items.
+
 ## Ports of a collapsed composite (0.28.0)
 
 At the user's request, a collapsed composite no longer draws its inner ports 140 units away with a link from the box. Expanded composites are unchanged. Collapsed:
