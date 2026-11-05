@@ -29,3 +29,4 @@ pub mod compiler;
 pub mod libraries;
 
 pub mod components;
+pub mod thumbnail;

@@ -31,9 +31,28 @@ fn main() {
         ));
     }
     generated.push_str("];\n");
-    fs::write(
-        PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("archetypes.rs"),
-        generated,
-    )
-    .unwrap();
+    let output = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    fs::write(output.join("archetypes.rs"), generated).unwrap();
+    // Named explicitly: examples/ also holds the user's own projects and generated output.
+    let examples = Path::new("../../examples");
+    let mut generated = String::from("pub const FILES: &[(&str,&str)] = &[\n");
+    for name in [
+        "webserver.orch",
+        "webserver-component.orch",
+        "webserver-go.orch",
+        "webserver-kotlin.orch",
+        "webserver-nodejs.orch",
+        "webserver-php.orch",
+        "webserver-rust.orch",
+        "webserver-systemjs.orch",
+    ] {
+        let file = examples.join(name);
+        println!("cargo:rerun-if-changed={}", file.display());
+        generated.push_str(&format!(
+            "({name:?}, include_str!({:?})),\n",
+            file.canonicalize().unwrap()
+        ));
+    }
+    generated.push_str("];\n");
+    fs::write(output.join("examples.rs"), generated).unwrap();
 }

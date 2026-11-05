@@ -7,6 +7,7 @@ pub mod service;
 
 pub mod archetypes;
 pub mod cli;
+pub mod examples;
 pub mod export;
 
 pub mod generation;

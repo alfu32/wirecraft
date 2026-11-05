@@ -820,3 +820,51 @@ fn a_headless_server_still_refuses_a_missing_project() {
         .unwrap();
     assert!(!output.status.success());
 }
+
+#[test]
+fn a_new_project_can_start_with_a_technology_and_an_example_opens_from_its_copy() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut s = Service::new(Document::new("Current"), None);
+    let new = |arguments| Request::new("file.new", arguments);
+    s.execute(new(
+        json!({"technology":{"languageId":"rust","technologyId":"rust"}}),
+    ))
+    .unwrap();
+    let root = s.document.root_node_id.clone();
+    assert_eq!(s.document.effective(&root, "technologyId"), "rust");
+    assert_eq!(s.document.effective(&root, "languageId"), "rust");
+    assert!(!s.snapshot().dirty);
+
+    // Unsaved work is protected, as for any other command replacing the project.
+    s.execute(Request::new(
+        "threadwork.create_entity",
+        json!({"parentId":root,"name":"work","kind":"Processor"}),
+    ))
+    .unwrap();
+    let open = |arguments: serde_json::Value| Request::new("examples.open", arguments);
+    let directory = dir.path().to_string_lossy().into_owned();
+    assert!(
+        s.execute(open(json!({"id":"webserver","directory":directory})))
+            .is_err()
+    );
+    assert!(s.document.nodes.values().any(|n| n.name == "work"));
+    assert!(s.execute(new(json!({}))).is_err());
+
+    s.execute(open(
+        json!({"id":"webserver","directory":directory,"discardChanges":true}),
+    ))
+    .unwrap();
+    let path = s.path.clone().unwrap();
+    assert!(path.starts_with(dir.path()));
+    assert_eq!(s.document.project_name(), "WebServerApp");
+    // Its Reference resolves against the component copied beside it.
+    let diagnostics = wirecraft_core::components::diagnostics(&s.document);
+    assert!(!diagnostics.iter().any(|d| d.severity == "Error"));
+    assert!(
+        s.execute(open(
+            json!({"id":"unknown","directory":directory,"discardChanges":true})
+        ))
+        .is_err()
+    );
+    assert_eq!(s.path.as_deref(), Some(path.as_path()));
+}

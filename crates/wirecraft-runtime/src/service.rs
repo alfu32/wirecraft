@@ -126,9 +126,27 @@ impl Service {
                 self.reset_history();
                 return Ok(serde_json::to_value(self.snapshot())?);
             }
+            "examples.open" => {
+                self.check_discard(a)?;
+                let path = crate::examples::materialize(
+                    required(a, "id")?,
+                    Path::new(required(a, "directory")?),
+                )?;
+                let d = store::load(&path)?;
+                self.document = d;
+                self.path = Some(path);
+                self.reset_history();
+                return Ok(serde_json::to_value(self.snapshot())?);
+            }
             "file.new" => {
                 self.check_discard(a)?;
-                self.document = Document::new(a["name"].as_str().unwrap_or("Untitled Wirecraft"));
+                let mut document =
+                    Document::new(a["name"].as_str().unwrap_or("Untitled Wirecraft"));
+                if !a["technology"].is_null() {
+                    let root = document.root_node_id.clone();
+                    document.patch(&root, &json!({"technology":a["technology"]}))?;
+                }
+                self.document = document;
                 self.path = None;
                 self.reset_history();
                 return Ok(serde_json::to_value(self.snapshot())?);

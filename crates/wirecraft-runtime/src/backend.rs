@@ -99,6 +99,19 @@ impl Application {
         let a = &r.arguments;
         match r.command.as_str() {
             "printers.list" => return crate::printing::list().await,
+            // Reads other files, so it does not hold the open project's lock.
+            "home.overview" => {
+                let recent = a["recent"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(PathBuf::from)
+                    .collect::<Vec<_>>();
+                return tokio::task::spawn_blocking(move || crate::examples::overview(&recent))
+                    .await
+                    .map_err(|e| Error::new("internal", e.to_string()));
+            }
             "print.submit" => return crate::printing::submit(self, a.clone()).await,
             "ai.submit" => {
                 let provider = self
