@@ -42,6 +42,42 @@ try {
   # The desktop reads its backend's readiness from a pipe; without a console it must stay up.
   python -c "import json,subprocess,sys,time; p=subprocess.Popen([sys.argv[1],'--backend','serve','--token','msix-check-backend-token'],stdout=subprocess.PIPE,text=True); ready=json.loads(p.stdout.readline()); assert ready['status']=='ready',ready; time.sleep(3); assert p.poll() is None,'backend exited'; p.kill(); print(sys.argv[1], 'backend: ready')" $Desktop
   if ($LASTEXITCODE -ne 0) { throw 'The console-less backend did not stay up' }
+  # The Start menu and the installer's Launch button activate the application by its
+  # user model ID. Neither it nor any process it starts may open a console: a console
+  # host (conhost, OpenConsole, Windows Terminal) would run among their descendants.
+  $Hosts = @('conhost.exe', 'OpenConsole.exe', 'WindowsTerminal.exe')
+  $Before = @(Get-CimInstance Win32_Process | ForEach-Object { $_.ProcessId })
+  $Tree = @{}
+  $Seen = @{}
+  Start-Process "shell:AppsFolder\$($Installed.PackageFamilyName)!Wirecraft"
+  $Deadline = (Get-Date).AddSeconds(30)
+  while ((Get-Date) -lt $Deadline) {
+    $New = @(Get-CimInstance Win32_Process | Where-Object { $Before -notcontains $_.ProcessId })
+    foreach ($Process in $New) {
+      if ($Process.Name -eq 'wirecraft-desktop.exe') { $Tree[$Process.ProcessId] = $Process }
+    }
+    do {
+      $Added = $false
+      foreach ($Process in $New) {
+        if (-not $Tree.ContainsKey($Process.ProcessId) -and $Tree.ContainsKey($Process.ParentProcessId)) {
+          $Tree[$Process.ProcessId] = $Process
+          $Added = $true
+        }
+      }
+    } while ($Added)
+    foreach ($Process in $Tree.Values) {
+      $Seen["$($Process.ProcessId) $($Process.Name) parent $($Process.ParentProcessId)"] = $Process.Name
+    }
+    Start-Sleep -Milliseconds 250
+  }
+  $Running = @()
+  if ($Tree.Count) { $Running = @(Get-Process -Id @($Tree.Keys) -ErrorAction SilentlyContinue) }
+  Write-Host "Activated application processes (running after 30 s: $($Running.Count)):"
+  $Seen.Keys | Sort-Object | ForEach-Object { Write-Host "  $_" }
+  $Running | Stop-Process -Force -ErrorAction SilentlyContinue
+  if ($Tree.Count -eq 0) { throw 'Activating the installed application started no wirecraft-desktop.exe' }
+  $Consoles = @($Seen.GetEnumerator() | Where-Object { $Hosts -contains $_.Value } | ForEach-Object { $_.Key })
+  if ($Consoles) { throw "The activated application opened a console: $($Consoles -join ', ')" }
 } finally {
   try {
     if ($Installed) { Remove-AppxPackage -Package $Installed.PackageFullName -ErrorAction Stop }

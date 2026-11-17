@@ -69,7 +69,9 @@ are pinned to commits/digests (`packaging/appimage-inputs.json`, notices under
   subsystem. Release CI installs the MSIX, runs `--version` from the install
   location and through the alias, checks that the backend stays up without a
   console and that `wirecraft
-  help` prints the command-line usage, and removes it. The MSI is unsigned.
+  help` prints the command-line usage. It then activates the application by
+  its user model ID, as the Start menu does, and fails if a console host runs
+  among the processes it starts within 30 seconds. Then it removes the package. The MSI is unsigned.
 - **macOS** bundles are ad-hoc signed, without Developer ID signing or
   notarization.
 

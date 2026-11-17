@@ -2,6 +2,16 @@
 
 Wirecraft **0.6.3** ignores selected links during alignment/distribution and retains compact same-side feedback loops on the less crowded side (right on ties), preserves the 0.6.1 native diagonal routing and recovered inspector fixes, and retains the compiler/template sets and existing canvas, export and editor work. **The complete migration remains unfinished.** The authoritative source baseline is Threadworks 2.6.7 at `7d392d3a0e30b86445e00e7c03032a5188b26593`. The source checkout, its running application, live Wirecraft project/settings, and user changes to root `example.orch` / `example.copy.orch` were preserved. Changes use Conventional Commits; only patch/minor versions are authorized.
 
+## No console window from the Windows MSIX (0.29.2)
+
+The user reported that the installed MSIX opens a terminal window. The 0.29.1 package is already built as intended: `wirecraft-desktop.exe` uses the GUI subsystem and `wirecraft.exe` the console subsystem. Neither the desktop nor its backend starts a console tool without `CREATE_NO_WINDOW`. The window's source has not been identified, so this release changes three things:
+
+- At startup, a release `wirecraft-desktop.exe` on Windows releases any console that only it is attached to. A GUI-subsystem process never inherits a terminal's console, so such a console was created for it.
+- The desktop starts its backend with `CREATE_NO_WINDOW`.
+- Release CI activates the installed MSIX by its user model ID, as the Start menu and the installer's Launch button do. It watches the processes the application starts for 30 seconds and fails if a console host (`conhost.exe`, `OpenConsole.exe` or `WindowsTerminal.exe`) runs among them. The log lists every process.
+
+Pending: confirmation in the user's Windows session. If a window still appears, its process name and when it appears (during installation, at launch, or while working) will identify its source.
+
 ## Placement shadow follows the pointer (0.29.1)
 
 At the user's request. The shadow of a new entity was the last routed preview, drawn where it had been computed, and each pointer move restarted the 50 ms wait for the next one. So it stayed behind until the pointer paused, then jumped. Now it is drawn offset to the pointer between projections, and projections keep coming while the pointer moves. See [canvas-interactions.md](canvas-interactions.md).

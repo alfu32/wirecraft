@@ -163,6 +163,12 @@ fn worker(
     if let Some(path) = project {
         command.arg("--project-or-new").arg(path);
     }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: the backend never gets a console window, whatever its subsystem.
+        command.creation_flags(0x0800_0000);
+    }
     #[cfg(target_os = "linux")]
     {
         use std::os::unix::process::CommandExt;
